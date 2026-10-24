@@ -7,3 +7,4 @@ local.properties
 .DS_Store
 captures/
 imza/*.jks
+!imza/tv-asistan.jks
