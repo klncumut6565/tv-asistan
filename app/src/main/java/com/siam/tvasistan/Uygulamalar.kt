@@ -25,14 +25,19 @@ object Uygulamalar {
             .trim()
     }
 
-    fun liste(ctx: Context): List<Uyg> {
+    /**
+     * Kurulu uygulamalar. [hepsi] false iken ayarlardan PASİF yapılanlar çıkarılır:
+     * Jülide onları talimatta görmez, adıyla bulamaz ve açamaz.
+     */
+    fun liste(ctx: Context, hepsi: Boolean = false): List<Uyg> {
+        val pasif = if (hepsi) emptySet() else Ayarlar(ctx).pasifUygulamalar
         val pm = ctx.packageManager
         val sonuc = LinkedHashMap<String, Uyg>()
         for (kat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
             val i = Intent(Intent.ACTION_MAIN).addCategory(kat)
             for (ri in pm.queryIntentActivities(i, 0)) {
                 val paket = ri.activityInfo.packageName
-                if (paket == ctx.packageName || sonuc.containsKey(paket)) continue
+                if (paket == ctx.packageName || sonuc.containsKey(paket) || paket in pasif) continue
                 sonuc[paket] = Uyg(ri.loadLabel(pm).toString(), paket)
             }
         }
@@ -51,10 +56,10 @@ object Uygulamalar {
     private val TARAYICI_KELIMELERI = setOf("tarayici", "internet", "browser", "web", "chrome")
 
     /** İsme göre en iyi eşleşmeler (en iyisi başta). */
-    fun bul(ctx: Context, ad: String): List<Uyg> {
+    fun bul(ctx: Context, ad: String, pasifDahil: Boolean = false): List<Uyg> {
         val h = normal(ad)
         if (h.isEmpty()) return emptyList()
-        val hepsi = liste(ctx)
+        val hepsi = liste(ctx, pasifDahil)
         if (h in TARAYICI_KELIMELERI) {
             val t = tarayicilar(ctx).filter { tr -> hepsi.any { it.paket == tr.paket } }
             if (t.isNotEmpty()) return t

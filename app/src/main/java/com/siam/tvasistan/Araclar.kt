@@ -177,6 +177,11 @@ TV'de kurulu uygulamalar: $uygulamalar
 
     private fun uygulamaAc(ad: String): JSONObject {
         val bulunan = Uygulamalar.bul(s, ad)
+        if (bulunan.isEmpty()) {
+            Uygulamalar.bul(s, ad, pasifDahil = true).firstOrNull()?.let {
+                return hata("${it.ad} Jülide ayarlarında PASİF yapılmış; açılamaz. Kullanıcı isterse Jülide uygulamasından aktif yapabilir.")
+            }
+        }
         val ilk = bulunan.firstOrNull()
             ?: return hata("'$ad' adında uygulama bulunamadı. Kurulu uygulamalar: " +
                 Uygulamalar.liste(s).joinToString(", ") { it.ad }.take(800))
@@ -188,9 +193,9 @@ TV'de kurulu uygulamalar: $uygulamalar
         val gorunenAd: String
         if (ad.isBlank()) {
             paket = s.aktifPaket ?: return hata("Şu an açık bir uygulama algılanamadı.")
-            gorunenAd = Uygulamalar.liste(s).firstOrNull { it.paket == paket }?.ad ?: paket
+            gorunenAd = Uygulamalar.liste(s, hepsi = true).firstOrNull { it.paket == paket }?.ad ?: paket
         } else {
-            val ilk = Uygulamalar.bul(s, ad).firstOrNull() ?: return hata("'$ad' adında uygulama bulunamadı.")
+            val ilk = Uygulamalar.bul(s, ad, pasifDahil = true).firstOrNull() ?: return hata("'$ad' adında uygulama bulunamadı.")
             paket = ilk.paket
             gorunenAd = ilk.ad
         }
@@ -213,7 +218,10 @@ TV'de kurulu uygulamalar: $uygulamalar
             liste.firstOrNull { Uygulamalar.normal(it).contains(Uygulamalar.normal(uygulama)) || Uygulamalar.normal(uygulama).contains(Uygulamalar.normal(it)) }
                 ?: return hata("'$uygulama' kullanıcının abonelikleri arasında değil. Abonelikler: ${liste.joinToString(", ")}.")
         val uyg = Uygulamalar.bul(s, hedefAdi).firstOrNull()
-            ?: return hata("$hedefAdi TV'de kurulu değil.")
+            ?: return hata(
+                if (Uygulamalar.bul(s, hedefAdi, pasifDahil = true).isNotEmpty()) "$hedefAdi Jülide ayarlarında PASİF yapılmış."
+                else "$hedefAdi TV'de kurulu değil."
+            )
         val siradaki = liste.dropWhile { it != hedefAdi }.drop(1)
         val ek = if (siradaki.isEmpty()) "" else " Bulunamazsa sıradaki: ${siradaki.joinToString(", ")}."
 
@@ -357,7 +365,7 @@ TV'de kurulu uygulamalar: $uygulamalar
 
     private fun ekraniOku(): JSONObject {
         val paket = s.aktifPaket
-        val uygAdi = paket?.let { p -> Uygulamalar.liste(s).firstOrNull { it.paket == p }?.ad } ?: paket ?: "bilinmiyor"
+        val uygAdi = paket?.let { p -> Uygulamalar.liste(s, hepsi = true).firstOrNull { it.paket == p }?.ad } ?: paket ?: "bilinmiyor"
         val l = ogeler()
         if (l.isEmpty()) return tamam("Açık uygulama: $uygAdi. Ekrandaki öğeler okunamadı (uygulama içeriğini gizliyor olabilir).")
         val satirlar = l.distinctBy { it.metin }.take(80).map { o ->

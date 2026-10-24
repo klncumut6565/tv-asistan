@@ -42,6 +42,11 @@ class Ayarlar(ctx: Context) {
         get() = p.getBoolean("tus_ogrenme", false)
         set(v) = p.edit().putBoolean("tus_ogrenme", v).apply()
 
+    /** Jülide'nin görmeyeceği/açmayacağı (pasif) uygulamaların paket adları. */
+    var pasifUygulamalar: Set<String>
+        get() = HashSet(p.getStringSet("pasif_uygulamalar", emptySet()) ?: emptySet())
+        set(v) = p.edit().putStringSet("pasif_uygulamalar", HashSet(v)).apply()
+
     /** Yeni sürüm çıkınca otomatik indir ve kurulum onayını göster. */
     var otomatikGuncelleme: Boolean
         get() = p.getBoolean("oto_guncelleme", true)

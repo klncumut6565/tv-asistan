@@ -159,7 +159,42 @@ class MainActivity : Activity() {
             if (s == null) toast("Önce erişilebilirlik servisini açın.") else s.oturumBaslat()
         })
 
-        sutun.addView(yazi("5) Güncelleme", 22f, true))
+        sutun.addView(yazi("5) Uygulamalar", 22f, true))
+        sutun.addView(yazi(
+            "PASİF yaptığın uygulamaları Jülide görmez, açmaz ve aramaz. Kullanmadığın uygulamaları pasif yapmak " +
+                "Jülide'nin talimatını kısaltır, yanlış uygulama açma ihtimalini azaltır. Değişiklik bir sonraki sohbette tam geçerli olur.",
+            14f, renk = Color.LTGRAY
+        ))
+        val uygKutusu = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun uygulamalariYaz() {
+            uygKutusu.removeAllViews()
+            val pasif = a.pasifUygulamalar
+            val liste = Uygulamalar.liste(this, hepsi = true)
+            val aktifSayi = liste.count { it.paket !in pasif }
+            uygKutusu.addView(yazi("${liste.size} uygulamadan $aktifSayi aktif", 15f, renk = Color.rgb(216, 180, 254)))
+            for (u in liste) {
+                val aktif = u.paket !in pasif
+                uygKutusu.addView(dugme((if (aktif) "✔ AKTİF   " else "✘ PASİF   ") + u.ad) {
+                    val yeni = a.pasifUygulamalar.toMutableSet()
+                    if (!yeni.remove(u.paket)) yeni.add(u.paket)
+                    a.pasifUygulamalar = yeni
+                    val odak = uygKutusu.indexOfChild(currentFocus ?: uygKutusu)
+                    uygulamalariYaz()
+                    if (odak >= 0) uygKutusu.getChildAt(odak)?.requestFocus()
+                }.apply {
+                    setTextColor(if (aktif) Color.WHITE else Color.GRAY)
+                    gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                })
+            }
+        }
+        uygulamalariYaz()
+        sutun.addView(uygKutusu)
+        sutun.addView(dugme("Tümünü aktif yap") {
+            a.pasifUygulamalar = emptySet()
+            uygulamalariYaz()
+        })
+
+        sutun.addView(yazi("6) Güncelleme", 22f, true))
         guncellemeTv = yazi("", 16f, renk = Color.LTGRAY)
         sutun.addView(guncellemeTv)
         sutun.addView(dugme("Güncellemeleri denetle ve kur") { guncellemeDenetle(kur = true) })
@@ -183,8 +218,9 @@ class MainActivity : Activity() {
         otoYaz()
         sutun.addView(oto)
         sutun.addView(yazi(
-            "Örnek komutlar: \"YouTube'u aç\", \"Netflix'te Kurtlar Vadisi'ni bul\", " +
-                "\"Tarayıcıyı aç, Çorlu hava durumunu ara\", \"Sesi yüzde otuz yap\", \"Duraklat\", \"Tamam, teşekkürler\".",
+            "Örnek komutlar: \"YouTube'u aç\", \"Prime Video'da Yüzüklerin Efendisi'ni aç\", \"Bunu kapat\", " +
+                "\"Tarayıcıyı aç, Çorlu hava durumunu ara\", \"Sesi yüzde otuz yap\", \"Duraklat\", \"Sohbeti kapat\".\n" +
+                "Tetik tuşu: kısa bas = konuş / Jülide'yi sustur, 1 sn basılı tut = sohbeti kapat.",
             15f, renk = Color.LTGRAY
         ))
 
