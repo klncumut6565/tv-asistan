@@ -20,9 +20,15 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - name: Derleme kontrolü (debug)
+        shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          set +e
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee derleme.log
+          durum=${PIPESTATUS[0]}
+          # Kotlin derleme hatalarını GitHub notu olarak göster (günlüğe erişmeden okunabilsin)
+          grep -E "^e: " derleme.log | head -25 | while IFS= read -r satir; do echo "::error::${satir}"; done
+          exit $durum
 
   derle:
     runs-on: ubuntu-latest
