@@ -88,7 +88,8 @@ class Panel(private val servis: AccessibilityService) {
     }
 
     /** Tıklanabilir öğelerin üstüne numara rozetleri çizer; 30 sn sonra kendiliğinden kalkar. */
-    fun numaralar(l: List<Pair<Int, android.graphics.Rect>>) = ana.post {
+    fun numaralar(l: List<Pair<Int, android.graphics.Rect>>) {
+        ana.post {
         val n = numara ?: NumaraKatmani(servis).also { v ->
             try { wm.addView(v, tamEkran()); numara = v } catch (_: Exception) { return@post }
         }
@@ -96,12 +97,15 @@ class Panel(private val servis: AccessibilityService) {
         n.invalidate()
         ana.removeCallbacks(numaraGizleyici)
         ana.postDelayed(numaraGizleyici, 30_000)
+        }
     }
 
-    fun numaralariGizle() = ana.post {
-        ana.removeCallbacks(numaraGizleyici)
-        numara?.let { try { wm.removeView(it) } catch (_: Exception) {} }
-        numara = null
+    fun numaralariGizle() {
+        ana.post {
+            ana.removeCallbacks(numaraGizleyici)
+            numara?.let { try { wm.removeView(it) } catch (_: Exception) {} }
+            numara = null
+        }
     }
 
     private fun tamEkran() = WindowManager.LayoutParams(
