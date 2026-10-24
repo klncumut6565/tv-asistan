@@ -16,7 +16,9 @@ Sesli komutla:
 |---|---|
 | `AsistanServisi` (Erişilebilirlik Servisi) | Kumanda tuşunu yakalar, oturumu yönetir, ekranı okur/tıklar/yazar |
 | `GeminiLive` | Gemini Live WebSocket istemcisi (model zinciriyle yedekli bağlantı) |
-| `Uzak` | `config/ayarlar.json` — model, ses, ek talimat (APK'sız anında güncellenir) |
+| `Uzak` | `config/ayarlar.json` — model, ses, zaman aşımı, konuşma eşiği (beyaz liste + ETag) |
+| `Kasa` | Gemini anahtarını Android Keystore (AES-256-GCM) ile şifreler |
+| `SesKapisi` | Yerel konuşma algılama: sessizlikte Gemini'ye ses göndermez |
 | `Guncelleme` | GitHub Releases'tan yeni APK'yı indirip kurulum ekranını açar |
 | `Araclar` | Gemini'nin çağırdığı TV araçları (`uygulama_ac`, `icerik_ara`, `tikla`, `yaz`, `tus`, `ses`, `medya` …) |
 | `Mikrofon` / `Oynatici` | 16 kHz PCM giriş, 24 kHz PCM çıkış |
@@ -28,7 +30,7 @@ Gemini API anahtarı **repoda ve APK'da yoktur** (repo herkese açık). Anahtar 
 
 | Ne değişti | TV'ye nasıl ulaşır |
 |---|---|
-| `config/ayarlar.json` (model, ses, ek talimat, zaman aşımı) | **Anında** — bir sonraki dinleme oturumunda, APK gerekmez |
+| `config/ayarlar.json` (model, ses, zaman aşımı, konuşma eşiği) | **Birkaç dakika içinde** — ETag ile denetlenir, APK gerekmez. Yalnızca doğrulanmış alanlar okunur; model talimatı uzaktan değişmez |
 | Kod (yeni araç, hata düzeltmesi) | Push → Actions APK'yı Releases'a koyar → TV 6 saatte bir denetler, **ana ekrandayken** indirip kurulum ekranını açar → bir kez **Yükle** |
 
 Elle: uygulamada "Güncellemeleri denetle ve kur" veya sesli "kendini güncelle".

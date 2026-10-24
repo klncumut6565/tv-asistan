@@ -140,3 +140,56 @@ class Oynatici {
         track.release()
     }
 }
+
+/**
+ * Yerel konuşma algılama: yalnızca konuşma varken (öncesindeki ~320 ms ile birlikte) ve
+ * bitişinden sonra 1,5 sn boyunca Gemini'ye ses gönderir; sessizlikte hiç veri gitmez.
+ * 1,5 sn "kuyruk", sunucunun kendi bitiş algılaması (800 ms sessizlik) için gereklidir.
+ */
+class SesKapisi(
+    private val esik: Int,
+    private val gonder: (ByteArray) -> Unit,
+    private val kapandi: () -> Unit,
+) {
+    private val onTampon = ArrayDeque<ByteArray>()
+    private var acik = false
+    private var sonKonusma = 0L
+    private var gurultu = 150.0
+
+    fun isle(pcm: ByteArray) {
+        val simdi = SystemClock.elapsedRealtime()
+        val rms = rms(pcm)
+        val konusma = rms > maxOf(esik.toDouble(), gurultu * 2.5)
+        if (!konusma && !acik) gurultu = gurultu * 0.95 + rms * 0.05 // ortam gürültüsünü yalnız sessizken öğren
+        if (konusma) {
+            sonKonusma = simdi
+            if (!acik) {
+                acik = true
+                while (onTampon.isNotEmpty()) gonder(onTampon.removeFirst())
+            }
+        }
+        if (acik) {
+            gonder(pcm)
+            if (simdi - sonKonusma > 1500) {
+                acik = false
+                kapandi()
+            }
+        } else {
+            onTampon.addLast(pcm)
+            if (onTampon.size > 8) onTampon.removeFirst()
+        }
+    }
+
+    private fun rms(b: ByteArray): Double {
+        var toplam = 0.0
+        var n = 0
+        var i = 0
+        while (i + 1 < b.size) {
+            val s = ((b[i + 1].toInt() shl 8) or (b[i].toInt() and 0xff)).toShort().toInt()
+            toplam += s.toDouble() * s
+            n++
+            i += 2
+        }
+        return if (n == 0) 0.0 else Math.sqrt(toplam / n)
+    }
+}

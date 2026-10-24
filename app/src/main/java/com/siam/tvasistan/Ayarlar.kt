@@ -8,8 +8,24 @@ class Ayarlar(ctx: Context) {
 
     /** Kullanıcının kendi Gemini API anahtarı (aistudio.google.com). APK'da/repoda YOKTUR. */
     var geminiAnahtari: String
-        get() = p.getString("gemini_anahtari", "") ?: ""
-        set(v) = p.edit().putString("gemini_anahtari", v.trim()).apply()
+        get() {
+            p.getString("gemini_sifreli", null)?.let { s -> Kasa.coz(s)?.let { return it } }
+            val eski = p.getString("gemini_anahtari", "") ?: ""
+            if (eski.isNotBlank()) geminiAnahtari = eski // düz metinden şifreliye taşı
+            return eski
+        }
+        set(v) {
+            val k = v.trim()
+            val sifreli = if (k.isBlank()) null else Kasa.sifrele(k)
+            val e = p.edit()
+            if (sifreli != null) e.putString("gemini_sifreli", sifreli).remove("gemini_anahtari")
+            else e.remove("gemini_sifreli").putString("gemini_anahtari", k) // Keystore çalışmıyorsa son çare
+            e.apply()
+        }
+
+    var uzakEtag: String?
+        get() = p.getString("uzak_etag", null)
+        set(v) = p.edit().putString("uzak_etag", v).apply()
 
     /** Son başarıyla indirilen uzaktan ayar dosyası (internet yoksa bu kullanılır). */
     var uzakAyar: String?

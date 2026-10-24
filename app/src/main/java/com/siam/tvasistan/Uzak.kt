@@ -7,16 +7,18 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Uzaktan ayarlar: repodaki config/ayarlar.json her oturum başında okunur.
- * Model listesi, ses, ek talimat ve zaman aşımı APK güncellemesi olmadan değişir.
+ * Uzaktan ayarlar (config/ayarlar.json). GÜVENLİK: yalnızca beyaz listedeki alanlar okunur ve
+ * hepsi doğrulanır. Model talimatı (system prompt) uzaktan DEĞİŞTİRİLEMEZ — o APK'dadır.
+ * Trafik: ETag ile koşullu istek; dosya değişmediyse sunucu ~300 bayt "304" döner.
  */
 object Uzak {
     data class Model(val ad: String, val etiket: String, val blocking: Boolean)
     data class Yapilandirma(
         val modeller: List<Model>,
         val ses: String,
-        val ekTalimat: String,
         val bostaSn: Int,
+        /** Yerel konuşma algılama eşiği (RMS). Düşük = daha hassas. */
+        val vadEsik: Int,
     )
 
     private val http = OkHttpClient.Builder()
@@ -25,6 +27,8 @@ object Uzak {
         .build()
 
     private val ADRES = "https://raw.githubusercontent.com/${BuildConfig.GUNCELLEME_REPO}/main/config/ayarlar.json"
+    private val MODEL_DESENI = Regex("^models/gemini-[a-z0-9.\\-]{1,60}$")
+    private val SES_DESENI = Regex("^[A-Za-z]{3,20}$")
 
     private val VARSAYILAN = Yapilandirma(
         modeller = listOf(
@@ -33,17 +37,24 @@ object Uzak {
             Model("models/gemini-2.5-flash-native-audio-preview-12-2025", "Gemini 2.5 Flash Native Audio", false),
         ),
         ses = "Kore",
-        ekTalimat = "",
         bostaSn = 20,
+        vadEsik = 400,
     )
 
-    /** Ağdan dener; olmazsa son kayıtlı kopyayı, o da yoksa yerleşik varsayılanı döndürür. */
+    /** Ağdan (ETag ile) dener; olmazsa son kayıtlı kopyayı, o da yoksa yerleşik varsayılanı döndürür. */
     fun getir(a: Ayarlar): Yapilandirma {
         try {
-            val istek = Request.Builder().url("$ADRES?t=${System.currentTimeMillis() / 60_000}").build()
-            http.newCall(istek).execute().use { r ->
-                val metin = r.body?.string().orEmpty()
-                if (r.isSuccessful && cozumle(metin) != null) a.uzakAyar = metin
+            val b = Request.Builder().url(ADRES)
+            val etag = a.uzakEtag
+            if (a.uzakAyar != null && etag != null) b.header("If-None-Match", etag)
+            http.newCall(b.build()).execute().use { r ->
+                if (r.code == 200) {
+                    val metin = r.body?.string().orEmpty()
+                    if (cozumle(metin) != null) {
+                        a.uzakAyar = metin
+                        a.uzakEtag = r.header("ETag")
+                    }
+                } // 304 → kayıtlı kopya geçerli
             }
         } catch (e: Exception) {
             Log.w("TvAsistan", "Uzak ayar alınamadı: ${e.message}")
@@ -56,17 +67,19 @@ object Uzak {
         val dizi = j.optJSONArray("modeller")
         val modeller = mutableListOf<Model>()
         if (dizi != null) {
-            for (i in 0 until dizi.length()) {
+            for (i in 0 until minOf(dizi.length(), 6)) {
                 val m = dizi.optJSONObject(i) ?: continue
                 val ad = m.optString("ad")
-                if (ad.isNotBlank()) modeller += Model(ad, m.optString("etiket", ad), m.optBoolean("blocking", false))
+                if (MODEL_DESENI.matches(ad)) {
+                    modeller += Model(ad, m.optString("etiket", ad).take(40), m.optBoolean("blocking", false))
+                }
             }
         }
         Yapilandirma(
             modeller = modeller.ifEmpty { VARSAYILAN.modeller },
-            ses = j.optString("ses").ifBlank { VARSAYILAN.ses },
-            ekTalimat = j.optString("ek_talimat"),
-            bostaSn = j.optInt("bosta_zaman_asimi_sn", VARSAYILAN.bostaSn).coerceIn(5, 300),
+            ses = j.optString("ses").takeIf { SES_DESENI.matches(it) } ?: VARSAYILAN.ses,
+            bostaSn = j.optInt("bosta_zaman_asimi_sn", VARSAYILAN.bostaSn).coerceIn(5, 120),
+            vadEsik = j.optInt("vad_esik", VARSAYILAN.vadEsik).coerceIn(100, 3000),
         )
     } catch (e: Exception) {
         null

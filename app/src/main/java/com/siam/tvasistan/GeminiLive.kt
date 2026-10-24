@@ -73,6 +73,10 @@ class GeminiLive(private val d: Dinleyici) {
                     sonCalisan = m.ad
                     Log.i(ETIKET, "Bağlandı: ${m.etiket} / $s")
                     return
+                } catch (e: KaliciHata) {
+                    ws?.cancel()
+                    ws = null
+                    throw e // anahtar geçersiz / kota dolu: diğer modelleri denemek boşuna
                 } catch (e: IOException) {
                     hatalar += "${m.etiket}/$s: ${e.message}"
                     ws?.cancel()
@@ -103,6 +107,16 @@ class GeminiLive(private val d: Dinleyici) {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                val kod = response?.code
+                val kalici = when (kod) {
+                    401, 403 -> KaliciHata("Gemini API anahtarı geçersiz veya yetkisiz (HTTP $kod). Anahtarı uygulamadan yeniden kaydedin.")
+                    429 -> KaliciHata("Gemini kotası doldu; biraz sonra tekrar deneyin.")
+                    else -> null
+                }
+                if (kalici != null && !hazir.isCompleted) {
+                    hazir.completeExceptionally(kalici)
+                    return
+                }
                 val mesaj = (t.message ?: "bağlantı hatası") + (response?.let { " (HTTP ${it.code})" } ?: "")
                 if (!hazir.isCompleted) hazir.completeExceptionally(IOException(mesaj))
                 else if (webSocket === ws && !kapatildi) d.hata(mesaj)
@@ -110,7 +124,15 @@ class GeminiLive(private val d: Dinleyici) {
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 webSocket.close(1000, null)
-                if (!hazir.isCompleted) hazir.completeExceptionally(IOException("Bağlantı kapandı ($code) $reason"))
+                if (!hazir.isCompleted) {
+                    hazir.completeExceptionally(
+                        when {
+                            reason.contains("API key", true) -> KaliciHata("Gemini API anahtarı geçersiz. Anahtarı uygulamadan yeniden kaydedin.")
+                            reason.contains("quota", true) -> KaliciHata("Gemini kotası doldu; biraz sonra tekrar deneyin.")
+                            else -> IOException("Bağlantı kapandı ($code) $reason")
+                        }
+                    )
+                }
                 else if (webSocket === ws && !kapatildi) d.kapandi()
             }
         }
@@ -221,6 +243,11 @@ class GeminiLive(private val d: Dinleyici) {
         w.send(mesaj.toString())
     }
 
+    /** Mikrofon akışı durdu (sessizlik): sunucudaki önbellekli sesi işlemesi için bildirir. */
+    fun sesAkisiBitti() {
+        ws?.send(JSONObject().put("realtimeInput", JSONObject().put("audioStreamEnd", true)).toString())
+    }
+
     fun metinGonder(t: String) {
         ws?.send(JSONObject().put("realtimeInput", JSONObject().put("text", t)).toString())
     }
@@ -232,3 +259,6 @@ class GeminiLive(private val d: Dinleyici) {
         aracYurutucu.shutdown()
     }
 }
+
+/** Yeniden denemenin anlamsız olduğu hata (geçersiz anahtar, dolu kota). */
+class KaliciHata(mesaj: String) : IOException(mesaj)

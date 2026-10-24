@@ -226,7 +226,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             try {
                 val y = withContext(Dispatchers.IO) { Uzak.getir(ayarlar) }
                 bostaZamanAsimiMs = y.bostaSn * 1000L
-                val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati(y.ekTalimat) }
+                val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
                 val l = GeminiLive(this@AsistanServisi)
                 live = l
                 withContext(Dispatchers.IO) { l.baglan(ayarlar.geminiAnahtari, y, talimat, araclar.bildirimler()) }
@@ -236,9 +236,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 val oy = Oynatici()
                 oynatici = oy
+                val kapi = SesKapisi(y.vadEsik, gonder = { l.sesGonder(it) }, kapandi = { l.sesAkisiBitti() })
                 val m = Mikrofon(hata = { mesaj -> ana.post { hataGoster(mesaj) } }) { pcm ->
                     // Yarı çift yönlü: asistan konuşurken TV hoparlöründen gelen sesi modele geri gönderme.
-                    if (!oy.caliyor()) l.sesGonder(pcm)
+                    if (!oy.caliyor()) kapi.isle(pcm)
                 }
                 withContext(Dispatchers.IO) { m.baslat() }
                 mikrofon = m
