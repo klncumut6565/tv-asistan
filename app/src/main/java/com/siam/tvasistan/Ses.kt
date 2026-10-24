@@ -13,7 +13,10 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /** Mikrofon: 16 kHz mono 16-bit PCM, 40 ms'lik parçalar. */
-class Mikrofon(private val parca: (ByteArray) -> Unit) {
+class Mikrofon(
+    private val hata: ((String) -> Unit)? = null,
+    private val parca: (ByteArray) -> Unit,
+) {
     @Volatile private var calisiyor = false
     private var kayit: AudioRecord? = null
     private var is_: Thread? = null
@@ -42,9 +45,20 @@ class Mikrofon(private val parca: (ByteArray) -> Unit) {
         calisiyor = true
         is_ = Thread({
             val tampon = ByteArray(1280) // 40 ms
+            var ardisikHata = 0
             while (calisiyor) {
                 val n = r.read(tampon, 0, tampon.size)
-                if (n > 0) parca(tampon.copyOf(n))
+                if (n > 0) {
+                    ardisikHata = 0
+                    parca(tampon.copyOf(n))
+                } else {
+                    // read() hata/0 dönerse sıkı döngüde işlemciyi yakmasın
+                    if (++ardisikHata > 50) {
+                        hata?.invoke("Mikrofon okunamıyor (kod $n).")
+                        break
+                    }
+                    try { Thread.sleep(20) } catch (_: InterruptedException) { break }
+                }
             }
         }, "mikrofon").apply { start() }
     }

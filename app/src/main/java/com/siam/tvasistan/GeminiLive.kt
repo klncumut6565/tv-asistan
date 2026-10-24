@@ -40,14 +40,17 @@ class GeminiLive(private val d: Dinleyici) {
     companion object {
         private const val ETIKET = "GeminiLive"
         @Volatile private var sonCalisan: String? = null
+        private val ORTAK_HTTP: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .readTimeout(0, TimeUnit.MILLISECONDS)
+                .pingInterval(20, TimeUnit.SECONDS)
+                .build()
+        }
     }
 
     private var sesAdi = "Kore"
 
-    private val http = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(20, TimeUnit.SECONDS)
-        .build()
+    private val http get() = ORTAK_HTTP
     private val aracYurutucu = Executors.newSingleThreadExecutor()
 
     @Volatile private var ws: WebSocket? = null
@@ -199,7 +202,7 @@ class GeminiLive(private val d: Dinleyici) {
                 } catch (e: Exception) {
                     JSONObject().put("hata", e.message ?: e.toString())
                 }
-                Log.i(ETIKET, "Araç $ad → $sonuc")
+                Log.i(ETIKET, "Araç: $ad (${if (sonuc.has("hata")) "hata" else "tamam"})")
                 yanitlar.put(JSONObject().put("id", c.optString("id")).put("name", ad).put("response", sonuc))
             }
             ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", yanitlar)).toString())

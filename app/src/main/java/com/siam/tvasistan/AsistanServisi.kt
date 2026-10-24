@@ -114,7 +114,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 if (s != null && durum == Durum.BOSTA && anaEkrandaMi() && !Guncelleme.kuruluyor) {
                     guncellemeyiKur(s)
                 }
-                delay(60_000)
+                // Bekleyen sürüm yoksa 15 dk uyu; varsa ana ekrana dönülmesini dakikada bir kontrol et
+                delay(if (bekleyenSurum != null) 60_000 else 15 * 60_000)
             }
         }
     }
@@ -235,7 +236,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 val oy = Oynatici()
                 oynatici = oy
-                val m = Mikrofon { pcm ->
+                val m = Mikrofon(hata = { mesaj -> ana.post { hataGoster(mesaj) } }) { pcm ->
                     // Yarı çift yönlü: asistan konuşurken TV hoparlöründen gelen sesi modele geri gönderme.
                     if (!oy.caliyor()) l.sesGonder(pcm)
                 }

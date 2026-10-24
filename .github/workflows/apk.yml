@@ -21,10 +21,24 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: İmza anahtarını hazırla
+        env:
+          IMZA_KEYSTORE_B64: ${{ secrets.IMZA_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$IMZA_KEYSTORE_B64" ]; then
+            echo "::error::IMZA_KEYSTORE_B64 / IMZA_SIFRE secret'ları eksik (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          echo "$IMZA_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/imza.jks"
+
       - name: APK derle
+        env:
+          IMZA_DOSYASI: ${{ runner.temp }}/imza.jks
+          IMZA_SIFRE: ${{ secrets.IMZA_SIFRE }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
+          rm -f "$RUNNER_TEMP/imza.jks"
 
       - name: APK'yı adlandır
         run: cp app/build/outputs/apk/release/app-release.apk tv-asistan.apk

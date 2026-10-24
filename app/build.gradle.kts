@@ -22,24 +22,27 @@ android {
         buildConfigField("String", "GUNCELLEME_REPO", "\"${ozellik("GUNCELLEME_REPO")}\"")
     }
 
-    // Sabit imza: her derleme aynı anahtarla imzalanır, böylece TV'de
-    // "adb install -r" / Downloader ile güncelleme imza hatası vermez.
+    // Sabit imza: her sürüm aynı anahtarla imzalanır (güncelleme imza hatası vermez).
+    // Anahtar REPODA DEĞİL: GitHub Secrets'tan (IMZA_KEYSTORE_B64 + IMZA_SIFRE) CI'da çözülür.
+    // Android, güncellemeyi yalnızca imza eşleşirse kabul eder — anahtar gizli kaldıkça
+    // başkası TV Asistan yerine geçen bir APK üretemez.
+    val imzaDosyasi = System.getenv("IMZA_DOSYASI")?.let { file(it) }
+    val imzaSifre = System.getenv("IMZA_SIFRE")
     signingConfigs {
-        create("ortak") {
-            storeFile = rootProject.file("imza/tv-asistan.jks")
-            storePassword = System.getenv("IMZA_SIFRE") ?: "tvasistan"
-            keyAlias = "tvasistan"
-            keyPassword = System.getenv("IMZA_SIFRE") ?: "tvasistan"
+        if (imzaDosyasi != null && imzaSifre != null) {
+            create("ortak") {
+                storeFile = imzaDosyasi
+                storePassword = imzaSifre
+                keyAlias = "tvasistan"
+                keyPassword = imzaSifre
+            }
         }
     }
 
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("ortak")
-        }
-        getByName("debug") {
-            signingConfig = signingConfigs.getByName("ortak")
+            signingConfig = signingConfigs.findByName("ortak")
         }
     }
 

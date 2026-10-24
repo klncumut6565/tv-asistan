@@ -38,7 +38,8 @@ Android, Play Store dışı uygulamaların **sessiz** kurulmasına izin vermez; 
 ## Derleme
 
 `main` dalına her push'ta GitHub Actions APK'yı derler ve **Releases**'a koyar.
-Her sürüm aynı anahtarla (`imza/tv-asistan.jks`) imzalanır; güncelleme kaldırma gerektirmez.
+Her sürüm aynı anahtarla imzalanır; güncelleme kaldırma gerektirmez.
+İmza anahtarı **repoda değildir**; GitHub Secrets'ta durur (`IMZA_KEYSTORE_B64`, `IMZA_SIFRE`). Secret'lar yoksa derleme bilinçli olarak durur.
 
 ## TV'ye kurulum
 
