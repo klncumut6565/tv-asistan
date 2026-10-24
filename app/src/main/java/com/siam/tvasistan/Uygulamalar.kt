@@ -30,18 +30,40 @@ object Uygulamalar {
      * Jülide onları talimatta görmez, adıyla bulamaz ve açamaz.
      */
     fun liste(ctx: Context, hepsi: Boolean = false): List<Uyg> {
-        val pasif = if (hepsi) emptySet() else Ayarlar(ctx).pasifUygulamalar
+        val tum = tumu(ctx)
+        if (hepsi) return tum
+        val pasif = Ayarlar(ctx).pasifUygulamalar
+        return if (pasif.isEmpty()) tum else tum.filter { it.paket !in pasif }
+    }
+
+    // Etiket yükleme (loadLabel) uygulama başına disk/kaynak okuması yapar; liste her araç
+    // çağrısında yeniden taranmasın diye 60 sn önbelleklenir.
+    private const val ONBELLEK_MS = 60_000L
+    @Volatile private var onbellek: List<Uyg> = emptyList()
+    @Volatile private var onbellekZamani = 0L
+
+    @Synchronized
+    private fun tumu(ctx: Context): List<Uyg> {
+        val simdi = android.os.SystemClock.elapsedRealtime()
+        if (onbellek.isNotEmpty() && simdi - onbellekZamani < ONBELLEK_MS) return onbellek
         val pm = ctx.packageManager
         val sonuc = LinkedHashMap<String, Uyg>()
         for (kat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
             val i = Intent(Intent.ACTION_MAIN).addCategory(kat)
             for (ri in pm.queryIntentActivities(i, 0)) {
                 val paket = ri.activityInfo.packageName
-                if (paket == ctx.packageName || sonuc.containsKey(paket) || paket in pasif) continue
+                if (paket == ctx.packageName || sonuc.containsKey(paket)) continue
                 sonuc[paket] = Uyg(ri.loadLabel(pm).toString(), paket)
             }
         }
-        return sonuc.values.sortedBy { it.ad.lowercase(TR) }
+        onbellek = sonuc.values.sortedBy { it.ad.lowercase(TR) }
+        onbellekZamani = simdi
+        return onbellek
+    }
+
+    /** Yeni uygulama kurulunca/kaldırılınca listeyi hemen tazelemek için. */
+    fun onbellegiTemizle() {
+        onbellekZamani = 0L
     }
 
     /** "https" bağlantılarını açabilen uygulamalar (tarayıcılar). */

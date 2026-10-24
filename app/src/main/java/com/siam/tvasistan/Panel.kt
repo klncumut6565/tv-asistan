@@ -2,9 +2,9 @@ package com.siam.tvasistan
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
-import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RadialGradient
@@ -192,7 +192,12 @@ class Panel(private val servis: AccessibilityService) {
         }
     }
 
-    /** Sese tepki veren, nefes alan mor küre. */
+    /**
+     * Sese tepki veren, nefes alan mor küre.
+     * Performans: donanım hızlandırmalı çizim (yazılım katmanı/blur YOK), gradyanlar boyut başına
+     * bir kez üretilir ve her karede yalnız matrisle ölçeklenir (kare başına sıfır nesne), kare hızı
+     * 30 fps; Jülide beklerken/sessizken 10 fps.
+     */
     private class Kure(ctx: Context) : View(ctx) {
         @Volatile var mod = Mod.BAGLANIYOR
         @Volatile private var hedefMik = 0f
@@ -202,24 +207,30 @@ class Panel(private val servis: AccessibilityService) {
         private var seviye = 0f
         private var renkKarisim = 0f // 0 = dinleme moru, 1 = konuşma pembesi
         private var t = 0f
+        private var sonKare = 0L
         @Volatile private var calisiyor = false
         private val dongu = object : Runnable {
             override fun run() {
                 if (!calisiyor) return
                 kare()
-                postOnAnimation(this)
+                val sakin = mod == Mod.BEKLIYOR || mod == Mod.HATA
+                postDelayed(this, if (sakin) 100L else 33L)
             }
         }
 
         private val halePaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val cekirdekPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val halkaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-        private val parlakPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val parlakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 230, 255) }
+        private val matris = Matrix()
 
-        init {
-            setLayerType(LAYER_TYPE_SOFTWARE, null) // BlurMaskFilter için
-            halkaPaint.maskFilter = BlurMaskFilter(6f * resources.displayMetrics.density, BlurMaskFilter.Blur.NORMAL)
-        }
+        // Palet: 0 = mor (dinliyor), 1 = pembe (konuşuyor), 2 = kırmızı (hata)
+        private val anaRenkler = intArrayOf(Color.rgb(168, 85, 247), Color.rgb(232, 121, 249), Color.rgb(244, 63, 94))
+        private val merkezRenkler = intArrayOf(Color.rgb(233, 213, 255), Color.rgb(253, 224, 255), Color.rgb(255, 228, 230))
+        private val koyuMor = Color.rgb(109, 40, 217)
+        private var haleGradyan = arrayOfNulls<RadialGradient>(3)
+        private var cekirdekGradyan = arrayOfNulls<RadialGradient>(3)
+        private var olcuR = 1f
 
         fun seviye(s: Float, asistan: Boolean) {
             val v = s.coerceIn(0f, 1f)
@@ -227,11 +238,11 @@ class Panel(private val servis: AccessibilityService) {
             if (asistan) { hedefAsistan = v; sonAsistan = simdi } else { hedefMik = v; sonMik = simdi }
         }
 
-        // ValueAnimator yerine kare döngüsü: geliştirici ayarlarındaki "animasyon ölçeği 0"dan etkilenmez.
         fun baslat() {
             calisiyor = true
+            sonKare = SystemClock.elapsedRealtime()
             removeCallbacks(dongu)
-            postOnAnimation(dongu)
+            post(dongu)
         }
 
         fun durdur() {
@@ -239,103 +250,122 @@ class Panel(private val servis: AccessibilityService) {
             removeCallbacks(dongu)
         }
 
+        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+            olcuR = maxOf(1f, min(w, h) / 2f)
+            for (i in 0 until 3) {
+                val a = anaRenkler[i]
+                haleGradyan[i] = RadialGradient(
+                    0f, 0f, olcuR,
+                    intArrayOf(renk(150, a), renk(60, koyuMor), renk(0, koyuMor)),
+                    floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP
+                )
+                cekirdekGradyan[i] = RadialGradient(
+                    0f, 0f, olcuR,
+                    intArrayOf(renk(235, merkezRenkler[i]), renk(215, a), renk(190, koyuMor)),
+                    floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
+                )
+            }
+        }
+
+        private fun renk(alfa: Int, c: Int) = Color.argb(alfa, Color.red(c), Color.green(c), Color.blue(c))
+
         private fun kare() {
             val simdi = SystemClock.elapsedRealtime()
+            val dt = ((simdi - sonKare).coerceIn(0L, 200L)) / 1000f
+            sonKare = simdi
             // Seviyeler 250 ms güncellenmezse sönümlenir
             val mik = if (simdi - sonMik < 250) hedefMik else 0f
             val ast = if (simdi - sonAsistan < 250) hedefAsistan else 0f
             val hedef = when (mod) {
                 Mod.KONUSUYOR -> max(ast, mik * 0.5f)
                 Mod.DINLIYOR -> mik
-                Mod.BEKLIYOR -> 0f
                 else -> 0f
             }
-            // hızlı yüksel, yavaş in
-            seviye += (hedef - seviye) * (if (hedef > seviye) 0.45f else 0.12f)
+            // hızlı yüksel, yavaş in (kare hızından bağımsız)
+            val k = if (hedef > seviye) 18f else 4.5f
+            seviye += (hedef - seviye) * min(1f, k * dt)
             val hedefRenk = if (mod == Mod.KONUSUYOR) 1f else 0f
-            renkKarisim += (hedefRenk - renkKarisim) * 0.08f
-            t += 0.016f
+            renkKarisim += (hedefRenk - renkKarisim) * min(1f, 3f * dt)
+            t += dt
             invalidate()
         }
 
-        private fun karistir(a: Int, b: Int, f: Float): Int = Color.argb(
-            (Color.alpha(a) + (Color.alpha(b) - Color.alpha(a)) * f).toInt(),
-            (Color.red(a) + (Color.red(b) - Color.red(a)) * f).toInt(),
-            (Color.green(a) + (Color.green(b) - Color.green(a)) * f).toInt(),
-            (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * f).toInt(),
-        )
+        /** Önceden üretilmiş gradyanı (cx, cy) merkezine r yarıçapla yerleştirip daire çizer. */
+        private fun gradyanDaire(c: Canvas, p: Paint, g: RadialGradient?, cx: Float, cy: Float, merkezX: Float, merkezY: Float,
+                                 gradyanR: Float, r: Float, alfa: Float) {
+            if (g == null || alfa <= 0.01f) return
+            matris.setScale(gradyanR / olcuR, gradyanR / olcuR)
+            matris.postTranslate(merkezX, merkezY)
+            g.setLocalMatrix(matris)
+            p.shader = g
+            p.alpha = (255 * alfa).toInt().coerceIn(0, 255)
+            c.drawCircle(cx, cy, r, p)
+        }
 
         override fun onDraw(c: Canvas) {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val cx = w / 2f
-            val cy = h / 2f
-            val maxR = min(w, h) / 2f
+            val cx = width / 2f
+            val cy = height / 2f
+            val maxR = min(width, height) / 2f
 
             val nefes = (sin(t * 2.2f) * 0.5f + 0.5f)             // 0..1 yavaş nefes
             val sonuk = mod == Mod.BEKLIYOR || mod == Mod.HATA
-            val bag = mod == Mod.BAGLANIYOR
             val alfa = when {
                 sonuk -> 0.45f
-                bag -> 0.55f + 0.35f * nefes
+                mod == Mod.BAGLANIYOR -> 0.55f + 0.35f * nefes
                 else -> 1f
             }
-
-            val mor = Color.rgb(168, 85, 247)       // #A855F7
-            val koyuMor = Color.rgb(109, 40, 217)   // #6D28D9
-            val pembe = Color.rgb(232, 121, 249)    // #E879F9
-            val hataRenk = Color.rgb(244, 63, 94)
-            val ana = if (mod == Mod.HATA) hataRenk else karistir(mor, pembe, renkKarisim)
+            val hata = mod == Mod.HATA
+            val pembe = if (hata) 0f else renkKarisim
 
             val cekirdekR = maxR * (0.40f + 0.04f * nefes + 0.16f * seviye)
             val haleR = maxR * (0.62f + 0.06f * nefes + 0.36f * seviye).coerceAtMost(1f)
 
-            // dış hale (yarı saydam)
-            halePaint.shader = RadialGradient(
-                cx, cy, haleR,
-                intArrayOf(
-                    Color.argb((150 * alfa).toInt(), Color.red(ana), Color.green(ana), Color.blue(ana)),
-                    Color.argb((60 * alfa).toInt(), Color.red(koyuMor), Color.green(koyuMor), Color.blue(koyuMor)),
-                    Color.argb(0, Color.red(koyuMor), Color.green(koyuMor), Color.blue(koyuMor)),
-                ),
-                floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP
-            )
-            c.drawCircle(cx, cy, haleR, halePaint)
+            // dış hale: mor ve pembe katmanlar karışım oranında üst üste
+            if (hata) {
+                gradyanDaire(c, halePaint, haleGradyan[2], cx, cy, cx, cy, haleR, haleR, alfa)
+            } else {
+                gradyanDaire(c, halePaint, haleGradyan[0], cx, cy, cx, cy, haleR, haleR, alfa * (1f - pembe))
+                gradyanDaire(c, halePaint, haleGradyan[1], cx, cy, cx, cy, haleR, haleR, alfa * pembe)
+            }
 
-            // ses dalgası halkaları
+            // ses dalgası halkaları: blur yerine geniş+ince iki çizgiyle yumuşak parıltı
             if (!sonuk) {
+                val a0 = anaRenkler[0]
+                val a1 = anaRenkler[1]
+                val rr = (Color.red(a0) + (Color.red(a1) - Color.red(a0)) * pembe).toInt()
+                val gg = (Color.green(a0) + (Color.green(a1) - Color.green(a0)) * pembe).toInt()
+                val bb = (Color.blue(a0) + (Color.blue(a1) - Color.blue(a0)) * pembe).toInt()
                 for (i in 0 until 3) {
                     val faz = (t * 0.8f + i / 3f) % 1f
                     val r = cekirdekR + (haleR - cekirdekR) * faz
-                    val a = ((1f - faz) * (0.25f + 0.75f * seviye) * 200 * alfa).toInt().coerceIn(0, 255)
-                    halkaPaint.color = Color.argb(a, Color.red(ana), Color.green(ana), Color.blue(ana))
-                    halkaPaint.strokeWidth = maxR * 0.03f
+                    val a = (1f - faz) * (0.25f + 0.75f * seviye) * alfa
+                    halkaPaint.color = Color.argb((70 * a).toInt().coerceIn(0, 255), rr, gg, bb)
+                    halkaPaint.strokeWidth = maxR * 0.08f
+                    c.drawCircle(cx, cy, r, halkaPaint)
+                    halkaPaint.color = Color.argb((200 * a).toInt().coerceIn(0, 255), rr, gg, bb)
+                    halkaPaint.strokeWidth = maxR * 0.025f
                     c.drawCircle(cx, cy, r, halkaPaint)
                 }
             }
 
-            // çekirdek: parlak merkezden koyu kenara
-            val merkez = karistir(Color.rgb(233, 213, 255), Color.rgb(253, 224, 255), renkKarisim)
-            cekirdekPaint.shader = RadialGradient(
-                cx - cekirdekR * 0.25f, cy - cekirdekR * 0.3f, cekirdekR * 1.3f,
-                intArrayOf(
-                    Color.argb((235 * alfa).toInt(), Color.red(merkez), Color.green(merkez), Color.blue(merkez)),
-                    Color.argb((215 * alfa).toInt(), Color.red(ana), Color.green(ana), Color.blue(ana)),
-                    Color.argb((190 * alfa).toInt(), Color.red(koyuMor), Color.green(koyuMor), Color.blue(koyuMor)),
-                ),
-                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
-            )
-            c.drawCircle(cx, cy, cekirdekR, cekirdekPaint)
+            // çekirdek: parlak merkezden koyu kenara (ışık sol üstten)
+            val gx = cx - cekirdekR * 0.25f
+            val gy = cy - cekirdekR * 0.3f
+            if (hata) {
+                gradyanDaire(c, cekirdekPaint, cekirdekGradyan[2], cx, cy, gx, gy, cekirdekR * 1.3f, cekirdekR, alfa)
+            } else {
+                gradyanDaire(c, cekirdekPaint, cekirdekGradyan[0], cx, cy, gx, gy, cekirdekR * 1.3f, cekirdekR, alfa * (1f - pembe))
+                gradyanDaire(c, cekirdekPaint, cekirdekGradyan[1], cx, cy, gx, gy, cekirdekR * 1.3f, cekirdekR, alfa * pembe)
+            }
 
             // dönen küçük parıltılar (canlılık hissi)
             if (!sonuk) {
+                parlakPaint.alpha = (140 * alfa).toInt()
+                val r = cekirdekR * (1.12f + 0.25f * seviye)
+                val nr = maxR * (0.025f + 0.02f * seviye)
                 for (i in 0 until 4) {
                     val aci = t * (1.1f + i * 0.25f) + i * (PI.toFloat() / 2f)
-                    val r = cekirdekR * (1.12f + 0.25f * seviye)
-                    val px = cx + cos(aci) * r
-                    val py = cy + sin(aci) * r
-                    parlakPaint.color = Color.argb((140 * alfa).toInt(), 245, 230, 255)
-                    c.drawCircle(px, py, maxR * (0.025f + 0.02f * seviye), parlakPaint)
+                    c.drawCircle(cx + cos(aci) * r, cy + sin(aci) * r, nr, parlakPaint)
                 }
             }
         }

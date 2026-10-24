@@ -187,6 +187,7 @@ class MainActivity : Activity() {
                 })
             }
         }
+        Uygulamalar.onbellegiTemizle() // yeni kurulan uygulamalar listede hemen görünsün
         uygulamalariYaz()
         sutun.addView(uygKutusu)
         sutun.addView(dugme("Tümünü aktif yap") {
