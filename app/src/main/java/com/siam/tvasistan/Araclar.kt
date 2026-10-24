@@ -86,6 +86,13 @@ class Araclar(private val s: AsistanServisi) {
                 P("yon", "STRING", "Kaydırma yönü", listOf("asagi", "yukari", "sol", "sag")),
                 P("miktar", "INTEGER", "Kaç adım (1 = biraz, 3 = epey, 5 = çok). Varsayılan 1")
             ), listOf("yon")))
+        .put(fn("kanal_ac", "Canlı yayında bir TV kanalını açar (ör. ATV, Show TV, TRT 1, Kanal D) ya da kanal numarasına geçer ('7').",
+            listOf(P("kanal", "STRING", "Kanal adı veya numarası, kullanıcının söylediği gibi")), listOf("kanal")))
+        .put(fn("kanal_degistir", "Canlı yayında sonraki/önceki kanala geçer. Canlı TV açık değilse önce açar.",
+            listOf(
+                P("yon", "STRING", "Yön", listOf("sonraki", "onceki")),
+                P("adet", "INTEGER", "Kaç kanal (varsayılan 1, en çok 10)")
+            ), listOf("yon")))
         .put(fn("numaralari_goster", "Ekrandaki TÜM tıklanabilir öğelerin (simgeler dahil) üstüne numara rozeti koyar ve 'numara: ad' listesini döndürür. Kullanıcı bir yeri işaret ederse ('şuraya', 'şuna', 'bu düğmeye') ya da tikla yazıyla bulamazsa kullan."))
         .put(fn("numaraya_tikla", "numaralari_goster ile gösterilen numaralı öğeye tıklar.",
             listOf(
@@ -118,6 +125,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "YouTube'da X" → youtube_ara.
 - "Tarayıcıyı aç, X'i ara" → web_ara. Belirli site → url_ac.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
+- TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5).
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
 - Kullanıcı bir yeri işaret ediyorsa ("şuraya tıkla", "şuna bas", "şu düğme") → numaralari_goster, sonra kısaca "Numaraları gösterdim, hangisi?" diye sor; kullanıcı numara söyleyince numaraya_tikla.
@@ -152,6 +160,8 @@ TV'de kurulu uygulamalar: $uygulamalar
             "tus" -> tus(a.optString("tus"), a.optInt("tekrar", 1))
             "kaydir" -> kaydir(a.optString("yon"), a.optInt("miktar", 1))
             "numaralari_goster" -> numaralariGoster()
+            "kanal_ac" -> kanalAc(a.optString("kanal"))
+            "kanal_degistir" -> kanalDegistir(a.optString("yon"), a.optInt("adet", 1))
             "numaraya_tikla" -> numarayaTikla(a.optInt("numara", -1), a.optBoolean("onayli", false))
             "ses" -> ses(a.optString("islem"), if (a.has("seviye")) a.optInt("seviye") else null)
             "medya" -> medya(a.optString("islem"))
@@ -568,6 +578,91 @@ TV'de kurulu uygulamalar: $uygulamalar
             SystemClock.sleep(90)
         }
         return tamam(if (yapilan > 0) "Kaydırma hareketi ve yön tuşuyla kaydırıldı." else "Yön tuşuyla kaydırıldı.")
+    }
+
+    // --- canlı yayın kanalları
+
+    private fun canliTvOnde(): Boolean {
+        val p = Kanallar.canliTvPaketi(s) ?: return false
+        return s.aktifPaket == p
+    }
+
+    /** Canlı TV önde değilse açar ve gelmesini bekler. */
+    private fun canliTvHazirla(): String? {
+        if (canliTvOnde()) return null
+        if (!Kanallar.canliTvAc(s)) return "Canlı TV uygulaması bulunamadı."
+        val p = Kanallar.canliTvPaketi(s)
+        var b = 0
+        while (p != null && s.aktifPaket != p && b < 30) { SystemClock.sleep(200); b++ }
+        SystemClock.sleep(1500)
+        return null
+    }
+
+    private fun kanalEslesir(metin: String, h: String): Boolean {
+        val n = Uygulamalar.normal(metin)
+        val hb = h.replace(" ", "")
+        return (" $n ").contains(" $h ") || (hb.length >= 4 && n.replace(" ", "").contains(hb))
+    }
+
+    private fun ekrandaKanal(h: String): Oge? =
+        ogeler().filter { kanalEslesir(it.metin, h) }.minByOrNull { it.metin.length }
+
+    private fun kanalAc(sorgu: String): JSONObject {
+        if (sorgu.isBlank()) return hata("Kanal adı boş.")
+        // 1) TV sağlayıcısından doğrudan
+        val liste = Kanallar.liste(s)
+        if (liste.isNotEmpty()) {
+            val k = Kanallar.bul(liste, sorgu)
+                ?: return hata("'$sorgu' kanal listesinde yok. Bazı kanallar: " + liste.take(30).joinToString(", ") { "${it.numara} ${it.ad}".trim() })
+            return if (Kanallar.ac(s, k)) tamam("${k.numara} ${k.ad} açıldı.".trim()) else hata("${k.ad} açılamadı.")
+        }
+        // 2) Canlı TV uygulaması + ekrandaki kanal listesi
+        canliTvHazirla()?.let { return hata(it) }
+        val h = Uygulamalar.normal(sorgu).removeSuffix(" kanali").removeSuffix(" kanal").trim()
+        fun sec(o: Oge): JSONObject {
+            val t = tiklanabilir(o.dugum)
+            val ok = t?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true ||
+                o.dugum.performAction(AccessibilityNodeInfo.ACTION_CLICK) ||
+                Rect().also { o.dugum.getBoundsInScreen(it) }.let { r -> !r.isEmpty && dokun(r.exactCenterX(), r.exactCenterY()) }
+            return if (ok) tamam("'${o.metin}' seçildi.") else hata("'${o.metin}' bulundu ama seçilemedi.")
+        }
+        ekrandaKanal(h)?.let { return sec(it) }
+        // Kanal listesini aç (çoğu TV'de canlı yayında OK tuşu listeyi açar)
+        tekBas("tamam")
+        SystemClock.sleep(1500)
+        repeat(8) {
+            ekrandaKanal(h)?.let { return sec(it) }
+            var kaydi = false
+            for (k in kokler()) {
+                val sb = mutableListOf<AccessibilityNodeInfo>()
+                fun ara(n: AccessibilityNodeInfo, d: Int) {
+                    if (d > 40) return
+                    if (n.isScrollable && n.isVisibleToUser) sb += n
+                    for (i in 0 until n.childCount) n.getChild(i)?.let { c -> ara(c, d + 1) }
+                }
+                ara(k, 0)
+                if (sb.any { it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) }) { kaydi = true; break }
+            }
+            if (!kaydi) repeat(8) { tekBas("asagi"); SystemClock.sleep(70) }
+            SystemClock.sleep(600)
+        }
+        return tamam(
+            "Canlı TV açıldı ama kanal listesinde '$sorgu' bulunamadı. ekrani_oku ile listeye bak, gerekirse numaralari_goster kullan. " +
+                "Kanal listesi okunamıyorsa kullanıcıya şu ADB komutunu önerebilirsin: adb shell pm grant com.siam.tvasistan com.android.providers.tv.permission.READ_EPG_DATA"
+        )
+    }
+
+    private fun kanalDegistir(yon: String, adet: Int): JSONObject {
+        canliTvHazirla()?.let { return hata(it) }
+        val n = adet.coerceIn(1, 10)
+        val tus = if (yon == "onceki") "asagi" else "yukari"
+        var ok = 0
+        repeat(n) {
+            if (tekBas(tus)) ok++
+            SystemClock.sleep(if (n > 1) 900 else 100)
+        }
+        return if (ok > 0) tamam("${if (yon == "onceki") "Önceki" else "Sonraki"} kanala geçildi ($ok). Bu TV'de yön ters ise kullanıcı söyler; o zaman diğer yönü kullan.")
+        else hata("Kanal değiştirilemedi.")
     }
 
     // --- numaralı tıklama
