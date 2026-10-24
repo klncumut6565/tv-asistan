@@ -45,19 +45,20 @@ jobs:
       - name: İmza anahtarını hazırla
         env:
           IMZA_KEYSTORE_B64: ${{ secrets.IMZA_KEYSTORE_B64 }}
+          IMZA_SIFRE: ${{ secrets.IMZA_SIFRE }}
         run: |
-          # Secret varsa onu, yoksa repodaki ortak anahtarı kullan
-          # (TV'deki kurulu sürümle aynı imza → otomatik güncelleme kabul edilir).
-          if [ -n "$IMZA_KEYSTORE_B64" ]; then
-            echo "$IMZA_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/imza.jks"
-          else
-            cp imza/tv-asistan.jks "$RUNNER_TEMP/imza.jks"
+          # İmza anahtarı YALNIZCA GitHub Secrets'tan gelir; yoksa derleme durur
+          # (herkese açık bir anahtarla imzalı APK asla yayınlanmaz).
+          if [ -z "$IMZA_KEYSTORE_B64" ] || [ -z "$IMZA_SIFRE" ]; then
+            echo "::error::IMZA_KEYSTORE_B64 / IMZA_SIFRE secret'ları eksik (Settings → Secrets and variables → Actions)."
+            exit 1
           fi
+          echo "$IMZA_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/imza.jks"
 
       - name: APK derle
         env:
           IMZA_DOSYASI: ${{ runner.temp }}/imza.jks
-          IMZA_SIFRE: ${{ secrets.IMZA_SIFRE || 'tvasistan' }}
+          IMZA_SIFRE: ${{ secrets.IMZA_SIFRE }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace

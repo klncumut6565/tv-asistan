@@ -23,9 +23,9 @@ android {
     }
 
     // Sabit imza: her sürüm aynı anahtarla imzalanır (güncelleme imza hatası vermez).
-    // CI önce GitHub Secrets'a (IMZA_KEYSTORE_B64 + IMZA_SIFRE) bakar; yoksa repodaki
-    // imza/tv-asistan.jks kullanılır (TV'de kurulu sürümle aynı imza). Bu anahtar herkese
-    // açıktır — Android güncellemeyi yalnızca imza eşleşirse kabul eder.
+    // Anahtar REPODA DEĞİL: yalnızca GitHub Secrets'tan (IMZA_KEYSTORE_B64 + IMZA_SIFRE) CI'da
+    // çözülür. Android güncellemeyi yalnızca imza eşleşirse kabul eder — anahtar gizli kaldıkça
+    // başkası Jülide yerine geçen bir APK üretemez.
     val imzaDosyasi = System.getenv("IMZA_DOSYASI")?.let { file(it) }
     val imzaSifre = System.getenv("IMZA_SIFRE")
     signingConfigs {
