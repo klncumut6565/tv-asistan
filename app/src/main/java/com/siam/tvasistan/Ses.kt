@@ -224,11 +224,13 @@ class SesKapisi(
         private set
     private var sonKonusma = 0L
     private var gurultu = 150.0
+    /** Video/TV sesi varken eşiği yükseltmek için çarpan (1 = normal). */
+    @Volatile var esikCarpani = 1.0
 
     fun isle(pcm: ByteArray) {
         val simdi = SystemClock.elapsedRealtime()
         val rms = rms(pcm)
-        val konusma = rms > maxOf(esik.toDouble(), gurultu * 2.5)
+        val konusma = rms > maxOf(esik.toDouble(), gurultu * 2.5) * esikCarpani
         if (!konusma && !acik) gurultu = gurultu * 0.95 + rms * 0.05 // ortam gürültüsünü yalnız sessizken öğren
         if (konusma) {
             sonKonusma = simdi

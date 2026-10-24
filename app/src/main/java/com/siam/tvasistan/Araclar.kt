@@ -628,28 +628,36 @@ TV'de kurulu uygulamalar: $uygulamalar
         }
         ekrandaKanal(h)?.let { return sec(it) }
         // Kanal listesini aç (çoğu TV'de canlı yayında OK tuşu listeyi açar)
+        val oncekiMetinler = ogeler().map { it.metin }.toSet()
         tekBas("tamam")
         SystemClock.sleep(1500)
-        repeat(8) {
-            ekrandaKanal(h)?.let { return sec(it) }
-            var kaydi = false
-            for (k in kokler()) {
-                val sb = mutableListOf<AccessibilityNodeInfo>()
-                fun ara(n: AccessibilityNodeInfo, d: Int) {
-                    if (d > 40) return
-                    if (n.isScrollable && n.isVisibleToUser) sb += n
-                    for (i in 0 until n.childCount) n.getChild(i)?.let { c -> ara(c, d + 1) }
-                }
-                ara(k, 0)
-                if (sb.any { it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) }) { kaydi = true; break }
-            }
-            if (!kaydi) repeat(8) { tekBas("asagi"); SystemClock.sleep(70) }
-            SystemClock.sleep(600)
+        ekrandaKanal(h)?.let { return sec(it) }
+
+        // Liste gerçekten açıldı ve OKUNABİLİYOR mu? Okunamıyorsa yön tuşuna BASMA:
+        // canlı yayında aşağı/yukarı tuşu kanal değiştirir (eski sürüm 64 kez zaplıyordu).
+        val yeniMetinler = ogeler().map { it.metin }.filter { it !in oncekiMetinler }
+        val kaydirilabilir = mutableListOf<AccessibilityNodeInfo>()
+        fun ara(n: AccessibilityNodeInfo, d: Int) {
+            if (d > 40) return
+            if (n.isScrollable && n.isVisibleToUser) kaydirilabilir += n
+            for (i in 0 until n.childCount) n.getChild(i)?.let { c -> ara(c, d + 1) }
         }
-        return tamam(
-            "Canlı TV açıldı ama kanal listesinde '$sorgu' bulunamadı. ekrani_oku ile listeye bak, gerekirse numaralari_goster kullan. " +
-                "Kanal listesi okunamıyorsa kullanıcıya şu ADB komutunu önerebilirsin: adb shell pm grant com.siam.tvasistan com.android.providers.tv.permission.READ_EPG_DATA"
-        )
+        for (k in kokler()) ara(k, 0)
+        if (yeniMetinler.size < 3 || kaydirilabilir.isEmpty()) {
+            tekBas("geri") // açılmış olabilecek menüyü kapat
+            return hata(
+                "Bu TV'nin kanal listesi okunamıyor; kanal adla seçilemedi. Kullanıcıya kısaca söyle: " +
+                    "kanal numarasını biliyorsa 'sonraki/önceki kanal' ile gidebilir ya da bilgisayardan şu izin verilirse " +
+                    "kanallar adla açılır: adb shell pm grant com.siam.tvasistan com.android.providers.tv.permission.READ_EPG_DATA"
+            )
+        }
+        // Okunabilir liste: en fazla 6 sayfa kaydırarak ara (toplam ~5 sn)
+        repeat(6) {
+            if (!kaydirilabilir.any { it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) }) return@repeat
+            SystemClock.sleep(700)
+            ekrandaKanal(h)?.let { return sec(it) }
+        }
+        return tamam("Kanal listesi açık ama '$sorgu' görünmüyor. ekrani_oku ile listeye bak ya da numaralari_goster kullan.")
     }
 
     private fun kanalDegistir(yon: String, adet: Int): JSONObject {

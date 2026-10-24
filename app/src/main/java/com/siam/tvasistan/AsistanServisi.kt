@@ -282,6 +282,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     // Başka bir uygulama mikrofonu alırsa Android bize dijital sıfır verir
                     sifirParca = if (rms < 1.0) sifirParca + 1 else 0
                     panel.mikrofonSeviyesi(sesSeviyesi(rms, 7.0))
+                    // TV sesi açıkken (pencere içinde) yalnız belirgin şekilde yüksek sesi konuşma say
+                    kapi.esikCarpani = if (medyaAktif && konusOdagi == null) 2.2 else 1.0
                     kapi.isle(pcm)
                     // Konuşma sürerken bas-konuş penceresi kapanmasın
                     if (kapi.acik && konusmaPenceresiBitis > 0) konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, simdi + 3000)
@@ -562,6 +564,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         ana.post {
             yeniTur = true
             medyaSessizUyarisi = false
+            // Cevaptan sonra 8 sn takip penceresi: video/canlı yayın açılmış olsa bile kullanıcı
+            // hemen ikinci komutu verebilsin (TV sesi varken konuşma eşiği yükseltilir).
+            konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, SystemClock.elapsedRealtime() + 8000)
             if (durum == Durum.DINLIYOR && !bekleyenKapat) panel.durum("Jülide dinliyor…")
         }
     }
