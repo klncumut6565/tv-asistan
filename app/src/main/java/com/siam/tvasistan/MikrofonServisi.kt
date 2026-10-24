@@ -19,10 +19,10 @@ class MikrofonServisi : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(KANAL, "TV Asistan dinleme", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(KANAL, "Jülide dinleme", NotificationManager.IMPORTANCE_LOW)
         )
         val bildirim = Notification.Builder(this, KANAL)
-            .setContentTitle("TV Asistan dinliyor")
+            .setContentTitle("Jülide dinliyor")
             .setSmallIcon(R.drawable.ic_mikrofon)
             .setOngoing(true)
             .build()

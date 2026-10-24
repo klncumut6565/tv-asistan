@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_adi">TV Asistan</string>
-    <string name="erisilebilirlik_aciklama">TV Asistan, sesli komutla uygulamaları açmak, ekrandaki öğelere tıklamak, arama kutularına yazmak ve kumandadaki tetik tuşunu dinlemek için bu izne ihtiyaç duyar. Ekran içeriği yalnızca siz bir komut verdiğinizde okunur.</string>
+    <string name="app_adi">Jülide</string>
+    <string name="erisilebilirlik_aciklama">Jülide, sesli komutla uygulamaları açmak, ekrandaki öğelere tıklamak, arama kutularına yazmak ve kumandadaki tetik tuşunu dinlemek için bu izne ihtiyaç duyar. Ekran içeriği yalnızca siz bir komut verdiğinizde okunur.</string>
 </resources>

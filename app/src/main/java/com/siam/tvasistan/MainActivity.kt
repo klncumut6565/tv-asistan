@@ -75,7 +75,7 @@ class MainActivity : Activity() {
             setOnClickListener { islem() }
         }
 
-        sutun.addView(yazi("TV Asistan", 30f, true, Color.rgb(34, 197, 94)))
+        sutun.addView(yazi("Jülide", 30f, true, Color.rgb(34, 197, 94)))
         sutun.addView(yazi("Android TV sesli asistanı — sürüm ${BuildConfig.VERSION_NAME}", 16f, renk = Color.LTGRAY))
 
         durumTv = yazi("", 18f)
@@ -169,7 +169,7 @@ class MainActivity : Activity() {
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
                 )
             } catch (ex: Exception) {
-                toast("Bu TV'de menü yok: Ayarlar → Cihaz Tercihleri → Güvenlik → Bilinmeyen kaynaklar → TV Asistan")
+                toast("Bu TV'de menü yok: Ayarlar → Cihaz Tercihleri → Güvenlik → Bilinmeyen kaynaklar → Jülide")
             }
         })
         val oto = dugme("") {}

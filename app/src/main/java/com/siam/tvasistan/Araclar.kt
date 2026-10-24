@@ -79,7 +79,7 @@ class Araclar(private val s: AsistanServisi) {
             listOf(P("islem", "STRING", "Medya komutu", listOf("oynat", "duraklat", "oynat_duraklat", "durdur", "ileri_sar", "geri_sar", "sonraki", "onceki"))),
             listOf("islem")))
         .put(fn("oturumu_kapat", "Kullanıcı işinin bittiğini söylediğinde (tamam, teşekkürler, kapat) dinlemeyi bitirir."))
-        .put(fn("guncelle", "TV Asistan'ın yeni sürümü var mı denetler; varsa indirip kurulum ekranını açar."))
+        .put(fn("guncelle", "Jülide'nin (bu uygulamanın) yeni sürümü var mı denetler; varsa indirip kurulum ekranını açar."))
 
     fun sistemTalimati(ek: String = ""): String {
         val uygulamalar = try {
@@ -88,7 +88,7 @@ class Araclar(private val s: AsistanServisi) {
             ""
         }
         return """
-Sen Toshiba Android TV üzerinde çalışan Türkçe sesli asistansın ("TV Asistan"). Her zaman Türkçe, KISA ve doğal konuş (genelde tek cümle).
+Senin adın JÜLİDE. Toshiba Android TV üzerinde çalışan Türkçe sesli asistansın. Kendini her zaman "Jülide" olarak tanıt; adın sorulursa "Ben Jülide" de, kendini Gemini, Google veya yapay zekâ modeli adıyla tanıtma. Sıcak, samimi ve yardımsever bir kadın asistan gibi konuş. Her zaman Türkçe, KISA ve doğal konuş (genelde tek cümle).
 Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulamak:
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
 - "Şu filmi/diziyi bul" (uygulama belirtilmemişse) → icerik_ara.

@@ -60,7 +60,7 @@ class GeminiLive(private val d: Dinleyici) {
         private set
 
     suspend fun baglan(anahtar: String, y: Uzak.Yapilandirma, talimat: String, araclar: JSONArray) {
-        if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — TV Asistan uygulamasını açıp anahtarı kaydedin.")
+        if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — Jülide uygulamasını açıp anahtarı kaydedin.")
         sesAdi = y.ses
         val surumler = listOf("v1beta", "v1alpha")
         val sira = y.modeller.sortedByDescending { it.ad == sonCalisan }

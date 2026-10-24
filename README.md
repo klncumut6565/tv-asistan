@@ -1,6 +1,6 @@
 # TV Asistan
 
-Android TV için bağımsız, Türkçe **Gemini Live** sesli asistanı.
+**Jülide** — Android TV için bağımsız, Türkçe **Gemini Live** sesli asistanı.
 Hedef cihaz: **Toshiba 50UA3D63DT** (Android TV).
 
 Sesli komutla:

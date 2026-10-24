@@ -110,7 +110,7 @@ class GuncellemeAlici : BroadcastReceiver() {
             }
             PackageInstaller.STATUS_SUCCESS -> {
                 Guncelleme.bitti()
-                Toast.makeText(c, "TV Asistan güncellendi.", Toast.LENGTH_LONG).show()
+                Toast.makeText(c, "Jülide güncellendi.", Toast.LENGTH_LONG).show()
             }
             else -> {
                 Guncelleme.bitti()

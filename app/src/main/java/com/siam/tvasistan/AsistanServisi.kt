@@ -191,7 +191,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 val o = oynatici
                 if (o != null && o.caliyor()) {
                     o.temizle()
-                    panel.durum("Dinliyorum…")
+                    panel.durum("Jülide dinliyor…")
                 } else {
                     bitir()
                 }
@@ -204,7 +204,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     fun oturumBaslat() {
         if (durum != Durum.BOSTA) return
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            panel.goster("Mikrofon izni yok — TV Asistan uygulamasını açıp izin verin.")
+            panel.goster("Mikrofon izni yok — Jülide uygulamasını açıp izin verin.")
             ana.postDelayed({ if (durum == Durum.BOSTA) panel.gizle() }, 6000)
             return
         }
@@ -244,7 +244,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 mikrofon = m
                 durum = Durum.DINLIYOR
                 sonEtkinlik = SystemClock.elapsedRealtime()
-                panel.durum("Dinliyorum…  (${l.modelEtiketi ?: "Gemini"})")
+                panel.durum("Jülide dinliyor…")
                 zamanlayici()
             } catch (e: Exception) {
                 Log.e(ETIKET, "Oturum başlatılamadı", e)
@@ -365,7 +365,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     override fun turBitti() {
         ana.post {
             yeniTur = true
-            if (durum == Durum.DINLIYOR && !bekleyenKapat) panel.durum("Dinliyorum…")
+            if (durum == Durum.DINLIYOR && !bekleyenKapat) panel.durum("Jülide dinliyor…")
         }
     }
 
