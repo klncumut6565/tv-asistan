@@ -67,13 +67,13 @@ class Mikrofon(
             r = ac(MediaRecorder.AudioSource.VOICE_RECOGNITION)
             if (r != null) kaynakAdi = "VOICE_RECOGNITION"
         }
-        if (r == null) throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
-        kayit = r
+        val ilkKayit: AudioRecord = r ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
+        kayit = ilkKayit
         calisiyor = true
         is_ = Thread({
             val tampon = ByteArray(1280) // 40 ms
             var ardisikHata = 0
-            var rec = r
+            var rec: AudioRecord = ilkKayit
             var sessizParca = 0
             var denetimBitti = !yankiEngelle || kaynakAdi != "VOICE_COMMUNICATION"
             while (calisiyor) {
