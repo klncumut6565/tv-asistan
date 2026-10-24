@@ -1,5 +1,6 @@
 package com.siam.tvasistan
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -85,6 +86,18 @@ object Uygulamalar {
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun anaEkranPaketi(ctx: Context): String? =
+        ctx.packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            ?.activityInfo?.packageName
+
+    /** Arka plandaki uygulamanın sürecini sonlandırır (KILL_BACKGROUND_PROCESSES). */
+    fun sonlandir(ctx: Context, paket: String) {
+        try {
+            ctx.getSystemService(ActivityManager::class.java).killBackgroundProcesses(paket)
+        } catch (_: Exception) {
         }
     }
 }

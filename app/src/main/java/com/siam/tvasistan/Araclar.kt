@@ -46,6 +46,8 @@ class Araclar(private val s: AsistanServisi) {
     fun bildirimler(): JSONArray = JSONArray()
         .put(fn("uygulama_ac", "TV'de kurulu bir uygulamayı adıyla açar (ör. YouTube, Netflix, tarayıcı, Ayarlar).",
             listOf(P("ad", "STRING", "Uygulamanın adı, kullanıcının söylediği gibi")), listOf("ad")))
+        .put(fn("uygulama_kapat", "Açık olan bir uygulamayı kapatır. Ad verilmezse şu an ekrandaki uygulamayı kapatır.",
+            listOf(P("ad", "STRING", "Kapatılacak uygulamanın adı; boş bırakılırsa ekrandaki uygulama"))))
         .put(fn("uygulamalari_listele", "TV'de kurulu tüm uygulamaların adlarını döndürür."))
         .put(fn("icerik_ara", "Film, dizi, oyuncu veya program için TV'nin genel içerik aramasını açar (tüm uygulamalarda arar).",
             listOf(P("sorgu", "STRING", "Aranacak film/dizi/kişi adı")), listOf("sorgu")))
@@ -94,6 +96,7 @@ class Araclar(private val s: AsistanServisi) {
 Senin adın JÜLİDE. Toshiba Android TV üzerinde çalışan Türkçe sesli asistansın. Kendini her zaman "Jülide" olarak tanıt; adın sorulursa "Ben Jülide" de, kendini Gemini, Google veya yapay zekâ modeli adıyla tanıtma. Sıcak, samimi ve yardımsever bir kadın asistan gibi konuş. Her zaman Türkçe, KISA ve doğal konuş (genelde tek cümle).
 Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulamak:
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
+- "X'i kapat", "bunu kapat", "uygulamadan çık" → uygulama_kapat (ad belirtilmemişse boş bırak). DİKKAT: yalnızca "kapat" deyip bir uygulama kastetmiyorsa ve işini bitirdiğini anlatıyorsa bu oturumu_kapat'tır.
 - "Şu filmi/diziyi bul" (uygulama belirtilmemişse) → icerik_ara.
 - "Netflix'te / Prime'da / Disney'de X'i bul" → önce uygulama_ac, sonra ekrani_oku ile ekrana bak, "Ara" öğesine tikla, yaz ile adı yaz (gonder=true), sonra sonucu tikla.
 - "YouTube'da X" → youtube_ara.
@@ -113,6 +116,7 @@ TV'de kurulu uygulamalar: $uygulamalar
     fun calistir(ad: String, a: JSONObject): JSONObject = try {
         when (ad) {
             "uygulama_ac" -> uygulamaAc(a.optString("ad"))
+            "uygulama_kapat" -> uygulamaKapat(a.optString("ad"))
             "uygulamalari_listele" -> tamam(Uygulamalar.liste(s).joinToString(", ") { it.ad })
             "icerik_ara" -> icerikAra(a.optString("sorgu"))
             "youtube_ara" -> youtubeAra(a.optString("sorgu"))
@@ -167,6 +171,29 @@ TV'de kurulu uygulamalar: $uygulamalar
             ?: return hata("'$ad' adında uygulama bulunamadı. Kurulu uygulamalar: " +
                 Uygulamalar.liste(s).joinToString(", ") { it.ad }.take(800))
         return if (Uygulamalar.ac(s, ilk.paket)) tamam("${ilk.ad} açıldı.") else hata("${ilk.ad} açılamadı.")
+    }
+
+    private fun uygulamaKapat(ad: String): JSONObject {
+        val paket: String
+        val gorunenAd: String
+        if (ad.isBlank()) {
+            paket = s.aktifPaket ?: return hata("Şu an açık bir uygulama algılanamadı.")
+            gorunenAd = Uygulamalar.liste(s).firstOrNull { it.paket == paket }?.ad ?: paket
+        } else {
+            val ilk = Uygulamalar.bul(s, ad).firstOrNull() ?: return hata("'$ad' adında uygulama bulunamadı.")
+            paket = ilk.paket
+            gorunenAd = ilk.ad
+        }
+        if (paket == s.packageName || Uygulamalar.anaEkranPaketi(s) == paket) {
+            return hata("Ana ekran veya Jülide kapatılamaz.")
+        }
+        // Önplandaysa ana ekrana dön; arka plana düşen süreç sonra sonlandırılır.
+        if (s.aktifPaket == paket) {
+            s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+            SystemClock.sleep(700)
+        }
+        Uygulamalar.sonlandir(s, paket)
+        return tamam("$gorunenAd kapatıldı.")
     }
 
     private fun icerikAra(q: String): JSONObject {
