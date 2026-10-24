@@ -150,9 +150,22 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
         .build()
 
     private val is_ = Thread({
-        track.play()
+        var oynuyor = false
         while (acik) {
-            val p = try { kuyruk.poll(100, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { null } ?: continue
+            val p = try { kuyruk.poll(100, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { null }
+            if (p == null) {
+                // Boştayken çalar duraklatılır: sistem "müzik çalıyor" sanmasın (video algılaması
+                // yanlış tetiklenmesin) ve ses çıkışı gereksiz açık kalmasın.
+                if (oynuyor && SystemClock.elapsedRealtime() > bitis + 400) {
+                    try { track.pause() } catch (_: Exception) {}
+                    oynuyor = false
+                }
+                continue
+            }
+            if (!oynuyor) {
+                try { track.play() } catch (_: Exception) {}
+                oynuyor = true
+            }
             val simdi = SystemClock.elapsedRealtime()
             val sureMs = p.size / 48L // 24000 örnek/sn × 2 bayt = 48 bayt/ms
             bitis = maxOf(bitis, simdi) + sureMs

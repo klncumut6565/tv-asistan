@@ -78,6 +78,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     @Volatile private var medyaSessizUyarisi = false
     /** Son denetimde video/müzik çalıyordu (zamanlayıcı 500 ms'de bir günceller). */
     @Volatile private var medyaAktif = false
+    /** Art arda gelen tamamen sessiz (dijital sıfır) mikrofon parçası sayısı. */
+    @Volatile private var sifirParca = 0
+    private var mikrofonUyarisi = false
     @Volatile private var sonCalma = 0L
     @Volatile private var yenidenBaglaniyor = false
     private var yenidenDenemeler = 0
@@ -275,7 +278,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                         panel.mikrofonSeviyesi(0f)
                         return@Mikrofon
                     }
-                    panel.mikrofonSeviyesi(sesSeviyesi(pcmRms(pcm), 7.0))
+                    val rms = pcmRms(pcm)
+                    // Başka bir uygulama mikrofonu alırsa Android bize dijital sıfır verir
+                    sifirParca = if (rms < 1.0) sifirParca + 1 else 0
+                    panel.mikrofonSeviyesi(sesSeviyesi(rms, 7.0))
                     kapi.isle(pcm)
                     // Konuşma sürerken bas-konuş penceresi kapanmasın
                     if (kapi.acik && konusmaPenceresiBitis > 0) konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, simdi + 3000)
@@ -321,7 +327,18 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     bitir()
                     break
                 }
-                if (surekliSohbet && !caliyor && !yenidenBaglaniyor) {
+                if (!caliyor && !yenidenBaglaniyor) {
+                    val sessizMik = sifirParca > 75 // ~3 sn
+                    if (sessizMik && !mikrofonUyarisi) {
+                        mikrofonUyarisi = true
+                        Log.w(ETIKET, "Mikrofon sıfır veriyor — başka uygulama mikrofonu tutuyor olabilir")
+                        panel.durum("Mikrofon sessiz — başka uygulama kullanıyor olabilir")
+                    } else if (!sessizMik && mikrofonUyarisi) {
+                        mikrofonUyarisi = false
+                        panel.durum("Jülide dinliyor…")
+                    }
+                }
+                if (surekliSohbet && !caliyor && !yenidenBaglaniyor && !mikrofonUyarisi) {
                     val sessiz = simdi > konusmaPenceresiBitis && medyaAktif
                     if (sessiz && !medyaSessizUyarisi) {
                         medyaSessizUyarisi = true
@@ -353,13 +370,15 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     @Volatile private var kapatmaIstegi = 0L
 
     /** Video/müzik çalıyor mu? (Jülide'nin kendi sesi USAGE_ASSISTANT olduğu için sayılmaz.) */
+    /**
+     * Gerçekten video/müzik ÇALIYOR mu? activePlaybackConfigurations duraklatılmış/boşta bekleyen
+     * oynatıcıları da listelediği için kullanılmaz (ilk komutta açılan uygulama mikrofonu kalıcı
+     * susturuyordu). isMusicActive yalnız o an ses üreten akışlar için true döner; Jülide'nin kendi
+     * sesi bittikten sonraki 1,5 sn sayılmaz.
+     */
     private fun medyaCaliyor(): Boolean = try {
-        getSystemService(AudioManager::class.java).activePlaybackConfigurations.any {
-            when (it.audioAttributes.usage) {
-                AudioAttributes.USAGE_MEDIA, AudioAttributes.USAGE_GAME, AudioAttributes.USAGE_UNKNOWN -> true
-                else -> false
-            }
-        }
+        val am = getSystemService(AudioManager::class.java)
+        am.isMusicActive && oynatici?.caliyor() != true && SystemClock.elapsedRealtime() - sonCalma > 1500
     } catch (_: Exception) {
         false
     }
