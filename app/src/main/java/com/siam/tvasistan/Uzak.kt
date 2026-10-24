@@ -23,6 +23,10 @@ object Uzak {
         val surekliSohbet: Boolean,
         /** Film/dizi aramasının yapılacağı abonelik uygulamaları (sırayla denenir). */
         val abonelikler: List<String>,
+        /** Mikrofonda TV'nin kendi sesini bastıran kaynağı dene (destekleyen cihazlarda). */
+        val yankiEngelle: Boolean,
+        /** Video açıkken tuşa basınca: true = videoyu duraklat (en temiz), false = sesini kıs. */
+        val konusurkenDuraklat: Boolean,
     )
 
     private val http = OkHttpClient.Builder()
@@ -46,6 +50,8 @@ object Uzak {
         vadEsik = 400,
         surekliSohbet = true,
         abonelikler = listOf("Prime Video", "TOD"),
+        yankiEngelle = true,
+        konusurkenDuraklat = true,
     )
 
     /** Ağdan (ETag ile) dener; olmazsa son kayıtlı kopyayı, o da yoksa yerleşik varsayılanı döndürür. */
@@ -91,6 +97,8 @@ object Uzak {
             abonelikler = j.optJSONArray("abonelikler")?.let { d ->
                 (0 until minOf(d.length(), 6)).map { d.optString(it).trim() }.filter { ABONELIK_DESENI.matches(it) }
             }?.takeIf { it.isNotEmpty() } ?: VARSAYILAN.abonelikler,
+            yankiEngelle = j.optBoolean("yanki_engelle", VARSAYILAN.yankiEngelle),
+            konusurkenDuraklat = j.optBoolean("konusurken_duraklat", VARSAYILAN.konusurkenDuraklat),
         )
     } catch (e: Exception) {
         null

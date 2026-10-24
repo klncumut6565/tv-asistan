@@ -65,6 +65,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private var mikrofon: Mikrofon? = null
     @Volatile private var oynatici: Oynatici? = null
     private var odakIstegi: AudioFocusRequest? = null
+    /** Bas-konuş sırasında videoyu duraklatmak/kısmak için alınan ses odağı. */
+    private var konusOdagi: AudioFocusRequest? = null
+    @Volatile private var konusurkenDuraklat = true
 
     @Volatile private var sonEtkinlik = 0L
     @Volatile private var bostaZamanAsimiMs = 20_000L
@@ -209,6 +212,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 // mikrofonu 12 sn açar). Kapatmak için "sohbeti kapat" de ya da tuşa uzun bas.
                 oynatici?.let { if (it.caliyor()) it.temizle() }
                 konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
+                // Video/müzik açıksa konuşurken TV sesini sustur: odak alınca uygulamalar duraklar
+                // (ya da sesini kısar), pencere bitince odak bırakılır ve kaldığı yerden devam eder.
+                if (medyaAktif) konusOdagiAl()
                 medyaSessizUyarisi = false
                 panel.durum("Dinliyorum…")
             }
@@ -246,6 +252,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 uyari = y
                 bostaZamanAsimiMs = y.bostaSn * 1000L
                 surekliSohbet = y.surekliSohbet
+                konusurkenDuraklat = y.konusurkenDuraklat
                 araclar.abonelikler = y.abonelikler
                 val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
                 val l = GeminiLive(this@AsistanServisi)
@@ -258,17 +265,20 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 val oy = Oynatici { panel.asistanSeviyesi(it) }
                 oynatici = oy
                 val kapi = SesKapisi(y.vadEsik, gonder = { live?.sesGonder(it) }, kapandi = { live?.sesAkisiBitti() })
-                val m = Mikrofon(hata = { mesaj -> ana.post { hataGoster(mesaj) } }) { pcm ->
+                val m = Mikrofon(y.yankiEngelle, hata = { mesaj -> ana.post { hataGoster(mesaj) } }) { pcm ->
                     // Yarı çift yönlü: asistan konuşurken TV hoparlöründen gelen sesi modele geri gönderme.
                     if (oy.caliyor()) return@Mikrofon
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
-                    if (surekliSohbet && SystemClock.elapsedRealtime() > konusmaPenceresiBitis && medyaAktif) {
+                    val simdi = SystemClock.elapsedRealtime()
+                    if (surekliSohbet && simdi > konusmaPenceresiBitis && medyaAktif && konusOdagi == null) {
                         kapi.kes()
                         panel.mikrofonSeviyesi(0f)
                         return@Mikrofon
                     }
-                    panel.mikrofonSeviyesi((pcmRms(pcm) / 2500.0).toFloat())
+                    panel.mikrofonSeviyesi(sesSeviyesi(pcmRms(pcm), 7.0))
                     kapi.isle(pcm)
+                    // Konuşma sürerken bas-konuş penceresi kapanmasın
+                    if (kapi.acik && konusmaPenceresiBitis > 0) konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, simdi + 3000)
                 }
                 withContext(Dispatchers.IO) { m.baslat() }
                 mikrofon = m
@@ -294,11 +304,16 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     sonEtkinlik = simdi
                     sonCalma = simdi
                     // Ses odağı yalnız Jülide konuşurken: video duraklamaz, sesi kısılır (ducking).
-                    if (odakIstegi == null) sesOdagiAl()
+                    if (odakIstegi == null && konusOdagi == null) sesOdagiAl()
                 } else if (odakIstegi != null && simdi - sonCalma > 800) {
                     sesOdagiBirak()
                 }
-                if (bekleyenKapat && !caliyor) {
+                // Bas-konuş bitti ve Jülide sustu → videoyu geri bırak
+                if (konusOdagi != null && !caliyor && simdi > konusmaPenceresiBitis && simdi - sonCalma > 1500) {
+                    konusOdagiBirak()
+                }
+                // Kapanış: Jülide'nin veda cümlesi bitince (hiç konuşmazsa en geç 3 sn sonra) küre söner.
+                if (bekleyenKapat && !caliyor && (sonCalma > kapatmaIstegi || simdi - kapatmaIstegi > 3000)) {
                     bitir()
                     break
                 }
@@ -320,10 +335,22 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         }
     }
 
+    private val KAPATMA = listOf("sohbeti kapat", "sohbet kapat", "sohbeti bitir", "julide kapan", "julide kapat", "seni kapat", "konusmayi kapat", "konusmayi bitir")
+
+    private fun kapatmaKomutuMu(metin: String): Boolean {
+        val n = Uygulamalar.normal(metin)
+        return KAPATMA.any { n.contains(it) }
+    }
+
     /** Araç: kullanıcı "tamam/kapat" dedi — asistanın veda cümlesi bitince kapat. */
     fun oturumuKapatIste() {
+        if (bekleyenKapat) return
+        kapatmaIstegi = SystemClock.elapsedRealtime()
         bekleyenKapat = true
+        panel.durum("Sohbet kapatılıyor")
     }
+
+    @Volatile private var kapatmaIstegi = 0L
 
     /** Video/müzik çalıyor mu? (Jülide'nin kendi sesi USAGE_ASSISTANT olduğu için sayılmaz.) */
     private fun medyaCaliyor(): Boolean = try {
@@ -413,6 +440,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         oynatici?.kapat()
         oynatici = null
         sesOdagiBirak()
+        konusOdagiBirak()
         try {
             stopService(Intent(this, MikrofonServisi::class.java))
         } catch (_: Exception) {
@@ -457,6 +485,30 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         odakIstegi = null
     }
 
+    private fun konusOdagiAl() {
+        if (konusOdagi != null) return
+        sesOdagiBirak()
+        val tur = if (konusurkenDuraklat) AudioManager.AUDIOFOCUS_GAIN_TRANSIENT else AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+        val istek = AudioFocusRequest.Builder(tur)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setWillPauseWhenDucked(false)
+            .setOnAudioFocusChangeListener { }
+            .build()
+        getSystemService(AudioManager::class.java).requestAudioFocus(istek)
+        konusOdagi = istek
+    }
+
+    private fun konusOdagiBirak() {
+        val istek = konusOdagi ?: return
+        getSystemService(AudioManager::class.java).abandonAudioFocusRequest(istek)
+        konusOdagi = null
+    }
+
     /** Araçlardan çağrılır. "Oynat" oturum bitince tekrar gönderilir (ses odağı geri dönünce). */
     fun medyaTusu(kod: Int) {
         medyaTusuGonder(kod)
@@ -498,6 +550,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             }
             kullaniciMetin.append(t)
             panel.metin(kullaniciMetin.toString(), asistanMetin.toString())
+            // "Sohbeti kapat" modelin aracı çağırmasına bırakılmaz: duyulduğu an kapanış başlar
+            // (veda cümlesi bitince küre söner).
+            if (kapatmaKomutuMu(kullaniciMetin.toString())) oturumuKapatIste()
         }
     }
 

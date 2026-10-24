@@ -70,11 +70,15 @@ adb install -r tv-asistan.apk
    ```
 4. **Tetik tuşunu öğret** → kumandada kullanmak istediğin tuşa bas.
    Varsayılan: Asistan / Arama tuşu. Google Asistan tuşu yakalanamazsa renkli bir tuş (ör. mavi) öğret.
-5. Tuşa bas → sağ altta mor küre çıkar → konuş. **Sürekli sohbet:** küre, uygulamalar arasında
+5. Tuşa bas → ekranın ortasında yarı saydam mor enerji küresi çıkar (TMGD web asistanındakiyle aynı) → konuş. **Sürekli sohbet:** küre, uygulamalar arasında
    gezinirken de açık kalır ve dinlemeye devam eder.
    - Kapatmak: **"sohbeti kapat"** de ya da tetik tuşuna **uzun bas** (1 sn).
-   - Video/müzik çalarken TV sesi mikrofona girmesin diye Jülide susar; **tetik tuşuna kısa bas**,
-     12 sn dinler. Jülide konuşurken kısa basış onu susturur.
+   - Video/müzik çalarken TV sesi mikrofona girmesin diye Jülide susar; **tetik tuşuna kısa bas**:
+     video duraklar (`konusurken_duraklat: false` → yalnız sesi kısılır), sen konuştukça dinler,
+     Jülide cevabını bitirince video kaldığı yerden devam eder. Jülide konuşurken kısa basış onu susturur.
+   - Mikrofon önce yankı engelleyici kaynağı (VOICE_COMMUNICATION) dener: TV donanımı destekliyorsa
+     hoparlörden çıkan sesi mikrofondan çıkarır. Desteklemiyorsa kendiliğinden normal kaynağa döner
+     (`yanki_engelle: false` ile kapatılabilir).
    - `config/ayarlar.json` → `"surekli_sohbet": false` yapılırsa eski davranış (boşta zaman aşımıyla kapanma).
 
 ## İlk testte kontrol edilecekler

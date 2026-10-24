@@ -14,42 +14,89 @@ import java.util.concurrent.TimeUnit
 
 /** Mikrofon: 16 kHz mono 16-bit PCM, 40 ms'lik parçalar. */
 class Mikrofon(
+    /**
+     * true: VOICE_COMMUNICATION kaynağı — TV'nin ses donanımı destekliyorsa kendi hoparlör
+     * sesini (yankı/TV sesi) mikrofondan çıkarır. Desteklemiyorsa ya da kaynak sessiz kalırsa
+     * otomatik olarak VOICE_RECOGNITION'a döner.
+     */
+    private val yankiEngelle: Boolean = true,
     private val hata: ((String) -> Unit)? = null,
     private val parca: (ByteArray) -> Unit,
 ) {
+    /** Şu an kullanılan kaynak (tanı için). */
+    @Volatile var kaynakAdi = ""
+        private set
+
     @Volatile private var calisiyor = false
     private var kayit: AudioRecord? = null
     private var is_: Thread? = null
 
     @SuppressLint("MissingPermission")
-    fun baslat() {
+    private fun ac(kaynak: Int): AudioRecord? {
         val min = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        val r = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            16000,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            maxOf(min, 12800)
-        )
+        val r = try {
+            AudioRecord(kaynak, 16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, 12800))
+        } catch (_: Exception) {
+            return null
+        }
         if (r.state != AudioRecord.STATE_INITIALIZED) {
             r.release()
-            throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
+            return null
         }
         try {
             if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(r.audioSessionId)?.enabled = true
             if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(r.audioSessionId)?.enabled = true
         } catch (_: Exception) {
         }
-        r.startRecording()
+        return try {
+            r.startRecording()
+            if (r.recordingState != AudioRecord.RECORDSTATE_RECORDING) { r.release(); null } else r
+        } catch (_: Exception) {
+            r.release()
+            null
+        }
+    }
+
+    fun baslat() {
+        var r: AudioRecord? = null
+        if (yankiEngelle) {
+            r = ac(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+            if (r != null) kaynakAdi = "VOICE_COMMUNICATION"
+        }
+        if (r == null) {
+            r = ac(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+            if (r != null) kaynakAdi = "VOICE_RECOGNITION"
+        }
+        if (r == null) throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
         kayit = r
         calisiyor = true
         is_ = Thread({
             val tampon = ByteArray(1280) // 40 ms
             var ardisikHata = 0
+            var rec = r
+            var sessizParca = 0
+            var denetimBitti = !yankiEngelle || kaynakAdi != "VOICE_COMMUNICATION"
             while (calisiyor) {
-                val n = r.read(tampon, 0, tampon.size)
+                val n = rec.read(tampon, 0, tampon.size)
                 if (n > 0) {
                     ardisikHata = 0
+                    // Bazı TV'lerde iletişim kaynağı açılır ama hep sıfır verir: ilk 4 sn tamamen
+                    // sessizse tanıma kaynağına geç.
+                    if (!denetimBitti) {
+                        if (pcmRms(tampon, 0, n) < 3.0) sessizParca++ else denetimBitti = true
+                        if (sessizParca >= 100) {
+                            denetimBitti = true
+                            val yedek = ac(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                            if (yedek != null) {
+                                try { rec.stop() } catch (_: Exception) {}
+                                rec.release()
+                                rec = yedek
+                                kayit = yedek
+                                kaynakAdi = "VOICE_RECOGNITION"
+                                continue
+                            }
+                        }
+                    }
                     parca(tampon.copyOf(n))
                 } else {
                     // read() hata/0 dönerse sıkı döngüde işlemciyi yakmasın
@@ -113,7 +160,7 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
             var o = 0
             while (o < p.size && acik) {
                 val n = minOf(1920, p.size - o)
-                seviye?.invoke((pcmRms(p, o, n) / 5000.0).toFloat())
+                seviye?.invoke(sesSeviyesi(pcmRms(p, o, n)))
                 track.write(p, o, n)
                 o += n
             }
@@ -159,7 +206,9 @@ class SesKapisi(
     private val kapandi: () -> Unit,
 ) {
     private val onTampon = ArrayDeque<ByteArray>()
-    private var acik = false
+    /** Şu an konuşma algılanıp sunucuya ses gidiyor mu? */
+    @Volatile var acik = false
+        private set
     private var sonKonusma = 0L
     private var gurultu = 150.0
 
@@ -198,6 +247,10 @@ class SesKapisi(
 
     private fun rms(b: ByteArray): Double = pcmRms(b)
 }
+
+/** RMS → 0..1 görsel seviye (TMGD web asistanındaki ölçekle aynı: (rms − 0.008) × 4.5). */
+fun sesSeviyesi(rms: Double, kazanc: Double = 4.5): Float =
+    ((rms / 32768.0 - 0.008) * kazanc).coerceIn(0.0, 1.0).toFloat()
 
 /** 16-bit little-endian PCM'in RMS değeri. */
 fun pcmRms(b: ByteArray, bas: Int = 0, uzunluk: Int = b.size): Double {
