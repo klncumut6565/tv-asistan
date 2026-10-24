@@ -1,0 +1,39 @@
+name: Uyandırma modeli (Vosk TR) yansısı
+
+# Jülide'nin internetsiz "Jülide" uyandırma kelimesi için Türkçe küçük Vosk modelini
+# GitHub Releases'a kopyalar (TV modeli buradan indirir ve SHA-256 ile doğrular).
+# Bu yayın "latest" YAPILMAZ: otomatik güncelleme releases/latest'i (APK) kullanır.
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/model.yml"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  yansit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Modeli indir
+        run: |
+          curl -fL --retry 3 -o vosk-model-small-tr-0.3.zip https://alphacephei.com/vosk/models/vosk-model-small-tr-0.3.zip
+          ls -l vosk-model-small-tr-0.3.zip
+          unzip -l vosk-model-small-tr-0.3.zip | tail -3
+          SHA=$(sha256sum vosk-model-small-tr-0.3.zip | cut -d' ' -f1)
+          BOYUT=$(stat -c %s vosk-model-small-tr-0.3.zip)
+          echo "::notice::MODEL_SHA256=${SHA} BOYUT=${BOYUT}"
+          echo "${SHA}  vosk-model-small-tr-0.3.zip" > vosk-model-small-tr-0.3.zip.sha256
+
+      - name: Release'e yükle (latest değil)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vosk-tr-0.3
+          name: Uyandırma modeli (Vosk TR 0.3)
+          body: Jülide'nin internetsiz uyandırma kelimesi modeli. alphacephei.com'dan yansıtılmıştır (Apache 2.0).
+          files: |
+            vosk-model-small-tr-0.3.zip
+            vosk-model-small-tr-0.3.zip.sha256
+          make_latest: false
+          prerelease: true
