@@ -73,7 +73,7 @@ class Mikrofon(
 }
 
 /** Asistan sesi: 24 kHz mono 16-bit PCM akışı. */
-class Oynatici {
+class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     private val kuyruk = LinkedBlockingQueue<ByteArray>()
     @Volatile private var acik = true
     /** Yazılan sesin tahmini bitiş anı (elapsedRealtime ms). */
@@ -109,7 +109,14 @@ class Oynatici {
             val simdi = SystemClock.elapsedRealtime()
             val sureMs = p.size / 48L // 24000 örnek/sn × 2 bayt = 48 bayt/ms
             bitis = maxOf(bitis, simdi) + sureMs
-            track.write(p, 0, p.size)
+            // Küreyi konuşmayla senkron tutmak için parçayı ~40 ms'lik dilimlerle yaz ve seviyeyi bildir.
+            var o = 0
+            while (o < p.size && acik) {
+                val n = minOf(1920, p.size - o)
+                seviye?.invoke((pcmRms(p, o, n) / 5000.0).toFloat())
+                track.write(p, o, n)
+                o += n
+            }
         }
     }, "oynatici").apply { start() }
 
@@ -180,16 +187,29 @@ class SesKapisi(
         }
     }
 
-    private fun rms(b: ByteArray): Double {
-        var toplam = 0.0
-        var n = 0
-        var i = 0
-        while (i + 1 < b.size) {
-            val s = ((b[i + 1].toInt() shl 8) or (b[i].toInt() and 0xff)).toShort().toInt()
-            toplam += s.toDouble() * s
-            n++
-            i += 2
+    /** Gönderim sürerken mikrofon susturulursa (ör. video başladı) sunucuya konuşmanın bittiğini bildir. */
+    fun kes() {
+        onTampon.clear()
+        if (acik) {
+            acik = false
+            kapandi()
         }
-        return if (n == 0) 0.0 else Math.sqrt(toplam / n)
     }
+
+    private fun rms(b: ByteArray): Double = pcmRms(b)
+}
+
+/** 16-bit little-endian PCM'in RMS değeri. */
+fun pcmRms(b: ByteArray, bas: Int = 0, uzunluk: Int = b.size): Double {
+    var toplam = 0.0
+    var n = 0
+    var i = bas
+    val son = bas + uzunluk
+    while (i + 1 < son) {
+        val s = ((b[i + 1].toInt() shl 8) or (b[i].toInt() and 0xff)).toShort().toInt()
+        toplam += s.toDouble() * s
+        n++
+        i += 2
+    }
+    return if (n == 0) 0.0 else Math.sqrt(toplam / n)
 }

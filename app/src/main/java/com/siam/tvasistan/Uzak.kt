@@ -19,6 +19,8 @@ object Uzak {
         val bostaSn: Int,
         /** Yerel konuşma algılama eşiği (RMS). Düşük = daha hassas. */
         val vadEsik: Int,
+        /** true: oturum "sohbeti kapat" denene kadar açık kalır (boşta zaman aşımı yok). */
+        val surekliSohbet: Boolean,
     )
 
     private val http = OkHttpClient.Builder()
@@ -39,6 +41,7 @@ object Uzak {
         ses = "Kore",
         bostaSn = 20,
         vadEsik = 400,
+        surekliSohbet = true,
     )
 
     /** Ağdan (ETag ile) dener; olmazsa son kayıtlı kopyayı, o da yoksa yerleşik varsayılanı döndürür. */
@@ -80,6 +83,7 @@ object Uzak {
             ses = j.optString("ses").takeIf { SES_DESENI.matches(it) } ?: VARSAYILAN.ses,
             bostaSn = j.optInt("bosta_zaman_asimi_sn", VARSAYILAN.bostaSn).coerceIn(5, 120),
             vadEsik = j.optInt("vad_esik", VARSAYILAN.vadEsik).coerceIn(100, 3000),
+            surekliSohbet = j.optBoolean("surekli_sohbet", VARSAYILAN.surekliSohbet),
         )
     } catch (e: Exception) {
         null

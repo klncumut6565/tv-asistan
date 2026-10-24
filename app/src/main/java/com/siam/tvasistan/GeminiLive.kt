@@ -59,6 +59,9 @@ class GeminiLive(private val d: Dinleyici) {
     var modelEtiketi: String? = null
         private set
 
+    /** Oturum devam tutamacı: bağlantı yenilenince sohbet bağlamı kaybolmaz. */
+    @Volatile var tutamac: String? = null
+
     suspend fun baglan(anahtar: String, y: Uzak.Yapilandirma, talimat: String, araclar: JSONArray) {
         if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — Jülide uygulamasını açıp anahtarı kaydedin.")
         sesAdi = y.ses
@@ -181,6 +184,7 @@ class GeminiLive(private val d: Dinleyici) {
                 )
             )
             .put("contextWindowCompression", JSONObject().put("slidingWindow", JSONObject()))
+            .put("sessionResumption", JSONObject().apply { tutamac?.let { put("handle", it) } })
         return JSONObject().put("setup", setup)
     }
 
@@ -189,6 +193,17 @@ class GeminiLive(private val d: Dinleyici) {
 
         if (j.has("setupComplete")) {
             hazir.complete(Unit)
+            return
+        }
+
+        j.optJSONObject("sessionResumptionUpdate")?.let { u ->
+            val h = u.optString("newHandle")
+            if (u.optBoolean("resumable") && h.isNotEmpty()) tutamac = h
+        }
+
+        // Sunucu bağlantıyı yakında kapatacak (oturum süresi doldu): servis hemen yeniden bağlanır.
+        if (j.has("goAway")) {
+            if (!kapatildi) d.kapandi()
             return
         }
 

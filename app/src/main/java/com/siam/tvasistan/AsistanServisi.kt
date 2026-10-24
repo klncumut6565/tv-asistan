@@ -68,6 +68,18 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     @Volatile private var sonEtkinlik = 0L
     @Volatile private var bostaZamanAsimiMs = 20_000L
+    /** true: oturum yalnız "sohbeti kapat" (veya tetik tuşuna uzun basış) ile kapanır. */
+    @Volatile private var surekliSohbet = true
+    /** Video/müzik çalarken mikrofon yalnız bu ana kadar açık (tetik tuşuyla açılır). */
+    @Volatile private var konusmaPenceresiBitis = 0L
+    @Volatile private var medyaSessizUyarisi = false
+    /** Son denetimde video/müzik çalıyordu (zamanlayıcı 500 ms'de bir günceller). */
+    @Volatile private var medyaAktif = false
+    @Volatile private var sonCalma = 0L
+    @Volatile private var yenidenBaglaniyor = false
+    private var yenidenDenemeler = 0
+    private var tusInisZamani = 0L
+    private var uyari: Uzak.Yapilandirma? = null
     /** İndirilmeyi bekleyen yeni sürüm (TV ana ekrandayken kurulum onayı açılır). */
     @Volatile private var bekleyenSurum: Guncelleme.Surum? = null
     @Volatile private var bekleyenKapat = false
@@ -179,7 +191,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         val tetik = ayarlar.tetikTusu
         val eslesti = if (tetik > 0) kod == tetik else kod in VARSAYILAN_TETIKLER
         if (!eslesti) return false
-        if (event.action == KeyEvent.ACTION_UP) ana.post { tetiklendi() }
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) tusInisZamani = SystemClock.elapsedRealtime()
+        if (event.action == KeyEvent.ACTION_UP) {
+            val uzun = tusInisZamani > 0 && SystemClock.elapsedRealtime() - tusInisZamani > 1000
+            tusInisZamani = 0
+            ana.post { if (uzun && durum != Durum.BOSTA) bitir() else tetiklendi() }
+        }
         return true
     }
 
@@ -188,13 +205,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             Durum.BOSTA -> oturumBaslat()
             Durum.BAGLANIYOR -> bitir()
             Durum.DINLIYOR -> {
-                val o = oynatici
-                if (o != null && o.caliyor()) {
-                    o.temizle()
-                    panel.durum("Jülide dinliyor…")
-                } else {
-                    bitir()
-                }
+                // Oturum açıkken kısa basış: Jülide'yi sustur ve dinlemeye geç (video açıkken
+                // mikrofonu 12 sn açar). Kapatmak için "sohbeti kapat" de ya da tuşa uzun bas.
+                oynatici?.let { if (it.caliyor()) it.temizle() }
+                konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
+                medyaSessizUyarisi = false
+                panel.durum("Dinliyorum…")
             }
         }
     }
@@ -214,18 +230,22 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         kullaniciMetin.clear()
         asistanMetin.clear()
         yeniTur = true
+        konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
+        medyaSessizUyarisi = false
+        yenidenDenemeler = 0
         panel.goster("Bağlanıyor…")
         try {
             startForegroundService(Intent(this, MikrofonServisi::class.java))
         } catch (e: Exception) {
             Log.w(ETIKET, "Ön plan servisi başlatılamadı: ${e.message}")
         }
-        sesOdagiAl()
 
         kapsam.launch {
             try {
                 val y = withContext(Dispatchers.IO) { Uzak.getir(ayarlar) }
+                uyari = y
                 bostaZamanAsimiMs = y.bostaSn * 1000L
+                surekliSohbet = y.surekliSohbet
                 val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
                 val l = GeminiLive(this@AsistanServisi)
                 live = l
@@ -234,12 +254,20 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     l.kapat()
                     return@launch
                 }
-                val oy = Oynatici()
+                val oy = Oynatici { panel.asistanSeviyesi(it) }
                 oynatici = oy
-                val kapi = SesKapisi(y.vadEsik, gonder = { l.sesGonder(it) }, kapandi = { l.sesAkisiBitti() })
+                val kapi = SesKapisi(y.vadEsik, gonder = { live?.sesGonder(it) }, kapandi = { live?.sesAkisiBitti() })
                 val m = Mikrofon(hata = { mesaj -> ana.post { hataGoster(mesaj) } }) { pcm ->
                     // Yarı çift yönlü: asistan konuşurken TV hoparlöründen gelen sesi modele geri gönderme.
-                    if (!oy.caliyor()) kapi.isle(pcm)
+                    if (oy.caliyor()) return@Mikrofon
+                    // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
+                    if (surekliSohbet && SystemClock.elapsedRealtime() > konusmaPenceresiBitis && medyaAktif) {
+                        kapi.kes()
+                        panel.mikrofonSeviyesi(0f)
+                        return@Mikrofon
+                    }
+                    panel.mikrofonSeviyesi((pcmRms(pcm) / 2500.0).toFloat())
+                    kapi.isle(pcm)
                 }
                 withContext(Dispatchers.IO) { m.baslat() }
                 mikrofon = m
@@ -260,14 +288,32 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 delay(500)
                 val caliyor = oynatici?.caliyor() == true
                 val simdi = SystemClock.elapsedRealtime()
-                if (caliyor) sonEtkinlik = simdi
+                medyaAktif = medyaCaliyor()
+                if (caliyor) {
+                    sonEtkinlik = simdi
+                    sonCalma = simdi
+                    // Ses odağı yalnız Jülide konuşurken: video duraklamaz, sesi kısılır (ducking).
+                    if (odakIstegi == null) sesOdagiAl()
+                } else if (odakIstegi != null && simdi - sonCalma > 800) {
+                    sesOdagiBirak()
+                }
                 if (bekleyenKapat && !caliyor) {
                     bitir()
                     break
                 }
-                if (simdi - sonEtkinlik > bostaZamanAsimiMs) {
+                if (!surekliSohbet && simdi - sonEtkinlik > bostaZamanAsimiMs) {
                     bitir()
                     break
+                }
+                if (surekliSohbet && !caliyor && !yenidenBaglaniyor) {
+                    val sessiz = simdi > konusmaPenceresiBitis && medyaAktif
+                    if (sessiz && !medyaSessizUyarisi) {
+                        medyaSessizUyarisi = true
+                        panel.durum("Video açık — konuşmak için tuşa bas")
+                    } else if (!sessiz && medyaSessizUyarisi) {
+                        medyaSessizUyarisi = false
+                        panel.durum("Jülide dinliyor…")
+                    }
                 }
             }
         }
@@ -276,6 +322,76 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     /** Araç: kullanıcı "tamam/kapat" dedi — asistanın veda cümlesi bitince kapat. */
     fun oturumuKapatIste() {
         bekleyenKapat = true
+    }
+
+    /** Video/müzik çalıyor mu? (Jülide'nin kendi sesi USAGE_ASSISTANT olduğu için sayılmaz.) */
+    private fun medyaCaliyor(): Boolean = try {
+        getSystemService(AudioManager::class.java).activePlaybackConfigurations.any {
+            when (it.audioAttributes.usage) {
+                AudioAttributes.USAGE_MEDIA, AudioAttributes.USAGE_GAME, AudioAttributes.USAGE_UNKNOWN -> true
+                else -> false
+            }
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+    /**
+     * Gemini bağlantısı kapandı (oturum süresi doldu / ağ koptu): sohbet bitmediyse aynı bağlamla
+     * sessizce yeniden bağlan. Mikrofon ve küre çalışmaya devam eder.
+     */
+    private fun yenidenBaglan() {
+        if (durum != Durum.DINLIYOR || bekleyenKapat || yenidenBaglaniyor) return
+        val y = uyari ?: return bitir()
+        if (++yenidenDenemeler > 5) {
+            hataGoster("Gemini bağlantısı tekrar tekrar koptu.")
+            return
+        }
+        yenidenBaglaniyor = true
+        val eski = live
+        val tutamac = eski?.tutamac
+        live = null
+        eski?.kapat()
+        oynatici?.temizle()
+        panel.durum("Yeniden bağlanıyor…")
+        kapsam.launch {
+            try {
+                val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
+                val l = GeminiLive(this@AsistanServisi)
+                l.tutamac = tutamac
+                try {
+                    withContext(Dispatchers.IO) { l.baglan(ayarlar.geminiAnahtari, y, talimat, araclar.bildirimler()) }
+                } catch (e: Exception) {
+                    if (tutamac == null) throw e
+                    l.kapat()
+                    // Tutamaç geçersizse temiz bir oturumla devam et.
+                    val t = GeminiLive(this@AsistanServisi)
+                    withContext(Dispatchers.IO) { t.baglan(ayarlar.geminiAnahtari, y, talimat, araclar.bildirimler()) }
+                    live = t
+                    return@launch
+                }
+                if (durum != Durum.DINLIYOR) {
+                    l.kapat()
+                    return@launch
+                }
+                live = l
+            } catch (e: Exception) {
+                Log.w(ETIKET, "Yeniden bağlanılamadı: ${e.message}")
+                yenidenBaglaniyor = false
+                delay(2000L * yenidenDenemeler)
+                yenidenBaglan()
+                return@launch
+            } finally {
+                if (live != null) {
+                    yenidenBaglaniyor = false
+                    if (durum == Durum.DINLIYOR) panel.durum("Jülide dinliyor…")
+                    kapsam.launch {
+                        delay(60_000)
+                        if (live != null) yenidenDenemeler = 0
+                    }
+                }
+            }
+        }
     }
 
     @Volatile private var sonraKurulacak: Guncelleme.Surum? = null
@@ -288,6 +404,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     fun bitir() {
         val oncekiDurum = durum
         durum = Durum.BOSTA
+        yenidenBaglaniyor = false
         mikrofon?.durdur()
         mikrofon = null
         live?.kapat()
@@ -320,7 +437,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     private fun sesOdagiAl() {
         val am = getSystemService(AudioManager::class.java)
-        val istek = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        val istek = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANT)
@@ -342,7 +459,6 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     /** Araçlardan çağrılır. "Oynat" oturum bitince tekrar gönderilir (ses odağı geri dönünce). */
     fun medyaTusu(kod: Int) {
         medyaTusuGonder(kod)
-        oturumSonuOynat = kod == KeyEvent.KEYCODE_MEDIA_PLAY || kod == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
     }
 
     private fun medyaTusuGonder(kod: Int) {
@@ -366,6 +482,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     override fun turBitti() {
         ana.post {
             yeniTur = true
+            medyaSessizUyarisi = false
             if (durum == Durum.DINLIYOR && !bekleyenKapat) panel.durum("Jülide dinliyor…")
         }
     }
@@ -401,10 +518,22 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     override fun hata(mesaj: String) {
-        ana.post { if (durum != Durum.BOSTA) hataGoster(mesaj) }
+        ana.post {
+            when {
+                durum == Durum.BOSTA -> Unit
+                durum == Durum.DINLIYOR && !bekleyenKapat -> yenidenBaglan()
+                else -> hataGoster(mesaj)
+            }
+        }
     }
 
     override fun kapandi() {
-        ana.post { if (durum != Durum.BOSTA) bitir() }
+        ana.post {
+            when {
+                durum == Durum.BOSTA -> Unit
+                durum == Durum.DINLIYOR && !bekleyenKapat -> yenidenBaglan()
+                else -> bitir()
+            }
+        }
     }
 }

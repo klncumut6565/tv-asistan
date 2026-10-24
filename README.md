@@ -62,14 +62,20 @@ adb install -r tv-asistan.apk
 2. **Mikrofon izni ver**.
 3. **Erişilebilirlik ayarlarını aç** → TV Asistan → Aç.
    Toshiba'da yol: Ayarlar → Cihaz Tercihleri → Erişilebilirlik.
-   Menü yoksa:
+   Menü yoksa veya "Tamam" işe yaramıyorsa (Android 14, dışarıdan yüklenen uygulamaları kısıtlar):
    ```
+   adb shell appops set com.siam.tvasistan ACCESS_RESTRICTED_SETTINGS allow
    adb shell settings put secure enabled_accessibility_services com.siam.tvasistan/.AsistanServisi
    adb shell settings put secure accessibility_enabled 1
    ```
 4. **Tetik tuşunu öğret** → kumandada kullanmak istediğin tuşa bas.
    Varsayılan: Asistan / Arama tuşu. Google Asistan tuşu yakalanamazsa renkli bir tuş (ör. mavi) öğret.
-5. Tuşa bas → panel çıkar → konuş. Tekrar basınca kapanır; 20 sn sessizlikte kendiliğinden kapanır.
+5. Tuşa bas → sağ altta mor küre çıkar → konuş. **Sürekli sohbet:** küre, uygulamalar arasında
+   gezinirken de açık kalır ve dinlemeye devam eder.
+   - Kapatmak: **"sohbeti kapat"** de ya da tetik tuşuna **uzun bas** (1 sn).
+   - Video/müzik çalarken TV sesi mikrofona girmesin diye Jülide susar; **tetik tuşuna kısa bas**,
+     12 sn dinler. Jülide konuşurken kısa basış onu susturur.
+   - `config/ayarlar.json` → `"surekli_sohbet": false` yapılırsa eski davranış (boşta zaman aşımıyla kapanma).
 
 ## İlk testte kontrol edilecekler
 
