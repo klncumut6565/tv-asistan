@@ -31,8 +31,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     companion object {
         private const val ETIKET = "TvAsistan"
-        /** Bu süre boyunca konuşma/ses olmazsa oturum kendiliğinden kapanır. */
-        private const val BOSTA_ZAMAN_ASIMI_MS = 20_000L
+        /** Yeni sürüm denetim aralığı. */
+        private const val GUNCELLEME_ARALIGI_MS = 6 * 60 * 60 * 1000L
         @Volatile var ornek: AsistanServisi? = null
             private set
 
@@ -67,6 +67,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private var odakIstegi: AudioFocusRequest? = null
 
     @Volatile private var sonEtkinlik = 0L
+    @Volatile private var bostaZamanAsimiMs = 20_000L
+    /** İndirilmeyi bekleyen yeni sürüm (TV ana ekrandayken kurulum onayı açılır). */
+    @Volatile private var bekleyenSurum: Guncelleme.Surum? = null
     @Volatile private var bekleyenKapat = false
     @Volatile private var oturumSonuOynat = false
 
@@ -86,6 +89,56 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         araclar = Araclar(this)
         ornek = this
         Log.i(ETIKET, "Erişilebilirlik servisi bağlandı")
+        guncellemeDongusu()
+    }
+
+    // ------------------------------------------------------------ otomatik güncelleme
+
+    private fun guncellemeDongusu() {
+        kapsam.launch {
+            delay(30_000)
+            var sonDenetim = 0L
+            while (true) {
+                val simdi = SystemClock.elapsedRealtime()
+                if (ayarlar.otomatikGuncelleme && (sonDenetim == 0L || simdi - sonDenetim > GUNCELLEME_ARALIGI_MS)) {
+                    sonDenetim = simdi
+                    bekleyenSurum = try {
+                        withContext(Dispatchers.IO) { Guncelleme.denetle() }
+                    } catch (e: Exception) {
+                        Log.w(ETIKET, "Güncelleme denetlenemedi: ${e.message}")
+                        bekleyenSurum
+                    }
+                }
+                val s = bekleyenSurum
+                // Film izlerken araya girmemek için onay yalnızca TV ana ekrandayken açılır.
+                if (s != null && durum == Durum.BOSTA && anaEkrandaMi() && !Guncelleme.kuruluyor) {
+                    guncellemeyiKur(s)
+                }
+                delay(60_000)
+            }
+        }
+    }
+
+    private fun anaEkrandaMi(): Boolean {
+        val ana = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            ?.activityInfo?.packageName ?: return false
+        return aktifPaket == ana
+    }
+
+    /** Sesli komut ("kendini güncelle") veya otomatik döngü tarafından çağrılır. */
+    fun guncellemeyiKur(s: Guncelleme.Surum) {
+        bekleyenSurum = null
+        panel.goster("Yeni sürüm ${s.ad} indiriliyor…")
+        kapsam.launch {
+            try {
+                withContext(Dispatchers.IO) { Guncelleme.kur(this@AsistanServisi, s) }
+                panel.durum("Kurulum için ekrandaki Yükle'ye basın.")
+            } catch (e: Exception) {
+                panel.durum("Güncelleme yapılamadı: ${e.message}")
+            }
+            delay(6000)
+            if (durum == Durum.BOSTA) panel.gizle()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -170,11 +223,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
         kapsam.launch {
             try {
-                val o = withContext(Dispatchers.IO) { Kimlik.canliOturumAl(ayarlar) }
-                val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
+                val y = withContext(Dispatchers.IO) { Uzak.getir(ayarlar) }
+                bostaZamanAsimiMs = y.bostaSn * 1000L
+                val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati(y.ekTalimat) }
                 val l = GeminiLive(this@AsistanServisi)
                 live = l
-                withContext(Dispatchers.IO) { l.baglan(o, talimat, araclar.bildirimler()) }
+                withContext(Dispatchers.IO) { l.baglan(ayarlar.geminiAnahtari, y, talimat, araclar.bildirimler()) }
                 if (durum != Durum.BAGLANIYOR) {
                     l.kapat()
                     return@launch
@@ -209,7 +263,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     bitir()
                     break
                 }
-                if (simdi - sonEtkinlik > BOSTA_ZAMAN_ASIMI_MS) {
+                if (simdi - sonEtkinlik > bostaZamanAsimiMs) {
                     bitir()
                     break
                 }
@@ -220,6 +274,13 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     /** Araç: kullanıcı "tamam/kapat" dedi — asistanın veda cümlesi bitince kapat. */
     fun oturumuKapatIste() {
         bekleyenKapat = true
+    }
+
+    @Volatile private var sonraKurulacak: Guncelleme.Surum? = null
+
+    /** Araç: sesli "güncelle" — oturum kapanınca kurulum başlar. */
+    fun guncellemeSonraKur(s: Guncelleme.Surum) {
+        sonraKurulacak = s
     }
 
     fun bitir() {
@@ -237,6 +298,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         } catch (_: Exception) {
         }
         if (::panel.isInitialized) panel.gizle()
+        sonraKurulacak?.let { s ->
+            sonraKurulacak = null
+            ana.postDelayed({ guncellemeyiKur(s) }, 1500)
+        }
         if (oturumSonuOynat && oncekiDurum != Durum.BOSTA) {
             oturumSonuOynat = false
             ana.postDelayed({ medyaTusuGonder(KeyEvent.KEYCODE_MEDIA_PLAY) }, 600)

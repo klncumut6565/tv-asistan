@@ -19,9 +19,7 @@ android {
         versionCode = surumKodu
         versionName = "0.1.$surumKodu"
 
-        buildConfigField("String", "API_BASE", "\"${ozellik("TV_API_BASE")}\"")
-        buildConfigField("String", "SUPABASE_URL", "\"${ozellik("SUPABASE_URL")}\"")
-        buildConfigField("String", "SUPABASE_KEY", "\"${ozellik("SUPABASE_KEY")}\"")
+        buildConfigField("String", "GUNCELLEME_REPO", "\"${ozellik("GUNCELLEME_REPO")}\"")
     }
 
     // Sabit imza: her derleme aynı anahtarla imzalanır, böylece TV'de

@@ -18,8 +18,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Gemini Live API (ham WebSocket) istemcisi — TMGD Yönetim Sistemi'ndeki
- * src/lib/voice/providers/geminiLive.ts ile AYNI protokol, model zinciri ve ses ayarları.
+ * Gemini Live API (ham WebSocket) istemcisi. Kullanıcının kendi API anahtarıyla
+ * doğrudan bağlanır; model listesi ve ses uzaktan ayardan (config/ayarlar.json) gelir.
  *   Giriş: 16-bit PCM 16 kHz mono   Çıkış: 16-bit PCM 24 kHz mono
  */
 class GeminiLive(private val d: Dinleyici) {
@@ -36,17 +36,13 @@ class GeminiLive(private val d: Dinleyici) {
         fun kapandi()
     }
 
-    private data class Model(val ad: String, val etiket: String, val blocking: Boolean = false)
 
     companion object {
         private const val ETIKET = "GeminiLive"
-        private val MODELLER = listOf(
-            Model("models/gemini-3.1-flash-live-preview", "Gemini 3.1 Flash Live"),
-            Model("models/gemini-3.8-live", "Gemini 3.8 Live", blocking = true),
-            Model("models/gemini-2.5-flash-native-audio-preview-12-2025", "Gemini 2.5 Flash Native Audio"),
-        )
         @Volatile private var sonCalisan: String? = null
     }
+
+    private var sesAdi = "Kore"
 
     private val http = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -60,14 +56,16 @@ class GeminiLive(private val d: Dinleyici) {
     var modelEtiketi: String? = null
         private set
 
-    suspend fun baglan(o: Kimlik.CanliOturum, talimat: String, araclar: JSONArray) {
-        val surumler = linkedSetOf("v1alpha", o.apiVersion.ifBlank { "v1beta" }, "v1beta")
-        val sira = MODELLER.sortedByDescending { it.ad == sonCalisan }
+    suspend fun baglan(anahtar: String, y: Uzak.Yapilandirma, talimat: String, araclar: JSONArray) {
+        if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — TV Asistan uygulamasını açıp anahtarı kaydedin.")
+        sesAdi = y.ses
+        val surumler = listOf("v1beta", "v1alpha")
+        val sira = y.modeller.sortedByDescending { it.ad == sonCalisan }
         val hatalar = mutableListOf<String>()
         for (m in sira) {
             for (s in surumler) {
                 try {
-                    tekBaglanti(o.token, s, m, talimat, araclar)
+                    tekBaglanti(anahtar, s, m, talimat, araclar)
                     modelEtiketi = m.etiket
                     sonCalisan = m.ad
                     Log.i(ETIKET, "Bağlandı: ${m.etiket} / $s")
@@ -82,10 +80,10 @@ class GeminiLive(private val d: Dinleyici) {
         throw IOException("Gemini Live bağlanamadı. " + hatalar.lastOrNull().orEmpty())
     }
 
-    private suspend fun tekBaglanti(token: String, surum: String, m: Model, talimat: String, araclar: JSONArray) {
+    private suspend fun tekBaglanti(anahtar: String, surum: String, m: Uzak.Model, talimat: String, araclar: JSONArray) {
         val hazir = CompletableDeferred<Unit>()
         val url = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.$surum." +
-            "GenerativeService.BidiGenerateContentConstrained?access_token=" + URLEncoder.encode(token, "UTF-8")
+            "GenerativeService.BidiGenerateContent?key=" + URLEncoder.encode(anahtar, "UTF-8")
         kapatildi = false
 
         val dinleyici = object : WebSocketListener() {
@@ -123,7 +121,7 @@ class GeminiLive(private val d: Dinleyici) {
         }
     }
 
-    private fun kurulumMesaji(m: Model, talimat: String, araclar: JSONArray): JSONObject {
+    private fun kurulumMesaji(m: Uzak.Model, talimat: String, araclar: JSONArray): JSONObject {
         val bildirimler = JSONArray()
         for (i in 0 until araclar.length()) {
             val a = JSONObject(araclar.getJSONObject(i).toString())
@@ -140,7 +138,7 @@ class GeminiLive(private val d: Dinleyici) {
                             .put("languageCode", "tr-TR")
                             .put(
                                 "voiceConfig", JSONObject().put(
-                                    "prebuiltVoiceConfig", JSONObject().put("voiceName", "Kore")
+                                    "prebuiltVoiceConfig", JSONObject().put("voiceName", sesAdi)
                                 )
                             )
                     )

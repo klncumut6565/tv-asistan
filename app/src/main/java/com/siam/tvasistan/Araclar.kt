@@ -20,10 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 
-/**
- * Gemini'nin çağırabileceği TV araçları + çalıştırıcıları.
- * TMGD sistemindeki go_to_page vb. araçların TV karşılığı.
- */
+/** Gemini'nin çağırabileceği TV araçları + çalıştırıcıları. */
 class Araclar(private val s: AsistanServisi) {
 
     // ---------------------------------------------------------------- tanımlar
@@ -82,8 +79,9 @@ class Araclar(private val s: AsistanServisi) {
             listOf(P("islem", "STRING", "Medya komutu", listOf("oynat", "duraklat", "oynat_duraklat", "durdur", "ileri_sar", "geri_sar", "sonraki", "onceki"))),
             listOf("islem")))
         .put(fn("oturumu_kapat", "Kullanıcı işinin bittiğini söylediğinde (tamam, teşekkürler, kapat) dinlemeyi bitirir."))
+        .put(fn("guncelle", "TV Asistan'ın yeni sürümü var mı denetler; varsa indirip kurulum ekranını açar."))
 
-    fun sistemTalimati(): String {
+    fun sistemTalimati(ek: String = ""): String {
         val uygulamalar = try {
             Uygulamalar.liste(s).joinToString(", ") { it.ad }.take(1500)
         } catch (_: Exception) {
@@ -100,8 +98,10 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - Ses → ses; oynat/duraklat → medya.
 - Kullanıcı "tamam", "teşekkürler", "kapat", "bu kadar" derse kısa bir veda et ve oturumu_kapat çağır.
+- "Kendini güncelle", "yeni sürüm var mı" → guncelle.
 Bir araç hata dönerse bunu dürüstçe ve kısaca söyle, gerekirse başka yol dene.
 TV'de kurulu uygulamalar: $uygulamalar
+$ek
 """.trim()
     }
 
@@ -125,6 +125,16 @@ TV'de kurulu uygulamalar: $uygulamalar
             "oturumu_kapat" -> {
                 s.oturumuKapatIste()
                 tamam("Oturum kapanacak.")
+            }
+            "guncelle" -> {
+                val yeni = Guncelleme.denetle()
+                if (yeni == null) {
+                    tamam("Zaten en son sürüm kullanılıyor (${BuildConfig.VERSION_NAME}).")
+                } else {
+                    s.oturumuKapatIste()
+                    s.guncellemeSonraKur(yeni)
+                    tamam("Yeni sürüm ${yeni.ad} bulundu; oturum kapanınca indirilip kurulum ekranı açılacak.")
+                }
             }
             else -> hata("Bilinmeyen araç: $ad")
         }
