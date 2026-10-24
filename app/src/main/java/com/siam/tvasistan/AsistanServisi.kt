@@ -359,6 +359,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         return KAPATMA.any { n.contains(it) }
     }
 
+    /** Araç: numara rozetlerini çiz / kaldır. */
+    fun numaralariCiz(l: List<Pair<Int, android.graphics.Rect>>) = panel.numaralar(l)
+    fun numaralariGizle() = panel.numaralariGizle()
+
     /** Araç: kullanıcı "tamam/kapat" dedi — asistanın veda cümlesi bitince kapat. */
     fun oturumuKapatIste() {
         if (bekleyenKapat) return
@@ -464,7 +468,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             stopService(Intent(this, MikrofonServisi::class.java))
         } catch (_: Exception) {
         }
-        if (::panel.isInitialized) panel.gizle()
+        if (::panel.isInitialized) {
+            panel.numaralariGizle()
+            panel.gizle()
+        }
         sonraKurulacak?.let { s ->
             sonraKurulacak = null
             ana.postDelayed({ guncellemeyiKur(s) }, 1500)

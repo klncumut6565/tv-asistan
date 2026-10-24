@@ -45,6 +45,8 @@ class Panel(private val servis: AccessibilityService) {
     private val ana = Handler(Looper.getMainLooper())
     private val wm = servis.getSystemService(WindowManager::class.java)
     @Volatile private var kure: KureKatmani? = null
+    private var numara: NumaraKatmani? = null
+    private val numaraGizleyici = Runnable { numaralariGizle() }
     private var sonDurum = ""
 
     /** Katmanı açar (yoksa oluşturur) ve durumu ayarlar. */
@@ -81,6 +83,71 @@ class Panel(private val servis: AccessibilityService) {
             if (kure === k) {
                 try { wm.removeView(k) } catch (_: Exception) {}
                 kure = null
+            }
+        }
+    }
+
+    /** Tıklanabilir öğelerin üstüne numara rozetleri çizer; 30 sn sonra kendiliğinden kalkar. */
+    fun numaralar(l: List<Pair<Int, android.graphics.Rect>>) = ana.post {
+        val n = numara ?: NumaraKatmani(servis).also { v ->
+            try { wm.addView(v, tamEkran()); numara = v } catch (_: Exception) { return@post }
+        }
+        n.ogeler = l
+        n.invalidate()
+        ana.removeCallbacks(numaraGizleyici)
+        ana.postDelayed(numaraGizleyici, 30_000)
+    }
+
+    fun numaralariGizle() = ana.post {
+        ana.removeCallbacks(numaraGizleyici)
+        numara?.let { try { wm.removeView(it) } catch (_: Exception) {} }
+        numara = null
+    }
+
+    private fun tamEkran() = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+        PixelFormat.TRANSLUCENT
+    )
+
+    /** Numara rozetleri: öğenin çevresinde ince mor çerçeve, sol üstte mor rozet içinde numara. */
+    private class NumaraKatmani(ctx: Context) : View(ctx) {
+        @Volatile var ogeler: List<Pair<Int, android.graphics.Rect>> = emptyList()
+        private val d = resources.displayMetrics.density
+        private val konum = IntArray(2)
+        private val cerceve = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = 2f * d; color = Color.argb(200, 192, 132, 252)
+        }
+        private val rozet = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(126, 34, 206) }
+        private val kenar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = 1.5f * d; color = Color.WHITE
+        }
+        private val yazi = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; textAlign = Paint.Align.CENTER; textSize = 15f * d
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+
+        override fun onDraw(c: Canvas) {
+            getLocationOnScreen(konum) // ekran koordinatlarını pencere koordinatına çevir
+            val ox = -konum[0].toFloat()
+            val oy = -konum[1].toFloat()
+            for ((no, r) in ogeler) {
+                val l = r.left + ox
+                val t = r.top + oy
+                c.drawRoundRect(l, t, r.right + ox, r.bottom + oy, 6f * d, 6f * d, cerceve)
+                val metin = no.toString()
+                val gen = max(24f * d, yazi.measureText(metin) + 12f * d)
+                val yuk = 22f * d
+                val bx = l.coerceAtLeast(0f)
+                val by = (t - yuk / 2f).coerceAtLeast(0f)
+                c.drawRoundRect(bx, by, bx + gen, by + yuk, yuk / 2f, yuk / 2f, rozet)
+                c.drawRoundRect(bx, by, bx + gen, by + yuk, yuk / 2f, yuk / 2f, kenar)
+                c.drawText(metin, bx + gen / 2f, by + yuk / 2f - (yazi.descent() + yazi.ascent()) / 2f, yazi)
             }
         }
     }
