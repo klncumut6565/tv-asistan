@@ -23,6 +23,9 @@ import java.net.URLEncoder
 /** Gemini'nin çağırabileceği TV araçları + çalıştırıcıları. */
 class Araclar(private val s: AsistanServisi) {
 
+    /** Kullanıcının abone olduğu film/dizi uygulamaları (uzak ayardan güncellenir). */
+    @Volatile var abonelikler: List<String> = listOf("Prime Video", "TOD")
+
     // ---------------------------------------------------------------- tanımlar
 
     private class P(val ad: String, val tip: String, val aciklama: String, val secenekler: List<String>? = null)
@@ -49,7 +52,12 @@ class Araclar(private val s: AsistanServisi) {
         .put(fn("uygulama_kapat", "Açık olan bir uygulamayı kapatır. Ad verilmezse şu an ekrandaki uygulamayı kapatır.",
             listOf(P("ad", "STRING", "Kapatılacak uygulamanın adı; boş bırakılırsa ekrandaki uygulama"))))
         .put(fn("uygulamalari_listele", "TV'de kurulu tüm uygulamaların adlarını döndürür."))
-        .put(fn("icerik_ara", "Film, dizi, oyuncu veya program için TV'nin genel içerik aramasını açar (tüm uygulamalarda arar).",
+        .put(fn("abonelikte_ara", "Filmi/diziyi kullanıcının ABONE olduğu uygulamada arar: uygulamayı açar, arama kutusuna adı yazar. Sonra ekrani_oku ile sonucu bulup tikla, ardından Oynat/İzle'ye tikla.",
+            listOf(
+                P("ad", "STRING", "Film veya dizi adı"),
+                P("uygulama", "STRING", "Abonelik uygulaması (boşsa ilk abonelik)")
+            ), listOf("ad")))
+        .put(fn("icerik_ara", "TV'nin genel içerik araması (tüm uygulamalar). Film/dizi için KULLANMA; abonelikte_ara kullan.",
             listOf(P("sorgu", "STRING", "Aranacak film/dizi/kişi adı")), listOf("sorgu")))
         .put(fn("youtube_ara", "YouTube uygulamasında arama yapar.",
             listOf(P("sorgu", "STRING", "Aranacak metin")), listOf("sorgu")))
@@ -97,8 +105,7 @@ Senin adın JÜLİDE. Toshiba Android TV üzerinde çalışan Türkçe sesli asi
 Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulamak:
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
 - "X'i kapat", "bunu kapat", "uygulamadan çık" → uygulama_kapat (ad belirtilmemişse boş bırak).
-- "Şu filmi/diziyi bul" (uygulama belirtilmemişse) → icerik_ara.
-- "Netflix'te / Prime'da / Disney'de X'i bul" → önce uygulama_ac, sonra ekrani_oku ile ekrana bak, "Ara" öğesine tikla, yaz ile adı yaz (gonder=true), sonra sonucu tikla.
+- FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. "X filmini bul/aç/izle" → abonelikte_ara (platform söylenmişse o, yoksa sırayla). Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
 - "YouTube'da X" → youtube_ara.
 - "Tarayıcıyı aç, X'i ara" → web_ara. Belirli site → url_ac.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
@@ -120,6 +127,7 @@ TV'de kurulu uygulamalar: $uygulamalar
             "uygulama_ac" -> uygulamaAc(a.optString("ad"))
             "uygulama_kapat" -> uygulamaKapat(a.optString("ad"))
             "uygulamalari_listele" -> tamam(Uygulamalar.liste(s).joinToString(", ") { it.ad })
+            "abonelikte_ara" -> abonelikteAra(a.optString("ad"), a.optString("uygulama"))
             "icerik_ara" -> icerikAra(a.optString("sorgu"))
             "youtube_ara" -> youtubeAra(a.optString("sorgu"))
             "web_ara" -> webAra(a.optString("sorgu"))
@@ -196,6 +204,47 @@ TV'de kurulu uygulamalar: $uygulamalar
         }
         Uygulamalar.sonlandir(s, paket)
         return tamam("$gorunenAd kapatıldı.")
+    }
+
+    private fun abonelikteAra(ad: String, uygulama: String): JSONObject {
+        if (ad.isBlank()) return hata("Film adı boş.")
+        val liste = abonelikler
+        val hedefAdi = if (uygulama.isBlank()) liste.first() else
+            liste.firstOrNull { Uygulamalar.normal(it).contains(Uygulamalar.normal(uygulama)) || Uygulamalar.normal(uygulama).contains(Uygulamalar.normal(it)) }
+                ?: return hata("'$uygulama' kullanıcının abonelikleri arasında değil. Abonelikler: ${liste.joinToString(", ")}.")
+        val uyg = Uygulamalar.bul(s, hedefAdi).firstOrNull()
+            ?: return hata("$hedefAdi TV'de kurulu değil.")
+        val siradaki = liste.dropWhile { it != hedefAdi }.drop(1)
+        val ek = if (siradaki.isEmpty()) "" else " Bulunamazsa sıradaki: ${siradaki.joinToString(", ")}."
+
+        // 1) Uygulama arama niyetini destekliyorsa doğrudan
+        val niyet = Intent(Intent.ACTION_SEARCH).setPackage(uyg.paket)
+            .putExtra(SearchManager.QUERY, ad).putExtra("query", ad)
+        if (s.packageManager.queryIntentActivities(niyet, 0).isNotEmpty() && baslat(niyet)) {
+            SystemClock.sleep(2500)
+            return tamam("${uyg.ad} içinde '$ad' arandı. Şimdi ekrani_oku ile sonuçlara bak.$ek")
+        }
+
+        // 2) Uygulamayı aç → Ara öğesine tıkla → adı yaz
+        if (!Uygulamalar.ac(s, uyg.paket)) return hata("${uyg.ad} açılamadı.")
+        var bekle = 0
+        while (s.aktifPaket != uyg.paket && bekle < 30) { SystemClock.sleep(200); bekle++ }
+        SystemClock.sleep(1800)
+        if (yaziAlani() == null) {
+            val araOgesi = ogeler().firstOrNull { o ->
+                val n = Uygulamalar.normal(o.metin)
+                n == "ara" || n == "arama" || n == "search" || n.startsWith("ara ") || n.contains("search")
+            }
+            val dugum = araOgesi?.let { tiklanabilir(it.dugum) }
+                ?: return tamam("${uyg.ad} açıldı ama arama düğmesi bulunamadı. ekrani_oku ile 'Ara' öğesini bulup tikla, sonra yaz ile '$ad' yaz.$ek")
+            dugum.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            var b = 0
+            while (yaziAlani() == null && b < 15) { SystemClock.sleep(200); b++ }
+        }
+        val y = yaz(ad, gonder = true)
+        if (y.has("hata")) return tamam("${uyg.ad} arama ekranı açıldı ama yazılamadı: ${y.optString("hata")}. ekrani_oku ile devam et.$ek")
+        SystemClock.sleep(2000)
+        return tamam("${uyg.ad} içinde '$ad' arandı. Şimdi ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra Oynat/İzle'ye tikla.$ek")
     }
 
     private fun icerikAra(q: String): JSONObject {

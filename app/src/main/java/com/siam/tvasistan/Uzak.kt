@@ -21,6 +21,8 @@ object Uzak {
         val vadEsik: Int,
         /** true: oturum "sohbeti kapat" denene kadar açık kalır (boşta zaman aşımı yok). */
         val surekliSohbet: Boolean,
+        /** Film/dizi aramasının yapılacağı abonelik uygulamaları (sırayla denenir). */
+        val abonelikler: List<String>,
     )
 
     private val http = OkHttpClient.Builder()
@@ -31,6 +33,7 @@ object Uzak {
     private val ADRES = "https://raw.githubusercontent.com/${BuildConfig.GUNCELLEME_REPO}/main/config/ayarlar.json"
     private val MODEL_DESENI = Regex("^models/gemini-[a-z0-9.\\-]{1,60}$")
     private val SES_DESENI = Regex("^[A-Za-z]{3,20}$")
+    private val ABONELIK_DESENI = Regex("^[\\p{L}0-9 .+'-]{2,30}$")
 
     private val VARSAYILAN = Yapilandirma(
         modeller = listOf(
@@ -42,6 +45,7 @@ object Uzak {
         bostaSn = 20,
         vadEsik = 400,
         surekliSohbet = true,
+        abonelikler = listOf("Prime Video", "TOD"),
     )
 
     /** Ağdan (ETag ile) dener; olmazsa son kayıtlı kopyayı, o da yoksa yerleşik varsayılanı döndürür. */
@@ -84,6 +88,9 @@ object Uzak {
             bostaSn = j.optInt("bosta_zaman_asimi_sn", VARSAYILAN.bostaSn).coerceIn(5, 120),
             vadEsik = j.optInt("vad_esik", VARSAYILAN.vadEsik).coerceIn(100, 3000),
             surekliSohbet = j.optBoolean("surekli_sohbet", VARSAYILAN.surekliSohbet),
+            abonelikler = j.optJSONArray("abonelikler")?.let { d ->
+                (0 until minOf(d.length(), 6)).map { d.optString(it).trim() }.filter { ABONELIK_DESENI.matches(it) }
+            }?.takeIf { it.isNotEmpty() } ?: VARSAYILAN.abonelikler,
         )
     } catch (e: Exception) {
         null

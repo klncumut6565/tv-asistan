@@ -246,6 +246,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 uyari = y
                 bostaZamanAsimiMs = y.bostaSn * 1000L
                 surekliSohbet = y.surekliSohbet
+                araclar.abonelikler = y.abonelikler
                 val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
                 val l = GeminiLive(this@AsistanServisi)
                 live = l
