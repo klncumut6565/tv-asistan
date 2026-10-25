@@ -522,6 +522,8 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return sonraki.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
     }
 
+    private fun ekranImzasi(): Int = try { ogeler().joinToString("|") { it.metin }.hashCode() } catch (_: Exception) { 0 }
+
     private fun kaydir(yon: String, miktar: Int): JSONObject {
         val adim = miktar.coerceIn(1, 5)
         val geri = yon == "yukari" || yon == "sol"
@@ -542,6 +544,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
         for (k in kokler()) ara(k, 0)
         var yapilan = 0
+        val once = ekranImzasi()
         en?.let { hedef ->
             val yonlu = when (yon) {
                 "asagi" -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_DOWN
@@ -556,7 +559,9 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
                 SystemClock.sleep(250)
             }
         }
-        if (yapilan > 0) return tamam("$yapilan adım kaydırıldı.")
+        // Eylem "başarılı" dönse bile sayfa kımıldamamış olabilir (web sayfaları); ekran değiştiyse bitir.
+        if (yapilan > 0 && ekranImzasi() != once) return tamam("$yapilan adım kaydırıldı.")
+        yapilan = 0
 
         // 2) Ekranda kaydırma hareketi (tarayıcı ve web sayfaları)
         val dm = s.resources.displayMetrics
@@ -575,6 +580,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             if (s.dispatchGesture(g, null, null)) yapilan++
             SystemClock.sleep(450)
         }
+        if (yapilan > 0 && ekranImzasi() != once) return tamam("Kaydırma hareketiyle kaydırıldı.")
         // 3) Yön tuşları (TV menüleri hareketi yok sayabilir; ikisini birden yapmak zararsız)
         repeat(adim * 3) {
             tekBas(yon)
