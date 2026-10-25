@@ -74,12 +74,18 @@ class Mikrofon(
         // USB mikrofon takılıysa dahili mikrofon yerine onu kullan (TV'nin sıfır veren dahili mikrofonunu atla)
         try {
             if (yonetici != null && android.os.Build.VERSION.SDK_INT >= 28) {
-                val usb = yonetici.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS).firstOrNull {
+                val girisler = yonetici.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+                // Öncelik: USB mikrofon, sonra Bluetooth (SCO) mikrofon
+                val secilen = girisler.firstOrNull {
                     it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE || it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
+                } ?: girisler.firstOrNull {
+                    it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO
                 }
-                if (usb != null) {
-                    r.setPreferredDevice(usb)
-                    android.util.Log.i("TvAsistan", "TANI usb giriş: ${usb.productName} tercih edildi")
+                if (secilen != null) {
+                    r.setPreferredDevice(secilen)
+                    android.util.Log.i("TvAsistan", "TANI giriş cihazı: ${secilen.productName} tip=${secilen.type} tercih edildi")
+                } else {
+                    android.util.Log.i("TvAsistan", "TANI giriş cihazı: harici mikrofon yok, dahili kullanılıyor")
                 }
             }
         } catch (_: Exception) {
