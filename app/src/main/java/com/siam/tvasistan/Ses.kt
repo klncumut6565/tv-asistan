@@ -379,13 +379,14 @@ class SessizCikis {
                 calisiyor = false
                 return@Thread
             }
-            // 40 ms'lik ±1 LSB gürültü (bazı ses işlemcileri tam sıfırı 'sessizlik' sayıp uyuyabilir)
+            // 40 ms'lik ±30 LSB gürültü (≈ -60 dBFS). ±1 LSB, TV ses donanımında "sessizlik" sayılıp
+            // çıkış uyku moduna geçiyordu (TANI: BUFFER TIMEOUT); bu seviye çıkışı uyanık tutmalı.
             val tampon = ByteArray(1280)
             val rnd = java.util.Random()
             for (i in tampon.indices step 2) {
-                val v = rnd.nextInt(3) - 1
-                tampon[i] = v.toByte()
-                tampon[i + 1] = (if (v < 0) -1 else 0).toByte()
+                val v = rnd.nextInt(61) - 30
+                tampon[i] = (v and 0xFF).toByte()
+                tampon[i + 1] = ((v shr 8) and 0xFF).toByte()
             }
             try {
                 track.play()
