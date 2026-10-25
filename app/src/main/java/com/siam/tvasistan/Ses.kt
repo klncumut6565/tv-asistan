@@ -71,6 +71,19 @@ class Mikrofon(
             } catch (_: Exception) {
             }
         }
+        // USB mikrofon takılıysa dahili mikrofon yerine onu kullan (TV'nin sıfır veren dahili mikrofonunu atla)
+        try {
+            if (yonetici != null && android.os.Build.VERSION.SDK_INT >= 28) {
+                val usb = yonetici.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS).firstOrNull {
+                    it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE || it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
+                }
+                if (usb != null) {
+                    r.setPreferredDevice(usb)
+                    android.util.Log.i("TvAsistan", "TANI usb giriş: ${usb.productName} tercih edildi")
+                }
+            }
+        } catch (_: Exception) {
+        }
         return try {
             r.startRecording()
             if (r.recordingState != AudioRecord.RECORDSTATE_RECORDING) { r.release(); null } else r
