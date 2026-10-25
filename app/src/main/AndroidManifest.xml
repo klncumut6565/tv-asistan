@@ -87,6 +87,33 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Deneme: Jülide'yi TV'nin "Dijital asistan" uygulaması olarak seçilebilir yapar -->
+        <service
+            android:name=".AsistanAsistan"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/asistan_asistan" />
+        </service>
+
+        <service
+            android:name=".AsistanOturumServisi"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+
+        <service
+            android:name=".AsistanTanima"
+            android:exported="true"
+            android:permission="android.permission.BIND_RECOGNITION_SERVICE">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".GuncellemeAlici"
             android:exported="false" />
