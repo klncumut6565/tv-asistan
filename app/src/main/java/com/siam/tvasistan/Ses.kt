@@ -48,6 +48,21 @@ class Mikrofon(
             if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(r.audioSessionId)?.enabled = true
         } catch (_: Exception) {
         }
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            // TANI: sistem kaydı susturuyor mu? (silenced=true ise sorun Android/TV tarafında)
+            try {
+                r.registerAudioRecordingCallback(java.util.concurrent.Executors.newSingleThreadExecutor(),
+                    object : android.media.AudioRecord.AudioRecordingCallback() {
+                        override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
+                            for (c in configs) {
+                                if (c.clientAudioSessionId != r.audioSessionId) continue
+                                android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynak silenced=${c.isClientSilenced} cihaz=${c.format.channelCount}ch")
+                            }
+                        }
+                    })
+            } catch (_: Exception) {
+            }
+        }
         return try {
             r.startRecording()
             if (r.recordingState != AudioRecord.RECORDSTATE_RECORDING) { r.release(); null } else r
