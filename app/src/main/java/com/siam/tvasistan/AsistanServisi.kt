@@ -87,6 +87,14 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     @Volatile private var sifirParca = 0
     private var mikrofonUyarisi = false
     private var sonMikrofonYenileme = 0L
+    // Tanılama: 2 sn'lik pencerede mikrofon istatistikleri (mikrofon iş parçacığı yazar)
+    @Volatile private var tPar = 0
+    @Volatile private var tSifir = 0
+    @Volatile private var tRmsToplam = 0.0
+    @Volatile private var tRmsMaks = 0.0
+    @Volatile private var tKapali = 0
+    private var sonTani = 0L
+    private var oncekiCaliyor = false
     @Volatile private var sonCalma = 0L
     @Volatile private var yenidenBaglaniyor = false
     private var yenidenDenemeler = 0
@@ -277,7 +285,14 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 val kapi = SesKapisi(y.vadEsik, gonder = { live?.sesGonder(it) }, kapandi = { live?.sesAkisiBitti() })
                 val m = Mikrofon(y.yankiEngelle, hata = { mesaj -> ana.post { hataGoster(mesaj) } }) { pcm ->
                     // Yarı çift yönlü: asistan konuşurken TV hoparlöründen gelen sesi modele geri gönderme.
-                    if (oy.caliyor()) return@Mikrofon
+                    run {
+                        val r = pcmRms(pcm)
+                        tPar++
+                        if (r < 1.0) tSifir++
+                        tRmsToplam += r
+                        if (r > tRmsMaks) tRmsMaks = r
+                    }
+                    if (oy.caliyor()) { tKapali++; return@Mikrofon }
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
                     val simdi = SystemClock.elapsedRealtime()
                     if (surekliSohbet && simdi > konusmaPenceresiBitis && medyaAktif && konusOdagi == null) {
@@ -332,6 +347,22 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 val caliyor = oynatici?.caliyor() == true
                 val simdi = SystemClock.elapsedRealtime()
                 medyaAktif = medyaCaliyor()
+                // Tanılama: Jülide'nin konuşmaya başlaması/bitmesi ve 2 sn'de bir mikrofon özeti
+                if (caliyor != oncekiCaliyor) {
+                    oncekiCaliyor = caliyor
+                    Log.i(ETIKET, if (caliyor) "TANI olay: Jülide konuşmaya başladı" else "TANI olay: Jülide sustu")
+                }
+                if (simdi - sonTani >= 2000) {
+                    sonTani = simdi
+                    val n = tPar
+                    if (n > 0) {
+                        Log.i(ETIKET, "TANI mik: parça=$n sıfır=%${tSifir * 100 / n} ort=${(tRmsToplam / n).toInt()} maks=${tRmsMaks.toInt()} " +
+                            "jülideKonuşuyor=$caliyor kapalı=$tKapali medya=$medyaAktif kaynak=${mikrofon?.kaynakAdi} odak=${odakIstegi != null || konusOdagi != null}")
+                    } else {
+                        Log.i(ETIKET, "TANI mik: HİÇ PARÇA GELMEDİ kaynak=${mikrofon?.kaynakAdi}")
+                    }
+                    tPar = 0; tSifir = 0; tRmsToplam = 0.0; tRmsMaks = 0.0; tKapali = 0
+                }
                 if (caliyor) {
                     sonEtkinlik = simdi
                     sonCalma = simdi
@@ -643,6 +674,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     override fun aracCagrisi(ad: String, args: JSONObject): JSONObject {
+        Log.i(ETIKET, "TANI olay: araç $ad")
         sonEtkinlik = SystemClock.elapsedRealtime()
         panel.durum("İşlem: ${ad.replace('_', ' ')}")
         val sonuc = araclar.calistir(ad, args)
