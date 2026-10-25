@@ -168,6 +168,7 @@ class Panel(private val servis: AccessibilityService) {
             d.startsWith("Bağlan") -> Mod.BAGLANIYOR to "BAĞLANIYOR"
             d.startsWith("Konuşuyor") -> Mod.KONUSUYOR to "KONUŞUYOR"
             d.startsWith("İşlem") -> Mod.ISLEM to "İŞLEM YAPIYOR"
+            d.contains("Jülide\" de") -> Mod.BEKLIYOR to "VİDEO AÇIK · \"JÜLİDE\" DE YA DA TUŞA BAS"
             d.contains("tuşa bas") -> Mod.BEKLIYOR to "VİDEO AÇIK · KONUŞMAK İÇİN TUŞA BAS"
             d.contains("dinliyor", true) || d.startsWith("Dinliyorum") -> Mod.DINLIYOR to "DİNLİYOR"
             else -> Mod.BILGI to d.uppercase(TR).take(70)

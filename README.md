@@ -76,6 +76,10 @@ adb install -r tv-asistan.apk
    - Video/müzik çalarken TV sesi mikrofona girmesin diye Jülide susar; **tetik tuşuna kısa bas**:
      video duraklar (`konusurken_duraklat: false` → yalnız sesi kısılır), sen konuştukça dinler,
      Jülide cevabını bitirince video kaldığı yerden devam eder. Jülide konuşurken kısa basış onu susturur.
+   - **"Jülide" uyandırma kelimesi:** video/canlı yayın açıkken tuşa basmadan **"Jülide, …"** de.
+     Ses Gemini'ye gitmez; TV'nin içinde, internetsiz (Vosk, küçük Türkçe model ~37 MB, ilk sohbette bir kez
+     indirilir, SHA-256 doğrulanır) yalnız bu kelime aranır. Duyunca TV kısılır/durur ve komut iletilir.
+     Kapatmak: `"uyandirma": false`; tanıyıcının yazımları: `"uyandirma_kelimeleri"`.
    - Mikrofon önce yankı engelleyici kaynağı (VOICE_COMMUNICATION) dener: TV donanımı destekliyorsa
      hoparlörden çıkan sesi mikrofondan çıkarır. Desteklemiyorsa kendiliğinden normal kaynağa döner
      (`yanki_engelle: false` ile kapatılabilir).

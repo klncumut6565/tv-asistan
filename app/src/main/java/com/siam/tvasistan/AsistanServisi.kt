@@ -78,6 +78,11 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     @Volatile private var medyaSessizUyarisi = false
     /** Son denetimde video/müzik çalıyordu (zamanlayıcı 500 ms'de bir günceller). */
     @Volatile private var medyaAktif = false
+    /** "Jülide" uyandırma dinleyicisi (yalnız sohbet açıkken; TV sesi varken beslenir). */
+    @Volatile private var uyandirma: Uyandirma? = null
+    /** Uyandırmadan önceki son ~3 sn mikrofon sesi ("Jülide, TRT Haber'i aç" kaybolmasın). */
+    private val sonSesler = ArrayDeque<ByteArray>()
+    @Volatile private var tamponuGonder = false
     /** Art arda gelen tamamen sessiz (dijital sıfır) mikrofon parçası sayısı. */
     @Volatile private var sifirParca = 0
     private var mikrofonUyarisi = false
@@ -274,9 +279,22 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
                     val simdi = SystemClock.elapsedRealtime()
                     if (surekliSohbet && simdi > konusmaPenceresiBitis && medyaAktif && konusOdagi == null) {
+                        // TV sesi var: ses Gemini'ye GİTMEZ, yalnız yerel "Jülide" dinleyicisine gider
                         kapi.kes()
                         panel.mikrofonSeviyesi(0f)
+                        uyandirma?.besle(pcm)
+                        synchronized(sonSesler) {
+                            sonSesler.addLast(pcm)
+                            while (sonSesler.size > 75) sonSesler.removeFirst() // ~3 sn
+                        }
                         return@Mikrofon
+                    }
+                    if (tamponuGonder) {
+                        // Uyandırma: "Jülide, …" ile başlayan son saniyeleri de Gemini'ye ilet
+                        tamponuGonder = false
+                        val eski = synchronized(sonSesler) { sonSesler.toList().also { sonSesler.clear() } }
+                        kapi.esikCarpani = 1.0
+                        for (p in eski) kapi.isle(p)
                     }
                     val rms = pcmRms(pcm)
                     // Başka bir uygulama mikrofonu alırsa Android bize dijital sıfır verir
@@ -290,6 +308,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 withContext(Dispatchers.IO) { m.baslat() }
                 mikrofon = m
+                if (y.uyandirma && surekliSohbet) {
+                    uyandirma = Uyandirma(this@AsistanServisi, y.uyandirmaKelimeleri) { ana.post { uyandirmaDuyuldu() } }
+                        .also { it.baslat() }
+                }
                 durum = Durum.DINLIYOR
                 sonEtkinlik = SystemClock.elapsedRealtime()
                 panel.durum("Jülide dinliyor…")
@@ -344,7 +366,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     val sessiz = simdi > konusmaPenceresiBitis && medyaAktif
                     if (sessiz && !medyaSessizUyarisi) {
                         medyaSessizUyarisi = true
-                        panel.durum("Video açık — konuşmak için tuşa bas")
+                        panel.durum(if (uyandirma != null && Uyandirma.modelHazirMi(this@AsistanServisi))
+                            "Video açık — \"Jülide\" de ya da tuşa bas" else "Video açık — konuşmak için tuşa bas")
                     } else if (!sessiz && medyaSessizUyarisi) {
                         medyaSessizUyarisi = false
                         panel.durum("Jülide dinliyor…")
@@ -359,6 +382,16 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private fun kapatmaKomutuMu(metin: String): Boolean {
         val n = Uygulamalar.normal(metin)
         return KAPATMA.any { n.contains(it) }
+    }
+
+    /** Yerel dinleyici "Jülide"yi duydu: TV'yi kıs/duraklat, dinlemeye geç, son saniyeleri ilet. */
+    private fun uyandirmaDuyuldu() {
+        if (durum != Durum.DINLIYOR || bekleyenKapat) return
+        konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 10_000
+        if (medyaAktif) konusOdagiAl()
+        medyaSessizUyarisi = false
+        tamponuGonder = true
+        panel.durum("Dinliyorum…")
     }
 
     /** Araç: numara rozetlerini çiz / kaldır. */
@@ -460,6 +493,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         yenidenBaglaniyor = false
         mikrofon?.durdur()
         mikrofon = null
+        uyandirma?.durdur()
+        uyandirma = null
+        synchronized(sonSesler) { sonSesler.clear() }
+        tamponuGonder = false
         live?.kapat()
         live = null
         oynatici?.kapat()

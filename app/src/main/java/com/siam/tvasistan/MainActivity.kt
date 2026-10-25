@@ -153,6 +153,11 @@ class MainActivity : Activity() {
             durumGuncelle()
         })
 
+        sutun.addView(dugme("\"Jülide\" uyandırma modelini şimdi indir (~37 MB, bir kez)") {
+            Thread { Uyandirma.modeliHazirla(this) }.start()
+            toast("İndirme başladı; durum yukarıda görünür.")
+        })
+
         sutun.addView(yazi("4) Deneme", 22f, true))
         sutun.addView(dugme("Şimdi dinle") {
             val s = AsistanServisi.ornek
@@ -275,7 +280,8 @@ class MainActivity : Activity() {
             a.tetikTusu > 0 -> KeyEvent.keyCodeToString(a.tetikTusu)
             else -> "Varsayılan (Asistan / Arama tuşu)"
         }
-        durumTv.text = "Gemini anahtarı: $giris\nErişilebilirlik servisi: $servis\nMikrofon izni: $mik\nTetik tuşu: $tus"
+        val uyan = if (Uyandirma.modelHazirMi(this)) "✔ hazır" else Uyandirma.durum
+        durumTv.text = "Gemini anahtarı: $giris\nErişilebilirlik servisi: $servis\nMikrofon izni: $mik\nTetik tuşu: $tus\n\"Jülide\" uyandırma modeli: $uyan"
     }
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_LONG).show()

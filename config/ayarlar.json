@@ -24,5 +24,16 @@
     "TOD"
   ],
   "yanki_engelle": true,
-  "konusurken_duraklat": true
+  "konusurken_duraklat": true,
+  "uyandirma": true,
+  "uyandirma_kelimeleri": [
+    "jülide",
+    "julide",
+    "cülide",
+    "jülida",
+    "gülide",
+    "jüli de",
+    "jülde",
+    "ülide"
+  ]
 }

@@ -27,6 +27,10 @@ object Uzak {
         val yankiEngelle: Boolean,
         /** Video açıkken tuşa basınca: true = videoyu duraklat (en temiz), false = sesini kıs. */
         val konusurkenDuraklat: Boolean,
+        /** Video/canlı yayın açıkken "Jülide" uyandırma kelimesiyle dinlemeye başla (internetsiz). */
+        val uyandirma: Boolean,
+        /** Uyandırma eşleşmesinde kabul edilen yazımlar (tanıyıcı "Jülide"yi farklı yazabilir). */
+        val uyandirmaKelimeleri: List<String>,
     )
 
     private val http = OkHttpClient.Builder()
@@ -37,6 +41,7 @@ object Uzak {
     private val ADRES = "https://raw.githubusercontent.com/${BuildConfig.GUNCELLEME_REPO}/main/config/ayarlar.json"
     private val MODEL_DESENI = Regex("^models/gemini-[a-z0-9.\\-]{1,60}$")
     private val SES_DESENI = Regex("^[A-Za-z]{3,20}$")
+    private val KELIME_DESENI = Regex("^[\\p{L} ]{3,20}$")
     private val ABONELIK_DESENI = Regex("^[\\p{L}0-9 .+'-]{2,30}$")
 
     private val VARSAYILAN = Yapilandirma(
@@ -52,6 +57,8 @@ object Uzak {
         abonelikler = listOf("Prime Video", "TOD"),
         yankiEngelle = true,
         konusurkenDuraklat = true,
+        uyandirma = true,
+        uyandirmaKelimeleri = listOf("jülide", "julide", "cülide", "jülida", "gülide", "jüli de", "jülde", "ülide"),
     )
 
     /** Ağdan (ETag ile) dener; olmazsa son kayıtlı kopyayı, o da yoksa yerleşik varsayılanı döndürür. */
@@ -99,6 +106,10 @@ object Uzak {
             }?.takeIf { it.isNotEmpty() } ?: VARSAYILAN.abonelikler,
             yankiEngelle = j.optBoolean("yanki_engelle", VARSAYILAN.yankiEngelle),
             konusurkenDuraklat = j.optBoolean("konusurken_duraklat", VARSAYILAN.konusurkenDuraklat),
+            uyandirma = j.optBoolean("uyandirma", VARSAYILAN.uyandirma),
+            uyandirmaKelimeleri = j.optJSONArray("uyandirma_kelimeleri")?.let { d ->
+                (0 until minOf(d.length(), 15)).map { d.optString(it).trim() }.filter { KELIME_DESENI.matches(it) }
+            }?.takeIf { it.isNotEmpty() } ?: VARSAYILAN.uyandirmaKelimeleri,
         )
     } catch (e: Exception) {
         null
