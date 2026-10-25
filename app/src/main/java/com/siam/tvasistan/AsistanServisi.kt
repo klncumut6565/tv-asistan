@@ -479,7 +479,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         "blutv", "exxen", "gain", "tabii", "trt", "puhutv", "todtv", "digiturk", "dsmart", "tivibu", "beinconnect", "ssport",
     )
     private val OYNATICI_AD_IPUCLARI = listOf(
-        "tod", "tv", "canli tv", "prime video", "youtube", "spotify", "netflix", "disney", "exxen", "blutv", "tabii", "gain",
+        "tod", "canli tv", "prime video", "youtube", "spotify", "netflix", "disney", "exxen", "blutv", "tabii", "gain",
     )
 
     /**
