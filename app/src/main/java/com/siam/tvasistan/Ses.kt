@@ -99,14 +99,15 @@ class Mikrofon(
                     if (sifirParca >= 75 && yenilemeSayisi < 6) {
                         sifirParca = 0
                         yenilemeSayisi++
-                        try { rec.stop() } catch (_: Exception) {}
-                        rec.release()
-                        try { Thread.sleep(150L * yenilemeSayisi) } catch (_: InterruptedException) { break }
+                        // ÖNCE yenisini aç; yalnız açılırsa eskisini kapat. (Eski sürüm önce kapatıyordu;
+                        // yeni kayıt açılamayınca 'Mikrofon okunamıyor' ile oturum ~30 sn'de kapanıyordu.)
                         val yeni = sirayla(kaynakSira + 1)
                         if (yeni == null) {
-                            hata?.invoke("Mikrofon yeniden açılamadı.")
-                            break
+                            android.util.Log.w("TvAsistan", "Mikrofon yeniden açılamadı; mevcut kayıtla devam (deneme $yenilemeSayisi)")
+                            continue
                         }
+                        try { rec.stop() } catch (_: Exception) {}
+                        try { rec.release() } catch (_: Exception) {}
                         rec = yeni.first
                         kayit = yeni.first
                         kaynakSira = yeni.third
@@ -118,6 +119,18 @@ class Mikrofon(
                 } else {
                     // read() hata/0 dönerse sıkı döngüde işlemciyi yakmasın
                     if (++ardisikHata > 50) {
+                        // Okuma bozulduysa bir kez yeni kayıt aç; o da olmazsa ancak o zaman bildir
+                        val yeni = sirayla(kaynakSira)
+                        if (yeni != null) {
+                            try { rec.release() } catch (_: Exception) {}
+                            rec = yeni.first
+                            kayit = yeni.first
+                            kaynakSira = yeni.third
+                            kaynakAdi = yeni.second
+                            ardisikHata = 0
+                            android.util.Log.w("TvAsistan", "Mikrofon okuma hatası ($n), kayıt yeniden açıldı: $kaynakAdi")
+                            continue
+                        }
                         hata?.invoke("Mikrofon okunamıyor (kod $n).")
                         break
                     }

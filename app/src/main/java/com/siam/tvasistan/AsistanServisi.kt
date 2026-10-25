@@ -248,6 +248,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
         medyaSessizUyarisi = false
         yenidenDenemeler = 0
+        sonMikrofonYenileme = 0L
         panel.goster("Bağlanıyor…")
         try {
             MikrofonBaslatici.baslat(this)
@@ -356,7 +357,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     val sessizMik = sifirParca > 75 // ~3 sn
                     // Android mikrofonu susturduysa: görünmez ekranla servisi öndeyken yeniden başlat
                     // (en çok 20 sn'de bir; video duraklamasın diye Jülide konuşmuyorken)
-                    if (sessizMik && simdi - sonMikrofonYenileme > 20_000) {
+                    if (sessizMik && sonMikrofonYenileme == 0L) {
                         sonMikrofonYenileme = simdi
                         Log.w(ETIKET, "Mikrofon susturulmuş — servis öndeyken yeniden başlatılıyor")
                         MikrofonBaslatici.baslat(this@AsistanServisi)
@@ -364,7 +365,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     if (sessizMik && !mikrofonUyarisi) {
                         mikrofonUyarisi = true
                         Log.w(ETIKET, "Mikrofon sıfır veriyor — Android arka planda susturmuş olabilir")
-                        panel.durum("Mikrofon susturuldu — yeniden açılıyor")
+                        panel.durum("Mikrofondan ses gelmiyor")
                     } else if (!sessizMik && mikrofonUyarisi) {
                         mikrofonUyarisi = false
                         panel.durum("Jülide dinliyor…")
