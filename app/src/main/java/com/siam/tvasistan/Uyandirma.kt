@@ -154,6 +154,8 @@ class Uyandirma(
                         }
                         rec.reset()
                     } else if (bitti) {
+                        // Ayar için: tanıyıcının duyduğu tam cümleler (yalnız TV'nin yerel kaydında kalır)
+                        if (metin.isNotEmpty()) Log.i(ETIKET, "Uyandırma duydu: \"${metin.take(60)}\"")
                         rec.reset()
                     }
                 }

@@ -57,45 +57,62 @@ class Mikrofon(
         }
     }
 
+    /** Denenecek kaynak sırası: yankı engelli → tanıma → ham mikrofon. */
+    private fun kaynaklar(): List<Pair<Int, String>> = buildList {
+        if (yankiEngelle) add(MediaRecorder.AudioSource.VOICE_COMMUNICATION to "VOICE_COMMUNICATION")
+        add(MediaRecorder.AudioSource.VOICE_RECOGNITION to "VOICE_RECOGNITION")
+        add(MediaRecorder.AudioSource.MIC to "MIC")
+    }
+
+    /** [bas] indeksinden başlayarak açılabilen ilk kaynağı açar. */
+    private fun sirayla(bas: Int): Triple<AudioRecord, String, Int>? {
+        val l = kaynaklar()
+        for (k in l.indices) {
+            val i = (bas + k) % l.size
+            ac(l[i].first)?.let { return Triple(it, l[i].second, i) }
+        }
+        return null
+    }
+
     fun baslat() {
-        var r: AudioRecord? = null
-        if (yankiEngelle) {
-            r = ac(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
-            if (r != null) kaynakAdi = "VOICE_COMMUNICATION"
-        }
-        if (r == null) {
-            r = ac(MediaRecorder.AudioSource.VOICE_RECOGNITION)
-            if (r != null) kaynakAdi = "VOICE_RECOGNITION"
-        }
-        val ilkKayit: AudioRecord = r ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
+        val ilk = sirayla(0) ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
+        val ilkKayit: AudioRecord = ilk.first
+        kaynakAdi = ilk.second
+        android.util.Log.i("TvAsistan", "Mikrofon kaynağı: $kaynakAdi")
         kayit = ilkKayit
         calisiyor = true
         is_ = Thread({
             val tampon = ByteArray(1280) // 40 ms
             var ardisikHata = 0
             var rec: AudioRecord = ilkKayit
-            var sessizParca = 0
-            var denetimBitti = !yankiEngelle || kaynakAdi != "VOICE_COMMUNICATION"
+            var kaynakSira = ilk.third
+            var sifirParca = 0
+            var yenilemeSayisi = 0
             while (calisiyor) {
                 val n = rec.read(tampon, 0, tampon.size)
                 if (n > 0) {
                     ardisikHata = 0
-                    // Bazı TV'lerde iletişim kaynağı açılır ama hep sıfır verir: ilk 4 sn tamamen
-                    // sessizse tanıma kaynağına geç.
-                    if (!denetimBitti) {
-                        if (pcmRms(tampon, 0, n) < 3.0) sessizParca++ else denetimBitti = true
-                        if (sessizParca >= 100) {
-                            denetimBitti = true
-                            val yedek = ac(MediaRecorder.AudioSource.VOICE_RECOGNITION)
-                            if (yedek != null) {
-                                try { rec.stop() } catch (_: Exception) {}
-                                rec.release()
-                                rec = yedek
-                                kayit = yedek
-                                kaynakAdi = "VOICE_RECOGNITION"
-                                continue
-                            }
+                    // Mikrofon tamamen sıfır veriyorsa (kaynak susturuldu / başka uygulama aldı /
+                    // iletişim kaynağı bu TV'de çalışmıyor) 3 sn sonra kaydı SIRADAKİ kaynakla yeniden aç.
+                    // Gerçek bir odada ortam gürültüsü sıfır olmaz; tam sıfır = sağır mikrofon.
+                    if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0 }
+                    if (sifirParca >= 75 && yenilemeSayisi < 6) {
+                        sifirParca = 0
+                        yenilemeSayisi++
+                        try { rec.stop() } catch (_: Exception) {}
+                        rec.release()
+                        try { Thread.sleep(150L * yenilemeSayisi) } catch (_: InterruptedException) { break }
+                        val yeni = sirayla(kaynakSira + 1)
+                        if (yeni == null) {
+                            hata?.invoke("Mikrofon yeniden açılamadı.")
+                            break
                         }
+                        rec = yeni.first
+                        kayit = yeni.first
+                        kaynakSira = yeni.third
+                        kaynakAdi = yeni.second
+                        android.util.Log.w("TvAsistan", "Mikrofon sıfır veriyordu, yeniden açıldı: $kaynakAdi (deneme $yenilemeSayisi)")
+                        continue
                     }
                     parca(tampon.copyOf(n))
                 } else {
