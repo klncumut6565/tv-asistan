@@ -27,6 +27,11 @@ class Mikrofon(
     @Volatile var kaynakAdi = ""
         private set
 
+    companion object {
+        /** Tanı için sistem ses yöneticisi (AsistanServisi atar). */
+        @Volatile var sesYoneticisi: android.media.AudioManager? = null
+    }
+
     @Volatile private var calisiyor = false
     private var kayit: AudioRecord? = null
     private var is_: Thread? = null
@@ -48,18 +53,21 @@ class Mikrofon(
             if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(r.audioSessionId)?.enabled = true
         } catch (_: Exception) {
         }
-        if (android.os.Build.VERSION.SDK_INT >= 29) {
-            // TANI: sistem kaydı susturuyor mu? (silenced=true ise sorun Android/TV tarafında)
+        // TANI: sistem kaydı susturuyor mu? (silenced=true ise sorun Android/TV tarafında)
+        val yonetici = sesYoneticisi
+        if (android.os.Build.VERSION.SDK_INT >= 29 && yonetici != null) {
             try {
-                r.registerAudioRecordingCallback(java.util.concurrent.Executors.newSingleThreadExecutor(),
-                    object : android.media.AudioRecord.AudioRecordingCallback() {
+                yonetici.registerAudioRecordingCallback(
+                    object : android.media.AudioManager.AudioRecordingCallback() {
                         override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
                             for (c in configs) {
                                 if (c.clientAudioSessionId != r.audioSessionId) continue
-                                android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynak silenced=${c.isClientSilenced} cihaz=${c.format.channelCount}ch")
+                                android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynak silenced=${c.isClientSilenced}")
                             }
                         }
-                    })
+                    },
+                    android.os.Handler(android.os.Looper.getMainLooper())
+                )
             } catch (_: Exception) {
             }
         }

@@ -118,6 +118,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Mikrofon.sesYoneticisi = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
         ayarlar = Ayarlar(this)
         panel = Panel(this)
         araclar = Araclar(this)
