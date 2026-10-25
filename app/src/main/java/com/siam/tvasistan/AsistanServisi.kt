@@ -60,6 +60,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private lateinit var araclar: Araclar
 
     @Volatile var durum = Durum.BOSTA
+    // Her oturumBaslat yeni bir numara alır; eski (iptal edilmiş) kurulum coroutine'leri bunu kontrol eder
+    private var oturumNo = 0L
         private set
     private var live: GeminiLive? = null
     private var mikrofon: Mikrofon? = null
@@ -251,6 +253,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             return
         }
         durum = Durum.BAGLANIYOR
+        val benimNo = ++oturumNo
         bekleyenKapat = false
         oturumSonuOynat = false
         kullaniciMetin.clear()
@@ -279,7 +282,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 val l = GeminiLive(this@AsistanServisi)
                 live = l
                 withContext(Dispatchers.IO) { l.baglan(ayarlar.geminiAnahtari, y, talimat, araclar.bildirimler()) }
-                if (durum != Durum.BAGLANIYOR) {
+                if (durum != Durum.BAGLANIYOR || oturumNo != benimNo) {
                     l.kapat()
                     return@launch
                 }
@@ -328,6 +331,11 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 sessizCikis = SessizCikis().also { it.baslat() }
                 withContext(Dispatchers.IO) { m.baslat() }
+                // m.baslat() sürerken bitir() çağrıldıysa mikrofonu geri bağlama, kendi kaynağını kapat
+                if (durum != Durum.BAGLANIYOR || oturumNo != benimNo) {
+                    m.durdur()
+                    return@launch
+                }
                 mikrofon = m
                 if (y.uyandirma && surekliSohbet) {
                     uyandirma = Uyandirma(this@AsistanServisi, y.uyandirmaKelimeleri) { ana.post { uyandirmaDuyuldu() } }
