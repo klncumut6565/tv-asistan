@@ -78,6 +78,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     @Volatile private var medyaSessizUyarisi = false
     /** Son denetimde video/müzik çalıyordu (zamanlayıcı 500 ms'de bir günceller). */
     @Volatile private var medyaAktif = false
+    /** Hoparlör çıkışını uyanık tutar; yoksa bu TV'nin mikrofonu sessizlikte sıfır verir. */
+    private var sessizCikis: SessizCikis? = null
     /** "Jülide" uyandırma dinleyicisi (yalnız sohbet açıkken; TV sesi varken beslenir). */
     @Volatile private var uyandirma: Uyandirma? = null
     /** Uyandırmadan önceki son ~3 sn mikrofon sesi ("Jülide, TRT Haber'i aç" kaybolmasın). */
@@ -259,7 +261,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         sonMikrofonYenileme = 0L
         panel.goster("Bağlanıyor…")
         try {
-            MikrofonBaslatici.baslat(this)
+            startForegroundService(Intent(this, MikrofonServisi::class.java))
         } catch (e: Exception) {
             Log.w(ETIKET, "Ön plan servisi başlatılamadı: ${e.message}")
         }
@@ -323,6 +325,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     // Konuşma sürerken bas-konuş penceresi kapanmasın
                     if (kapi.acik && konusmaPenceresiBitis > 0) konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, simdi + 3000)
                 }
+                sessizCikis = SessizCikis().also { it.baslat() }
                 withContext(Dispatchers.IO) { m.baslat() }
                 mikrofon = m
                 if (y.uyandirma && surekliSohbet) {
@@ -388,10 +391,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     val sessizMik = sifirParca > 75 // ~3 sn
                     // Android mikrofonu susturduysa: görünmez ekranla servisi öndeyken yeniden başlat
                     // (en çok 20 sn'de bir; video duraklamasın diye Jülide konuşmuyorken)
-                    if (sessizMik && simdi - sonMikrofonYenileme > 60_000) {
+                    // Çıkış uykuya geçtiyse (sessiz akış durduysa) yeniden başlat
+                    if (sessizMik && simdi - sonMikrofonYenileme > 20_000) {
                         sonMikrofonYenileme = simdi
-                        Log.w(ETIKET, "Mikrofon susturulmuş — servis öndeyken yeniden başlatılıyor")
-                        MikrofonBaslatici.baslat(this@AsistanServisi)
+                        Log.w(ETIKET, "Mikrofon sıfır — sessiz çıkış yeniden başlatılıyor")
+                        sessizCikis?.durdur()
+                        sessizCikis = SessizCikis().also { it.baslat() }
                     }
                     if (sessizMik && !mikrofonUyarisi) {
                         mikrofonUyarisi = true
@@ -535,6 +540,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         mikrofon = null
         uyandirma?.durdur()
         uyandirma = null
+        sessizCikis?.durdur()
+        sessizCikis = null
         synchronized(sonSesler) { sonSesler.clear() }
         tamponuGonder = false
         live?.kapat()

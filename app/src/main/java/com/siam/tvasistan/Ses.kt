@@ -311,3 +311,71 @@ fun pcmRms(b: ByteArray, bas: Int = 0, uzunluk: Int = b.size): Double {
     }
     return if (n == 0) 0.0 else Math.sqrt(toplam / n)
 }
+
+/**
+ * Ses çıkışını UYANIK tutan, duyulmayan sessizlik akışı.
+ *
+ * Bu TV'nin (Vestel/MediaTek) yerleşik mikrofonu yankı engelleme için hoparlör çıkışını referans
+ * alır: hoparlörden ses çıkmazken çıkış uykuya geçer, referans kesilir ve mikrofon uygulamalara
+ * yalnızca SIFIR verir (TANI kaydı: medya/Jülide sesi yokken %100 sıfır, ses başlayınca anında canlı).
+ * Sohbet boyunca ±1 bitlik (duyulmaz) gürültü çalarak çıkışı açık tutar.
+ * USAGE_ASSISTANCE_SONIFICATION: 'müzik çalıyor' sayılmaz, video algılamasını bozmaz.
+ */
+class SessizCikis {
+    @Volatile private var calisiyor = false
+    private var is_: Thread? = null
+
+    fun baslat() {
+        if (calisiyor) return
+        calisiyor = true
+        is_ = Thread({
+            val oran = 16000
+            val track = try {
+                AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setSampleRate(oran)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(maxOf(AudioTrack.getMinBufferSize(oran, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT), 6400))
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+            } catch (e: Exception) {
+                android.util.Log.w("TvAsistan", "Sessiz çıkış açılamadı: ${e.message}")
+                calisiyor = false
+                return@Thread
+            }
+            // 40 ms'lik ±1 LSB gürültü (bazı ses işlemcileri tam sıfırı 'sessizlik' sayıp uyuyabilir)
+            val tampon = ByteArray(1280)
+            val rnd = java.util.Random()
+            for (i in tampon.indices step 2) {
+                val v = rnd.nextInt(3) - 1
+                tampon[i] = v.toByte()
+                tampon[i + 1] = (if (v < 0) -1 else 0).toByte()
+            }
+            try {
+                track.play()
+                android.util.Log.i("TvAsistan", "TANI olay: sessiz çıkış başladı (mikrofon referansı açık)")
+                while (calisiyor) track.write(tampon, 0, tampon.size) // yazma, çalma hızında bloklar
+            } catch (_: Exception) {
+            } finally {
+                try { track.stop() } catch (_: Exception) {}
+                track.release()
+            }
+        }, "sessiz-cikis").apply { start() }
+    }
+
+    fun durdur() {
+        calisiyor = false
+        try { is_?.join(300) } catch (_: InterruptedException) {}
+        is_ = null
+    }
+}
