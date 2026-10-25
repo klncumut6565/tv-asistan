@@ -73,6 +73,15 @@
                 android:resource="@xml/erisilebilirlik" />
         </service>
 
+        <!-- Görünmez: mikrofon servisini uygulama öndeyken başlatır (Android 14 arka plan mikrofon kuralı) -->
+        <activity
+            android:name=".MikrofonBaslatici"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".MikrofonServisi"
             android:exported="false"

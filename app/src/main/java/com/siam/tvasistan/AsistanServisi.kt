@@ -86,6 +86,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     /** Art arda gelen tamamen sessiz (dijital sıfır) mikrofon parçası sayısı. */
     @Volatile private var sifirParca = 0
     private var mikrofonUyarisi = false
+    private var sonMikrofonYenileme = 0L
     @Volatile private var sonCalma = 0L
     @Volatile private var yenidenBaglaniyor = false
     private var yenidenDenemeler = 0
@@ -249,7 +250,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         yenidenDenemeler = 0
         panel.goster("Bağlanıyor…")
         try {
-            startForegroundService(Intent(this, MikrofonServisi::class.java))
+            MikrofonBaslatici.baslat(this)
         } catch (e: Exception) {
             Log.w(ETIKET, "Ön plan servisi başlatılamadı: ${e.message}")
         }
@@ -353,10 +354,17 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 if (!caliyor && !yenidenBaglaniyor) {
                     val sessizMik = sifirParca > 75 // ~3 sn
+                    // Android mikrofonu susturduysa: görünmez ekranla servisi öndeyken yeniden başlat
+                    // (en çok 20 sn'de bir; video duraklamasın diye Jülide konuşmuyorken)
+                    if (sessizMik && simdi - sonMikrofonYenileme > 20_000) {
+                        sonMikrofonYenileme = simdi
+                        Log.w(ETIKET, "Mikrofon susturulmuş — servis öndeyken yeniden başlatılıyor")
+                        MikrofonBaslatici.baslat(this@AsistanServisi)
+                    }
                     if (sessizMik && !mikrofonUyarisi) {
                         mikrofonUyarisi = true
-                        Log.w(ETIKET, "Mikrofon sıfır veriyor — başka uygulama mikrofonu tutuyor olabilir")
-                        panel.durum("Mikrofon sessiz — başka uygulama kullanıyor olabilir")
+                        Log.w(ETIKET, "Mikrofon sıfır veriyor — Android arka planda susturmuş olabilir")
+                        panel.durum("Mikrofon susturuldu — yeniden açılıyor")
                     } else if (!sessizMik && mikrofonUyarisi) {
                         mikrofonUyarisi = false
                         panel.durum("Jülide dinliyor…")
