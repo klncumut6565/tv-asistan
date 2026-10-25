@@ -388,7 +388,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     val sessizMik = sifirParca > 75 // ~3 sn
                     // Android mikrofonu susturduysa: görünmez ekranla servisi öndeyken yeniden başlat
                     // (en çok 20 sn'de bir; video duraklamasın diye Jülide konuşmuyorken)
-                    if (sessizMik && sonMikrofonYenileme == 0L) {
+                    if (sessizMik && simdi - sonMikrofonYenileme > 60_000) {
                         sonMikrofonYenileme = simdi
                         Log.w(ETIKET, "Mikrofon susturulmuş — servis öndeyken yeniden başlatılıyor")
                         MikrofonBaslatici.baslat(this@AsistanServisi)

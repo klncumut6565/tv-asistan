@@ -18,12 +18,18 @@ class MikrofonBaslatici : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
+        Log.i("TvAsistan", "TANI olay: görünmez başlatıcı öne geldi")
     }
 
     override fun onResume() {
         super.onResume()
+        // Servis zaten çalışıyorsa Android 'kullanım sırasında' mikrofon iznini YENİDEN
+        // değerlendirmez (yalnız 30 sn ek süre tanır). Bu yüzden önce durdur, sonra uygulama
+        // öndeyken sıfırdan başlat: servis kalıcı mikrofon yetkisiyle doğar.
+        try { stopService(Intent(this, MikrofonServisi::class.java)) } catch (_: Exception) {}
         try {
             startForegroundService(Intent(this, MikrofonServisi::class.java))
+            Log.i("TvAsistan", "TANI olay: mikrofon servisi uygulama öndeyken başlatıldı")
         } catch (e: Exception) {
             Log.w("TvAsistan", "Mikrofon servisi öndeyken başlatılamadı: ${e.message}")
         }
