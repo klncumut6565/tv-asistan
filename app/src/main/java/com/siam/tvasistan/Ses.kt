@@ -391,8 +391,21 @@ class SessizCikis {
             try {
                 track.play()
                 android.util.Log.i("TvAsistan", "TANI olay: sessiz çıkış başladı (mikrofon referansı açık)")
-                while (calisiyor) track.write(tampon, 0, tampon.size) // yazma, çalma hızında bloklar
-            } catch (_: Exception) {
+                var yazilan = 0
+                var sonLog = SystemClock.elapsedRealtime()
+                while (calisiyor) {
+                    val n = track.write(tampon, 0, tampon.size) // yazma, çalma hızında bloklar
+                    yazilan++
+                    // TANI: çıkış akışı durumu (her 3 sn ya da yazma hatasında)
+                    val simdi = SystemClock.elapsedRealtime()
+                    if (n < 0 || simdi - sonLog > 3000) {
+                        android.util.Log.i("TvAsistan", "TANI sessiz: yazma=$n durum=${track.playState} parca=$yazilan")
+                        sonLog = simdi
+                    }
+                }
+                android.util.Log.i("TvAsistan", "TANI sessiz: döngü bitti (calisiyor=$calisiyor) parca=$yazilan")
+            } catch (e: Exception) {
+                android.util.Log.w("TvAsistan", "TANI sessiz: hata ${e.javaClass.simpleName} ${e.message}")
             } finally {
                 try { track.stop() } catch (_: Exception) {}
                 track.release()
