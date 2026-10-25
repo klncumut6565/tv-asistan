@@ -326,7 +326,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     // Konuşma sürerken bas-konuş penceresi kapanmasın
                     if (kapi.acik && konusmaPenceresiBitis > 0) konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, simdi + 3000)
                 }
-                sessizCikis = null // TEST: sessiz çıkış kapalı (A/B)
+                sessizCikis = SessizCikis().also { it.baslat() }
                 withContext(Dispatchers.IO) { m.baslat() }
                 mikrofon = m
                 if (y.uyandirma && surekliSohbet) {
@@ -397,7 +397,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                         sonMikrofonYenileme = simdi
                         Log.w(ETIKET, "Mikrofon sıfır — sessiz çıkış yeniden başlatılıyor")
                         sessizCikis?.durdur()
-                        sessizCikis = null // TEST: sessiz çıkış kapalı (A/B)
+                        sessizCikis = SessizCikis().also { it.baslat() }
                     }
                     if (sessizMik && !mikrofonUyarisi) {
                         mikrofonUyarisi = true
