@@ -460,12 +460,27 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
      * susturuyordu). isMusicActive yalnız o an ses üreten akışlar için true döner; Jülide'nin kendi
      * sesi bittikten sonraki 1,5 sn sayılmaz.
      */
-    private fun medyaCaliyor(): Boolean = try {
-        val am = getSystemService(AudioManager::class.java)
-        am.isMusicActive && oynatici?.caliyor() != true && SystemClock.elapsedRealtime() - sonCalma > 1500
-    } catch (_: Exception) {
-        false
+    private fun medyaCaliyor(): Boolean {
+        // Jülide kendi sessiz akışını medya kanalından çaldığı için isMusicActive hep true olur;
+        // bu yüzden 'TV'den video/müzik sesi geliyor' durumu öndeki uygulamaya göre tahmin edilir.
+        val p = aktifPaket ?: return false
+        if (p == packageName) return false
+        val n = p.lowercase()
+        if (OYNATICI_PAKET_IPUCLARI.any { n.contains(it) }) return true
+        val ad = try {
+            Uygulamalar.liste(this, hepsi = true).firstOrNull { it.paket == p }?.ad?.let { Uygulamalar.normal(it) }
+        } catch (_: Exception) { null } ?: return false
+        return OYNATICI_AD_IPUCLARI.any { (" $ad ").contains(" $it ") }
     }
+
+    private val OYNATICI_PAKET_IPUCLARI = listOf(
+        "youtube", "netflix", "disney", "amazon.avod", "amazonvideo", "primevideo", "spotify", "music",
+        "tvcenter", "livetv", "tvplayer", "exoplayer", "mxtech", "vlc", "kodi", "plex", "twitch",
+        "blutv", "exxen", "gain", "tabii", "trt", "puhutv", "todtv", "digiturk", "dsmart", "tivibu", "beinconnect", "ssport",
+    )
+    private val OYNATICI_AD_IPUCLARI = listOf(
+        "tod", "tv", "canli tv", "prime video", "youtube", "spotify", "netflix", "disney", "exxen", "blutv", "tabii", "gain",
+    )
 
     /**
      * Gemini bağlantısı kapandı (oturum süresi doldu / ağ koptu): sohbet bitmediyse aynı bağlamla

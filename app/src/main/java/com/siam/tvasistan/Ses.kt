@@ -319,7 +319,8 @@ fun pcmRms(b: ByteArray, bas: Int = 0, uzunluk: Int = b.size): Double {
  * alır: hoparlörden ses çıkmazken çıkış uykuya geçer, referans kesilir ve mikrofon uygulamalara
  * yalnızca SIFIR verir (TANI kaydı: medya/Jülide sesi yokken %100 sıfır, ses başlayınca anında canlı).
  * Sohbet boyunca ±1 bitlik (duyulmaz) gürültü çalarak çıkışı açık tutar.
- * USAGE_ASSISTANCE_SONIFICATION: 'müzik çalıyor' sayılmaz, video algılamasını bozmaz.
+ * MEDYA kanalından çalar (yalnız bu kanal mikrofonu açık tutuyor). Bu yüzden 'video çalıyor mu'
+ * artık isMusicActive ile değil, öndeki uygulamaya bakılarak belirlenir (AsistanServisi.medyaCaliyor).
  */
 class SessizCikis {
     @Volatile private var calisiyor = false
@@ -334,8 +335,10 @@ class SessizCikis {
                 AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            // MEDYA kanalı: TV mikrofonu yalnız medya akışı çalarken açık (TANI 06:00:53–06:01:07);
+                            // bildirim kanalı (SONIFICATION) mikrofonu uyandırmıyordu.
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN)
                             .build()
                     )
                     .setAudioFormat(
