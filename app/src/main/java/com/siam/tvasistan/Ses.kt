@@ -28,6 +28,20 @@ class Mikrofon(
         private set
 
     companion object {
+        /** Kayıt bu kadar süredir açıksa ve konuşma yoksa önleyici yenileme (servis 15,0 sn'de keser). */
+        private const val ONLEYICI_MS = 12_500L
+        /** Konuşma sürse de bu sürede yenile (kesintiden hemen önce). */
+        private const val ZORUNLU_MS = 14_500L
+        /** Bu RMS'in altı "konuşma yok" sayılır (SesKapisi'nin varsayılan eşiğinin altında). */
+        private const val KONUSMA_YOK_RMS = 300.0
+        /** Önleyici yenileme için en az bu kadar ardışık sessiz parça (~0,3 sn): kelime arasında kesmesin. */
+        private const val SESSIZ_PARCA_ESIK = 8
+        /** Bu kadar ardışık sıfır parça (40 ms) → sağır: ~0,6 sn. */
+        private const val SIFIR_PARCA_ESIK = 15
+        /** Kapatma ile yeniden açma arasındaki ara: servis bunu yeni kayıt başlangıcı olarak görsün. */
+        private const val TEMIZ_ARA_MS = 150L
+        private const val TEMIZ_ILK_ARALIK_MS = 1_000L
+
         /** Tanı için sistem ses yöneticisi (AsistanServisi atar). */
         @Volatile var sesYoneticisi: android.media.AudioManager? = null
         /** Oturumlar arası: son kez sıfır olmayan ses veren kaynağın indeksi (-1 = henüz yok). */
@@ -59,13 +73,16 @@ class Mikrofon(
         }
         // TANI: sistem kaydı susturuyor mu? (silenced=true ise sorun Android/TV tarafında)
         val yonetici = sesYoneticisi
-        if (android.os.Build.VERSION.SDK_INT >= 29 && yonetici != null) {
+        // Tek geri çağrı yeter: kayıt artık ~13 sn'de bir yenilendiği için her açılışta yenisini eklemek
+        // geri çağrıları biriktiriyordu. Geri çağrı o anki kaydın oturumuna bakar.
+        if (android.os.Build.VERSION.SDK_INT >= 29 && yonetici != null && geriCagrilar.isEmpty()) {
             try {
                 val cb = object : android.media.AudioManager.AudioRecordingCallback() {
                     override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
+                        val su = kayit ?: return
                         for (c in configs) {
-                            if (c.clientAudioSessionId != r.audioSessionId) continue
-                            android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynak silenced=${c.isClientSilenced}")
+                            if (c.clientAudioSessionId != su.audioSessionId) continue
+                            android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynakAdi silenced=${c.isClientSilenced}")
                         }
                     }
                 }
@@ -142,18 +159,70 @@ class Mikrofon(
             var yenilemeSayisi = 0
             var sonYenileme = 0L
             var sonCalisan = -1
+
+            // ---- 15 sn kesintisine karşı temiz yenileme (TANI 27.10.2026, dumpsys audio) ----
+            // Bu TV'de (Toshiba/Vestel, Android 14) mikrofon sesi uygulamalara doğrudan donanımdan değil,
+            // com.google.android.tv.remote.service'in kayıt yapanlara ENJEKTE ettiği akıştan gelir
+            // (usage 15, "mixr" ses politikası). Servis her YENİ kayıt başlangıcında ~15,0 sn ses verip
+            // keser; eskisi kapanmadan açılan kayıt yeni başlangıç sayılmaz. Bu yüzden kayıt, servis
+            // kesmeden önce (kullanıcı konuşmuyorken) ve sıfır gelir gelmez KAPAT → kısa ara → AÇ ile yenilenir.
+            var acilisAni = android.os.SystemClock.elapsedRealtime()
+            var sonTemiz = 0L
+            var temizAralik = TEMIZ_ILK_ARALIK_MS
+            var buKayittaVeri = false
+            var sessizParca = 0
+
+            /** Kaydı kapatıp aynı kaynakla yeniden açar. Açılamazsa birkaç kez dener; olmazsa false. */
+            fun temizYenile(neden: String): Boolean {
+                try { rec.stop() } catch (_: Exception) {}
+                try { rec.release() } catch (_: Exception) {}
+                kayit = null
+                for (deneme in 1..5) {
+                    try { Thread.sleep(if (deneme == 1) TEMIZ_ARA_MS else 400L) } catch (_: InterruptedException) { return false }
+                    if (!calisiyor) return false
+                    val yeni = sirayla(kaynakSira, kaynakSira) ?: continue
+                    rec = yeni.first
+                    kayit = yeni.first
+                    kaynakSira = yeni.third
+                    kaynakAdi = yeni.second
+                    val simdi = android.os.SystemClock.elapsedRealtime()
+                    android.util.Log.i("TvAsistan", "Mikrofon temiz yenilendi ($neden, ${simdi - acilisAni} ms sonra): $kaynakAdi")
+                    acilisAni = simdi
+                    sonTemiz = simdi
+                    sifirParca = 0
+                    sessizParca = 0
+                    buKayittaVeri = false
+                    return true
+                }
+                return false
+            }
+
             while (calisiyor) {
                 val n = rec.read(tampon, 0, tampon.size)
                 if (n > 0) {
                     ardisikHata = 0
-                    // Mikrofon tamamen sıfır veriyorsa (kaynak susturuldu / başka uygulama aldı /
-                    // iletişim kaynağı bu TV'de çalışmıyor) 3 sn sonra kaydı SIRADAKİ kaynakla yeniden aç.
                     // Gerçek bir odada ortam gürültüsü sıfır olmaz; tam sıfır = sağır mikrofon.
-                    if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0; sonCalisan = kaynakSira; sonCalisanKalici = kaynakSira }
-                    // Sınır yok: sıfır sürdükçe en fazla 15 sn'de bir yeniden dene. Eski 6 deneme sınırı
-                    // tükenince mikrofon kalıcı olarak sağır kalıyordu (uzun basışa kadar).
+                    val rms = pcmRms(tampon, 0, n)
+                    if (rms < KONUSMA_YOK_RMS) sessizParca++ else sessizParca = 0
+                    if (rms < 1.0) sifirParca++ else {
+                        sifirParca = 0; yenilemeSayisi = 0; sonCalisan = kaynakSira; sonCalisanKalici = kaynakSira
+                        if (!buKayittaVeri) { buKayittaVeri = true; temizAralik = TEMIZ_ILK_ARALIK_MS }
+                    }
                     val simdi = android.os.SystemClock.elapsedRealtime()
-                    if (sifirParca >= 75 && simdi - sonYenileme >= 15_000) {
+                    val yas = simdi - acilisAni
+                    // 1) Önleyici: servis 15 sn'de kesmeden önce, konuşma yokken yenile; 14,5 sn'de her durumda.
+                    val onleyici = buKayittaVeri && yas >= ONLEYICI_MS && (sessizParca >= SESSIZ_PARCA_ESIK || yas >= ZORUNLU_MS)
+                    // 2) Sıfıra düştüyse ~0,6 sn'de fark et ve yenile. Yenileme ses getirmediyse aralığı ikiye
+                    //    katla (en çok 15 sn): servis hiç yanıt vermiyorsa saniyede bir kayıt açıp kapatmasın.
+                    val sifirdan = sifirParca >= SIFIR_PARCA_ESIK && simdi - sonTemiz >= temizAralik
+                    if (onleyici || sifirdan) {
+                        if (sifirdan && !buKayittaVeri && sonTemiz > 0) temizAralik = minOf(temizAralik * 2, 15_000L)
+                        if (temizYenile(if (onleyici) "önleyici" else "sıfır")) continue
+                        hata?.invoke("Mikrofon yeniden açılamadı.")
+                        break
+                    }
+                    // Eski yedek yol: temiz yenileme hiç ses getirmiyorsa 15 sn'de bir SIRADAKİ kaynağı dene.
+                    if (sifirParca >= 75 && simdi - sonYenileme >= 15_000 && temizAralik >= 15_000L) {
                         sifirParca = 0
                         sonYenileme = simdi
                         yenilemeSayisi++
@@ -194,6 +263,11 @@ class Mikrofon(
                     }
                     try { Thread.sleep(20) } catch (_: InterruptedException) { break }
                 }
+            }
+            // Durdurulurken temiz yenileme yeni bir kayıt açtıysa o da serbest kalsın (release iki kez güvenli).
+            if (!calisiyor) {
+                try { rec.stop() } catch (_: Exception) {}
+                try { rec.release() } catch (_: Exception) {}
             }
         }, "mikrofon").apply { start() }
     }
