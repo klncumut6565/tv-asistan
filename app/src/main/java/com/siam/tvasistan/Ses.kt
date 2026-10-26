@@ -36,15 +36,24 @@ class Mikrofon(
      */
     fun tusaBasildi() {
         tusAni = SystemClock.elapsedRealtime()
+        hemenYenile = true
     }
+
+    /**
+     * Tuşa basılınca kayıt HEMEN yenilenir: TANI (27.10.2026, 9 basış) kumanda sesinin açık duran kayda
+     * hiçbir zaman kendiliğinden gelmediğini, her seferinde yeni kayıt gerektiğini gösterdi. Sıfır beklemek
+     * sözün ilk ~0,5 sn'sini kaybettiriyordu. Kumanda sesi BLE ile ~0,2-0,5 sn sonra başladığı için anında
+     * yenilemede kayıp olmaz.
+     */
+    @Volatile private var hemenYenile = false
 
     companion object {
         /** Tuşa basıldıktan sonra kumanda sesini bekleme penceresi. */
         private const val TUS_PENCERESI_MS = 3_000L
         /** Pencere içinde bu kadar ardışık sıfır parça (40 ms) → ses yönlenmemiş, kaydı yenile: ~0,4 sn. */
         private const val SIFIR_PARCA_ESIK = 10
-        /** Pencere içinde iki yenileme arasında en az bu kadar süre. */
-        private const val YENILEME_ARALIGI_MS = 800L
+        /** Yedek yenileme: anında yenilemeden sonra kumanda sesi 1,5 sn içinde gelmezse bir kez daha. */
+        private const val YENILEME_ARALIGI_MS = 1_500L
         /** Kapatma ile yeniden açma arasındaki kısa ara. */
         private const val TEMIZ_ARA_MS = 150L
 
@@ -208,6 +217,12 @@ class Mikrofon(
                         sifirParca = 0; yenilemeSayisi = 0; sonCalisan = kaynakSira; sonCalisanKalici = kaynakSira
                     }
                     val simdi = SystemClock.elapsedRealtime()
+                    if (hemenYenile) {
+                        hemenYenile = false
+                        if (temizYenile("tuş")) continue
+                        hata?.invoke("Mikrofon yeniden açılamadı.")
+                        break
+                    }
                     val tusPenceresi = simdi - tusAni in 0..TUS_PENCERESI_MS
                     if (tusPenceresi && sifirParca >= SIFIR_PARCA_ESIK && simdi - sonTemiz >= YENILEME_ARALIGI_MS) {
                         if (temizYenile("tuş")) continue
