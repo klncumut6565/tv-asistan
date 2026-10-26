@@ -350,7 +350,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     return@launch
                 }
                 mikrofon = m
-                if (y.uyandirma && surekliSohbet) {
+                // Uzak ayar izin verse bile kullanıcı ayar ekranından açmadıkça uyandırma kelimesi çalışmaz.
+                if (y.uyandirma && surekliSohbet && ayarlar.uyandirmaAktif) {
                     uyandirma = Uyandirma(this@AsistanServisi, y.uyandirmaKelimeleri) { ana.post { uyandirmaDuyuldu() } }
                         .also { it.baslat() }
                 }

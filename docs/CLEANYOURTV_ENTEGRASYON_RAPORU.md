@@ -406,7 +406,7 @@ Yöntem kodları:
 | **2** ✅ (TV'de doğrulandı: 2 dk zamanlayıcı tam zamanında doldu, TV kapandı, 1 dk önce uyarı çıktı) | F2 `tv_kapat` / uyku zamanlayıcısı (Handler tabanlı; AlarmManager yerine, çünkü Android 12+ kısa pencereleri 10 dk'ya uzatıyor ve kesin alarm özel izin istiyor) | Aşama 1 |
 | **3** ✅ (kod) | F3 servis onarımı, `BOOT_COMPLETED` alıcısı, README'ye `pm grant` talimatı | Tek seferlik ADB |
 | **4** | F4 `SistemPaketleri.kt` ve canlı TV önceliği | Aşama 0 doğrulaması olumlu |
-| **5** | F6 HDMI/kaynak değiştirme | Aşama 0'daki `dumpsys tv_input` çıktısı |
+| **5** ✅ (kod) | F6 HDMI/kaynak değiştirme | Aşama 0'daki `dumpsys tv_input` çıktısı |
 | **6** | F8 kategoriler (ölçüm sonrasında karar) | — |
 | **7** | F7 GuardRevival (yalnızca logcat'te servis kaybı görülürse) | Aşama 3 |
 | **Ayrı** | F10 bilgisayardan debloat (isteğe bağlı) | Liste kopyalanıp düzenlenmiş olmalı |

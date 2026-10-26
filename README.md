@@ -10,6 +10,7 @@ Sesli komutla:
 - Ekranda gezinme — "Ara'ya tıkla", "Aşağı in", "Geri", "Ana ekran"
 - Ses ve medya — "Sesi yüzde otuz yap", "Duraklat", "Devam et"
 - Cihaz durumu — "İnternet var mı?", "TV'nin durumu ne?"
+- Giriş kaynağı — "HDMI 1'e geç", "PlayStation'a geç", "TV'ye dön", "Hangi girişler var?"
 - TV'yi kapatma — "Televizyonu kapat", "30 dakika sonra TV'yi kapat", "Zamanlayıcıyı iptal et"
 - Ayarlar — "Wi-Fi ayarlarını aç", "Ses ayarlarını aç", "YouTube'un uygulama bilgisini aç"
   (devre dışı bırakma/kaldırma düğmesine Jülide basmaz; kullanıcı kumandayla basar)

@@ -18,6 +18,7 @@ import android.text.InputType
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -155,6 +156,23 @@ class MainActivity : Activity() {
             durumGuncelle()
         })
 
+        sutun.addView(CheckBox(this).apply {
+            text = "\"Jülide\" uyandırma kelimesi (tuşa basmadan dinleme)"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            isChecked = a.uyandirmaAktif
+            isFocusable = true
+            setPadding(px(8), px(12), px(8), px(12))
+            setOnCheckedChangeListener { _, acik ->
+                a.uyandirmaAktif = acik
+                toast(if (acik) "Uyandırma kelimesi AÇIK — bir sonraki sohbette geçerli." else "Uyandırma kelimesi KAPALI.")
+            }
+        })
+        sutun.addView(yazi(
+            "Bu TV'nin dahili mikrofonu ses vermiyor; ses yalnız kumandanın Asistan tuşuyla geliyor. " +
+                "Uyandırma kelimesi ancak TV'ye USB mikrofon takılıysa çalışır (Jülide USB mikrofonu otomatik seçer).",
+            14f, renk = Color.LTGRAY
+        ))
         sutun.addView(dugme("\"Jülide\" uyandırma modelini şimdi indir (~37 MB, bir kez)") {
             Thread { Uyandirma.modeliHazirla(this) }.start()
             toast("İndirme başladı; durum yukarıda görünür.")

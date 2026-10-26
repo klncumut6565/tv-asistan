@@ -124,6 +124,9 @@ class Araclar(private val s: AsistanServisi) {
                 P("islem", "STRING", "Yapılacak işlem", listOf("kur", "iptal", "durum")),
                 P("dakika", "INTEGER", "Yalnızca 'kur' için: kaç dakika sonra kapansın (1-${Uyku.EN_COK_DAKIKA}). 'Bir saat' = 60, 'yarım saat' = 30")
             ), listOf("islem")))
+        .put(fn("kaynak_degistir", "TV'nin giriş kaynağını değiştirir: HDMI girişleri (ör. 'HDMI 1', 'HDMI 2', 'HDMI 3' ya da kullanıcının verdiği ad, ör. 'PlayStation') veya 'TV' (anten/uydu canlı yayını).",
+            listOf(P("kaynak", "STRING", "Giriş adı: 'HDMI 1', 'HDMI 2', 'HDMI 3', 'TV' ya da girişin adı")), listOf("kaynak")))
+        .put(fn("kaynaklari_listele", "TV'deki giriş kaynaklarını (HDMI) adlarıyla listeler."))
 
     fun sistemTalimati(): String {
         val uygulamalar = try {
@@ -156,6 +159,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "İnternet var mı", "bağlantı nasıl", "TV'nin durumu ne", "neden yavaş" → cihaz_durumu; sonucu bir-iki kısa cümleyle özetle (her alanı okuma, sorulana cevap ver).
 - "Ayarları aç", "Wi-Fi/ağ ayarları", "ses ayarları", "bluetooth ayarları" vb. → ayarlari_ac.
 - UYGULAMA DEVRE DIŞI BIRAKMA / KALDIRMA / VERİ SİLME / DURMAYA ZORLA istenirse: bunu kendin YAPAMAZSIN. ayarlari_ac (sayfa=uygulama_bilgisi, uygulama=adı) ile o uygulamanın bilgi sayfasını aç ve kullanıcıya ilgili düğmeye KUMANDAYLA kendisinin basmasını söyle. Bu düğmelere tikla/numaraya_tikla ile sen basma. Jülide'yi, canlı TV'yi, ana ekranı ve sistem uygulamalarını devre dışı bırakmanın TV'yi bozabileceğini hatırlat.
+- GİRİŞ KAYNAĞI: "HDMI 1'e geç", "ikinci HDMI", "kaynağı değiştir", "PlayStation'a geç", "uyduya/antene dön", "TV'ye geç" → kaynak_degistir. "Hangi girişler var" → kaynaklari_listele. Kanal adı (ATV, TRT 1…) söylenirse kaynak_degistir DEĞİL kanal_ac kullan.
 - "TV'yi kapat", "televizyonu kapat", "TV'yi uyut" → tv_kapat; önce kısaca "Televizyonu kapatıyorum, iyi geceler" gibi bir veda et (TV birkaç saniye sonra kapanır). Yalnızca "kapat" denirse bu TV değil, ekrandaki uygulamadır → uygulama_kapat. Emin değilsen sor.
 - "30 dakika sonra kapat", "bir saat sonra TV'yi kapat", "uyku zamanlayıcısı kur" → uyku_zamanlayicisi (islem=kur, dakika). "Zamanlayıcıyı iptal et", "kapatma" → islem=iptal. "Ne kadar kaldı" → islem=durum.
 Bir araç hata dönerse bunu dürüstçe ve kısaca söyle, gerekirse başka yol dene.
@@ -195,6 +199,12 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "cihaz_durumu" -> Cihaz.durum(s, oturumDurumu())
             "ayarlari_ac" -> ayarlariAc(a.optString("sayfa"), a.optString("uygulama"))
             "tv_kapat" -> tvKapat()
+            "kaynak_degistir" -> kaynakDegistir(a.optString("kaynak"))
+            "kaynaklari_listele" -> {
+                val l = Girisler.liste(s)
+                if (l.isEmpty()) hata("Bu TV'de giriş listesi okunamadı.")
+                else tamam("Girişler: " + l.joinToString(", ") { it.ad } + ", TV (canlı yayın)")
+            }
             "uyku_zamanlayicisi" -> uykuZamanlayicisi(a.optString("islem"), if (a.has("dakika")) a.optInt("dakika") else null)
             "guncelle" -> {
                 val yeni = Guncelleme.denetle()
@@ -216,6 +226,23 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         AsistanServisi.Durum.BOSTA -> "kapalı"
         AsistanServisi.Durum.BAGLANIYOR -> "bağlanıyor"
         AsistanServisi.Durum.DINLIYOR -> "açık, dinliyor"
+    }
+
+    // --- giriş kaynağı (HDMI)
+
+    private val CANLI_TV_SOZLERI = setOf("tv", "televizyon", "anten", "uydu", "canli tv", "canli yayin", "yayin", "tuner")
+
+    private fun kaynakDegistir(kaynak: String): JSONObject {
+        val n = Uygulamalar.normal(kaynak)
+        if (n.isEmpty()) return hata("Hangi girişe geçilsin? Kaynak adı verilmedi.")
+        if (n in CANLI_TV_SOZLERI) {
+            return if (Kanallar.canliTvAc(s)) tamam("Canlı TV'ye geçildi.") else hata("Canlı TV açılamadı.")
+        }
+        val liste = Girisler.liste(s)
+        if (liste.isEmpty()) return hata("Bu TV'de giriş listesi okunamadı.")
+        val g = Girisler.bul(liste, kaynak)
+            ?: return hata("'$kaynak' adında giriş yok. Girişler: " + liste.joinToString(", ") { it.ad } + ", TV")
+        return if (Girisler.ac(s, g)) tamam("${g.ad} girişine geçildi.") else hata("${g.ad} girişine geçilemedi.")
     }
 
     // --- TV'yi kapatma ve uyku zamanlayıcısı

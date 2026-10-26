@@ -51,4 +51,13 @@ class Ayarlar(ctx: Context) {
     var otomatikGuncelleme: Boolean
         get() = p.getBoolean("oto_guncelleme", true)
         set(v) = p.edit().putBoolean("oto_guncelleme", v).apply()
+
+    /**
+     * "Jülide" uyandırma kelimesi. VARSAYILAN KAPALI: bu TV'nin dahili mikrofonu ses vermiyor, ses yalnız
+     * kumandanın Asistan tuşuyla geliyor; sürekli dinleme ancak USB mikrofon takılınca anlamlı.
+     * Kullanıcı ayar ekranındaki onay kutusundan açar.
+     */
+    var uyandirmaAktif: Boolean
+        get() = p.getBoolean("uyandirma_aktif", false)
+        set(v) = p.edit().putBoolean("uyandirma_aktif", v).apply()
 }
