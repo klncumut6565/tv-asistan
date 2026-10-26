@@ -125,8 +125,16 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         panel = Panel(this)
         araclar = Araclar(this)
         ornek = this
+        ServisOnarim.kaydet(this)
         Log.i(ETIKET, "Erişilebilirlik servisi bağlandı")
         guncellemeDongusu()
+    }
+
+    /** Kullanıcı servisi Ayarlar'dan kendisi kapattı: Jülide kendini bir daha açmasın. */
+    override fun onUnbind(intent: Intent?): Boolean {
+        ServisOnarim.kaydiSil(this)
+        Log.i(ETIKET, "Erişilebilirlik servisi kapatıldı (onarım kaydı silindi)")
+        return super.onUnbind(intent)
     }
 
     // ------------------------------------------------------------ otomatik güncelleme

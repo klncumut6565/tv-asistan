@@ -73,6 +73,8 @@ adb install -r tv-asistan.apk
    adb shell appops set com.siam.tvasistan ACCESS_RESTRICTED_SETTINGS allow
    adb shell settings put secure enabled_accessibility_services com.siam.tvasistan/.AsistanServisi
    adb shell settings put secure accessibility_enabled 1
+   # İsteğe bağlı, bir kez: servis "Durmaya zorla" ile kapanırsa Jülide açılınca kendini geri açsın
+   adb shell pm grant com.siam.tvasistan android.permission.WRITE_SECURE_SETTINGS
    ```
 4. **Tetik tuşunu öğret** → kumandada kullanmak istediğin tuşa bas.
    Varsayılan: Asistan / Arama tuşu. Google Asistan tuşu yakalanamazsa renkli bir tuş (ör. mavi) öğret.

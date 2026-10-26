@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- "İnternet var mı / TV durumu" (Cihaz.kt): ağ tipini ve internetin doğrulandığını okur. Normal izin. -->
@@ -13,6 +14,12 @@
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <!-- Canlı yayın kanal listesi (TvContract). Çoğu TV'de yalnız ADB ile verilebilir; yoksa ekrandan aranır. -->
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
+    <!-- Servis onarımı (ServisOnarim.kt): yalnızca ADB ile verilir:
+         adb shell pm grant com.siam.tvasistan android.permission.WRITE_SECURE_SETTINGS
+         Verilmezse onarım çalışmaz, başka hiçbir şey etkilenmez. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -119,5 +126,16 @@
         <receiver
             android:name=".GuncellemeAlici"
             android:exported="false" />
+
+        <!-- TV açılınca / Jülide güncellenince erişilebilirlik servisini gerekirse geri açar (ServisOnarim).
+             İki yayın da korumalı (yalnız sistem gönderebilir). -->
+        <receiver
+            android:name=".AcilisAlici"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

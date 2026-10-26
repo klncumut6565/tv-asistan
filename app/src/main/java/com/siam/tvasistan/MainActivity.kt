@@ -134,7 +134,9 @@ class MainActivity : Activity() {
         sutun.addView(yazi(
             "Menü yoksa bilgisayardan:\n" +
                 "adb shell settings put secure enabled_accessibility_services com.siam.tvasistan/.AsistanServisi\n" +
-                "adb shell settings put secure accessibility_enabled 1",
+                "adb shell settings put secure accessibility_enabled 1\n\n" +
+                "Otomatik onarım (servis \"Durmaya zorla\" ile kapanırsa Jülide açılınca kendini geri açar), bir kez:\n" +
+                "adb shell pm grant com.siam.tvasistan android.permission.WRITE_SECURE_SETTINGS",
             14f, renk = Color.LTGRAY
         ))
 
@@ -241,6 +243,9 @@ class MainActivity : Activity() {
         super.onResume()
         ana.post(yenileyici)
         guncellemeDenetle(kur = false)
+        // Servis listeden düştüyse hemen; listede görünüp bağlanmadıysa ("çökmüş") 3 sn tanıyıp onar.
+        ServisOnarim.onar(this)
+        ana.postDelayed({ if (AsistanServisi.ornek == null) ServisOnarim.onar(this, listedeyseDe = true) }, 3000)
     }
 
     private fun guncellemeDenetle(kur: Boolean) {
@@ -274,6 +279,7 @@ class MainActivity : Activity() {
     private fun durumGuncelle() {
         val giris = if (a.geminiAnahtari.isNotBlank()) "✔ kayıtlı" else "✘ girilmedi"
         val servis = if (AsistanServisi.ornek != null) "✔ açık" else "✘ kapalı"
+        val onarim = if (ServisOnarim.izinVar(this)) "✔ etkin" else "✘ izin yok (aşağıdaki pm grant komutu)"
         val mik = if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "✔ var" else "✘ yok"
         val tus = when {
             a.tusOgrenme -> "ŞİMDİ KUMANDADA BİR TUŞA BASIN…"
@@ -281,7 +287,7 @@ class MainActivity : Activity() {
             else -> "Varsayılan (Asistan / Arama tuşu)"
         }
         val uyan = if (Uyandirma.modelHazirMi(this)) "✔ hazır" else Uyandirma.durum
-        durumTv.text = "Gemini anahtarı: $giris\nErişilebilirlik servisi: $servis\nMikrofon izni: $mik\nTetik tuşu: $tus\n\"Jülide\" uyandırma modeli: $uyan"
+        durumTv.text = "Gemini anahtarı: $giris\nErişilebilirlik servisi: $servis\nOtomatik onarım: $onarim\nMikrofon izni: $mik\nTetik tuşu: $tus\n\"Jülide\" uyandırma modeli: $uyan"
     }
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_LONG).show()
