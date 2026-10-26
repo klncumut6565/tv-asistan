@@ -131,6 +131,7 @@ class Mikrofon(
             var kaynakSira = ilk.third
             var sifirParca = 0
             var yenilemeSayisi = 0
+            var sonYenileme = 0L
             while (calisiyor) {
                 val n = rec.read(tampon, 0, tampon.size)
                 if (n > 0) {
@@ -139,8 +140,12 @@ class Mikrofon(
                     // iletişim kaynağı bu TV'de çalışmıyor) 3 sn sonra kaydı SIRADAKİ kaynakla yeniden aç.
                     // Gerçek bir odada ortam gürültüsü sıfır olmaz; tam sıfır = sağır mikrofon.
                     if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0 }
-                    if (sifirParca >= 75 && yenilemeSayisi < 6) {
+                    // Sınır yok: sıfır sürdükçe en fazla 15 sn'de bir yeniden dene. Eski 6 deneme sınırı
+                    // tükenince mikrofon kalıcı olarak sağır kalıyordu (uzun basışa kadar).
+                    val simdi = android.os.SystemClock.elapsedRealtime()
+                    if (sifirParca >= 75 && simdi - sonYenileme >= 15_000) {
                         sifirParca = 0
+                        sonYenileme = simdi
                         yenilemeSayisi++
                         // ÖNCE yenisini aç; yalnız açılırsa eskisini kapat. (Eski sürüm önce kapatıyordu;
                         // yeni kayıt açılamayınca 'Mikrofon okunamıyor' ile oturum ~30 sn'de kapanıyordu.)
