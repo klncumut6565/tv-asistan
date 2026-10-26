@@ -30,6 +30,8 @@ class Mikrofon(
     companion object {
         /** Tanı için sistem ses yöneticisi (AsistanServisi atar). */
         @Volatile var sesYoneticisi: android.media.AudioManager? = null
+        /** Oturumlar arası: son kez sıfır olmayan ses veren kaynağın indeksi (-1 = henüz yok). */
+        @Volatile var sonCalisanKalici = -1
     }
 
     @Volatile private var calisiyor = false
@@ -122,7 +124,7 @@ class Mikrofon(
     }
 
     fun baslat() {
-        val ilk = sirayla(0) ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
+        val ilk = sirayla(0, sonCalisanKalici) ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
         val ilkKayit: AudioRecord = ilk.first
         kaynakAdi = ilk.second
         android.util.Log.i("TvAsistan", "Mikrofon kaynağı: $kaynakAdi")
@@ -144,7 +146,7 @@ class Mikrofon(
                     // Mikrofon tamamen sıfır veriyorsa (kaynak susturuldu / başka uygulama aldı /
                     // iletişim kaynağı bu TV'de çalışmıyor) 3 sn sonra kaydı SIRADAKİ kaynakla yeniden aç.
                     // Gerçek bir odada ortam gürültüsü sıfır olmaz; tam sıfır = sağır mikrofon.
-                    if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0; sonCalisan = kaynakSira }
+                    if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0; sonCalisan = kaynakSira; sonCalisanKalici = kaynakSira }
                     // Sınır yok: sıfır sürdükçe en fazla 15 sn'de bir yeniden dene. Eski 6 deneme sınırı
                     // tükenince mikrofon kalıcı olarak sağır kalıyordu (uzun basışa kadar).
                     val simdi = android.os.SystemClock.elapsedRealtime()
