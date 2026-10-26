@@ -9,6 +9,11 @@ Sesli komutla:
 - Tarayıcı — "Tarayıcıyı aç, Çorlu hava durumunu ara"
 - Ekranda gezinme — "Ara'ya tıkla", "Aşağı in", "Geri", "Ana ekran"
 - Ses ve medya — "Sesi yüzde otuz yap", "Duraklat", "Devam et"
+- Cihaz durumu — "İnternet var mı?", "TV'nin durumu ne?"
+- Ayarlar — "Wi-Fi ayarlarını aç", "Ses ayarlarını aç", "YouTube'un uygulama bilgisini aç"
+  (devre dışı bırakma/kaldırma düğmesine Jülide basmaz; kullanıcı kumandayla basar)
+
+CleanYourTV incelemesi ve yol haritası: [`docs/CLEANYOURTV_ENTEGRASYON_RAPORU.md`](docs/CLEANYOURTV_ENTEGRASYON_RAPORU.md)
 
 ## Mimari
 
