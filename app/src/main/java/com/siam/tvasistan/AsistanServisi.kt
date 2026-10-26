@@ -189,6 +189,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        if (::araclar.isInitialized) araclar.uyku.iptal()
         bitir()
         ornek = null
         kapsam.cancel()

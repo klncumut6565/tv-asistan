@@ -2,7 +2,7 @@
 
 ## CleanYourTV
 
-Jülide'nin bazı yaklaşımları (ağ/ADB durumu okuma, ileride erişilebilirlik servisinin kendini onarması ve
+Jülide'nin bazı yaklaşımları (ağ/ADB durumu okuma, TV'yi uyutma ve uyku zamanlayıcısı — sleep-timer eklentisi, ileride erişilebilirlik servisinin kendini onarması ve
 HDMI/kaynak değiştirme) CleanYourTV projesinin Android launcher'ı ve eklentilerindeki desenlerden
 **uyarlanmıştır**. Kod kopyalanmamış, Kotlin ile yeniden yazılmıştır. İncelenen sürüm: `76a9312`.
 
