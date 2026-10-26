@@ -107,9 +107,13 @@ class Mikrofon(
         add(MediaRecorder.AudioSource.MIC to "MIC")
     }
 
-    /** [bas] indeksinden başlayarak açılabilen ilk kaynağı açar. */
-    private fun sirayla(bas: Int): Triple<AudioRecord, String, Int>? {
+    /** [bas] indeksinden başlayarak açılabilen ilk kaynağı açar. [tercih] geçerliyse önce o denenir. */
+    private fun sirayla(bas: Int, tercih: Int = -1): Triple<AudioRecord, String, Int>? {
         val l = kaynaklar()
+        // Son kez sıfır olmayan ses veren kaynak önce denenir (loglarda VOICE_RECOGNITION hep canlandırdı)
+        if (tercih in l.indices) {
+            ac(l[tercih].first)?.let { return Triple(it, l[tercih].second, tercih) }
+        }
         for (k in l.indices) {
             val i = (bas + k) % l.size
             ac(l[i].first)?.let { return Triple(it, l[i].second, i) }
@@ -132,6 +136,7 @@ class Mikrofon(
             var sifirParca = 0
             var yenilemeSayisi = 0
             var sonYenileme = 0L
+            var sonCalisan = -1
             while (calisiyor) {
                 val n = rec.read(tampon, 0, tampon.size)
                 if (n > 0) {
@@ -139,7 +144,7 @@ class Mikrofon(
                     // Mikrofon tamamen sıfır veriyorsa (kaynak susturuldu / başka uygulama aldı /
                     // iletişim kaynağı bu TV'de çalışmıyor) 3 sn sonra kaydı SIRADAKİ kaynakla yeniden aç.
                     // Gerçek bir odada ortam gürültüsü sıfır olmaz; tam sıfır = sağır mikrofon.
-                    if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0 }
+                    if (pcmRms(tampon, 0, n) < 1.0) sifirParca++ else { sifirParca = 0; yenilemeSayisi = 0; sonCalisan = kaynakSira }
                     // Sınır yok: sıfır sürdükçe en fazla 15 sn'de bir yeniden dene. Eski 6 deneme sınırı
                     // tükenince mikrofon kalıcı olarak sağır kalıyordu (uzun basışa kadar).
                     val simdi = android.os.SystemClock.elapsedRealtime()
@@ -149,7 +154,7 @@ class Mikrofon(
                         yenilemeSayisi++
                         // ÖNCE yenisini aç; yalnız açılırsa eskisini kapat. (Eski sürüm önce kapatıyordu;
                         // yeni kayıt açılamayınca 'Mikrofon okunamıyor' ile oturum ~30 sn'de kapanıyordu.)
-                        val yeni = sirayla(kaynakSira + 1)
+                        val yeni = sirayla(kaynakSira + 1, sonCalisan)
                         if (yeni == null) {
                             android.util.Log.w("TvAsistan", "Mikrofon yeniden açılamadı; mevcut kayıtla devam (deneme $yenilemeSayisi)")
                             continue
