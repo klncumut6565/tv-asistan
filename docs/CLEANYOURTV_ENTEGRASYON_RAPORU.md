@@ -4,6 +4,8 @@
 
 **Revizyon 1 (26.10.2026):** TV'nin Vestel üretimi olduğu ve Prime Video'nun aktif kullanıldığı kullanıcı tarafından teyit edildi. Bölüm 3.1, F4, F10, 8 ve 9 güncellendi.
 
+**Revizyon 2 (27.10.2026):** Aşama 1 yayında (commit `fd50496`, sürüm v0.1.49). Aşama 0 cihaz doğrulaması TV üzerinde ADB ile yapıldı. Sonuçlar Bölüm 3.2'de.
+
 **İncelenen sürümler**
 
 | Depo | Commit | Tarih |
@@ -128,6 +130,39 @@ Bu dosya belgelenen cihaz için doğrulanmış bilgiler içeriyor: Vestel Cosmos
 > - `adb shell pm list packages | grep -E "vestel|mediatek"`
 >
 > 🚫 **Bu liste Prime Video'yu (`com.amazon.amazonvideo.livingroom`) ve YouTube'u devre dışı bırakıyor.** Prime Video bu TV'de **aktif olarak kullanılıyor**. Liste olduğu gibi **KESİNLİKLE UYGULANMAMALI**.
+
+### 3.2 Aşama 0 — Toshiba 50UA3D63DT doğrulama sonuçları (27.10.2026, ADB)
+
+| Kontrol | Sonuç | Değerlendirme |
+|---|---|---|
+| Parmak izi | `Toshiba/EMIR_Toshiba/shandao:14/UKNV.260528.001/15515267:user/release-keys` | **Android 14**, cihaz `shandao`. CleanYourTV birimi (Cosmos170 / `yeoksam`, Android 11) ile **aynı firmware DEĞİL** |
+| `ro.adb.secure` | `1` | ✅ Yeni cihazlar için TV'de onay ekranı çıkıyor |
+| Toplam RAM | `MemTotal: 1824348 kB` (~1,74 GB) | CleanYourTV birimindeki ~1 GB'tan fazla. Bellek baskısı daha düşük, F7 önceliği düşer |
+| Üretici | `com.vestel.*` paketleri mevcut | ✅ Vestel kesin |
+| Canlı TV | `com.mediatek.wwtv.tvcenter` | ✅ Belgelenen birimle aynı paket. F4 önceliği geçerli |
+| Prime Video | `com.amazon.amazonvideo.livingroom` | 🔒 Korunacak |
+| TOD | `com.beonetv.tod` | 🔒 Korunacak |
+| Donanım servisleri | `com.vestel.tv.service`, `com.vestel.tv.backlight`, `com.vestel.tv.keycontroller`, `com.mediatek.tv.service`, `com.mediatek.tvinput`, `com.vestel.tv.eib`, `com.mediatek.android.tv.globalkeyoverlayvestel` | 🔒 Korunacak |
+| Fabrika / kurulum | `com.mediatek.tv.factory`, `mediatek.factorymenu.ui`, `com.mediatek.wwtv.setupwizard` | 🔒 Dokunulmayacak |
+| Telemetri / günlük | `com.vestel.vestelreporter`, `com.vestel.smartlogger` | P3 (F10) için aday. Kapatılmadan önce etkisi test edilmeli |
+| Otomatik kurulum | `android.autoinstalls.config.vestel.medusa` | P3 için aday |
+| Belgelenen birimde olup burada olmayan | `com.cltv.fast`, `com.vestel.tv.servicepatch`, `com.vestel.tv.rcupdater` görünmedi (filtre `vestel\|mediatek` ile) | Farklı firmware nesli |
+
+**TV girişleri (`dumpsys tv_input`):**
+
+| Giriş kimliği | Tür | Fiziksel port | state |
+|---|---|---|---|
+| `com.mediatek.tvinput/.hdmi.HDMIInputService/HW5` | HDMI | `hdmi_port=1` (HDMI 1) | 1 |
+| `com.mediatek.tvinput/.hdmi.HDMIInputService/HW6` | HDMI | `hdmi_port=2` (HDMI 2) | 1 |
+| `com.mediatek.tvinput/.hdmi.HDMIInputService/HW7` | HDMI | `hdmi_port=3` (HDMI 3) | 1 |
+| `com.mediatek.tvinput/.tuner.TunerInputService/HW0` | Tuner | — | 0 |
+| `com.mediatek.tvinput/.tuner.TunerInputService/HW1` | Tuner | — | 0 |
+
+- **F6 (HDMI geçişi) için olumlu:** HDMI girişleri standart `TvInputManager` üzerinden, `com.mediatek.tvinput` paketiyle yayınlanıyor. CleanYourTV'nin `buildChannelUriForPassthroughInput` yöntemi bu yapıda çalışmalı. Kesin sonuç Aşama 5 testinde alınacak.
+- **AV girişi listede yok.** Sesli komutta yalnızca HDMI 1-3 ve TV sunulacak.
+- `state` değerleri (`0`: bağlı, `1`: bağlı-bekleme, `2`: bağlantısız) Android sabitlerine göre yorumlanmalı. HDMI'ların `1` görünmesi takılı cihazların beklemede olmasından kaynaklanıyor olabilir. Doğrulanmadı.
+
+**Hâlâ test edilmesi gerekenler (bu firmware için):** Ses tuşlarının ve YouTube/Prime tuşlarının Android'e ulaşıp ulaşmadığı (belgelenen birimde ulaşmıyordu), bekleme modunda Wi-Fi'ın kapanıp kapanmadığı, `GLOBAL_ACTION_LOCK_SCREEN` ile TV'nin uyuyup uyumadığı (Aşama 2).
 
 ---
 
@@ -366,8 +401,8 @@ Yöntem kodları:
 
 | Aşama | İçerik | Ön koşul |
 |---|---|---|
-| **0** | Cihaz doğrulaması (kod yok): firmware parmak izi, Vestel/MediaTek paket listesi, Prime Video ve TOD paket adları, `dumpsys tv_input`, `ro.adb.secure`, `dumpsys meminfo` | ADB erişimi |
-| **1** | F1 `cihaz_durumu` ve F5 `ayarlari_ac` ile `HASSAS` regex genişletmesi | — |
+| **0** ✅ | Cihaz doğrulaması (kod yok, 27.10.2026 tamamlandı, Bölüm 3.2): firmware parmak izi, Vestel/MediaTek paket listesi, Prime Video ve TOD paket adları, `dumpsys tv_input`, `ro.adb.secure`, `dumpsys meminfo` | ADB erişimi |
+| **1** ✅ | F1 `cihaz_durumu` ve F5 `ayarlari_ac` ile `HASSAS` regex genişletmesi | — |
 | **2** | F2 `tv_kapat` / uyku zamanlayıcısı | Aşama 1 |
 | **3** | F3 servis onarımı, `BOOT_COMPLETED` alıcısı, README'ye `pm grant` talimatı | Tek seferlik ADB |
 | **4** | F4 `SistemPaketleri.kt` ve canlı TV önceliği | Aşama 0 doğrulaması olumlu |
