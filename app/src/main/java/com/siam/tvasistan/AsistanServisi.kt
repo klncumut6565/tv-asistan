@@ -225,7 +225,11 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         val tetik = ayarlar.tetikTusu
         val eslesti = if (tetik > 0) kod == tetik else kod in VARSAYILAN_TETIKLER
         if (!eslesti) return false
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) tusInisZamani = SystemClock.elapsedRealtime()
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            tusInisZamani = SystemClock.elapsedRealtime()
+            // Kumanda mikrofonu bu tuşla açılır; mikrofon sesin gelişini beklesin (gerekirse kaydı yeniler).
+            mikrofon?.tusaBasildi()
+        }
         if (event.action == KeyEvent.ACTION_UP) {
             val uzun = tusInisZamani > 0 && SystemClock.elapsedRealtime() - tusInisZamani > 1000
             tusInisZamani = 0
@@ -410,16 +414,13 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     // Android mikrofonu susturduysa: görünmez ekranla servisi öndeyken yeniden başlat
                     // (en çok 20 sn'de bir; video duraklamasın diye Jülide konuşmuyorken)
                     // Çıkış uykuya geçtiyse (sessiz akış durduysa) yeniden başlat
-                    if (sessizMik && simdi - sonMikrofonYenileme > 20_000) {
-                        sonMikrofonYenileme = simdi
-                        Log.w(ETIKET, "Mikrofon sıfır — sessiz çıkış yeniden başlatılıyor")
-                        sessizCikis?.durdur()
-                        sessizCikis = SessizCikis().also { it.baslat() }
-                    }
+                    // Bu TV'de ses yalnız kumanda mikrofonundan gelir (Asistan tuşuyla ~15 sn). Tuşa
+                    // basılmamışken sıfır normaldir: sessiz çıkışı yeniden başlatmak gibi çareler aranmaz,
+                    // kullanıcıya tuşa basması söylenir.
                     if (sessizMik && !mikrofonUyarisi) {
                         mikrofonUyarisi = true
-                        Log.w(ETIKET, "Mikrofon sıfır veriyor — Android arka planda susturmuş olabilir")
-                        panel.durum("Mikrofondan ses gelmiyor")
+                        Log.i(ETIKET, "Kumanda mikrofonu kapalı — konuşmak için Asistan tuşu bekleniyor")
+                        panel.durum("Konuşmak için kumandadaki Asistan tuşuna basın")
                     } else if (!sessizMik && mikrofonUyarisi) {
                         mikrofonUyarisi = false
                         panel.durum("Jülide dinliyor…")
