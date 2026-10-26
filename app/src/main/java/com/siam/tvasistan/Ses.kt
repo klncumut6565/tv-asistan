@@ -124,7 +124,10 @@ class Mikrofon(
     }
 
     fun baslat() {
-        val ilk = sirayla(0, sonCalisanKalici) ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
+        // Hatırlanan kaynak yoksa (uygulama yeni başladıysa) ilk deneme VOICE_RECOGNITION: loglarda VOICE_COMMUNICATION
+        // ilk açılışta hep sıfır verdi, VOICE_RECOGNITION bazen veri getirdi.
+        val varsayilan = kaynaklar().indexOfFirst { it.first == MediaRecorder.AudioSource.VOICE_RECOGNITION }.coerceAtLeast(0)
+        val ilk = sirayla(0, if (sonCalisanKalici >= 0) sonCalisanKalici else varsayilan) ?: throw IllegalStateException("Mikrofon açılamadı (TV'de kullanılabilir mikrofon yok olabilir).")
         val ilkKayit: AudioRecord = ilk.first
         kaynakAdi = ilk.second
         android.util.Log.i("TvAsistan", "Mikrofon kaynağı: $kaynakAdi")
