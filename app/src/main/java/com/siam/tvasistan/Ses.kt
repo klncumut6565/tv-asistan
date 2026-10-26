@@ -35,6 +35,8 @@ class Mikrofon(
     @Volatile private var calisiyor = false
     private var kayit: AudioRecord? = null
     private var is_: Thread? = null
+    /** Açılan her kayıt için kaydedilen AudioRecordingCallback'ler; durdur()'da sökülür. */
+    private val geriCagrilar = java.util.concurrent.CopyOnWriteArrayList<android.media.AudioManager.AudioRecordingCallback>()
 
     @SuppressLint("MissingPermission")
     private fun ac(kaynak: Int): AudioRecord? {
@@ -57,17 +59,16 @@ class Mikrofon(
         val yonetici = sesYoneticisi
         if (android.os.Build.VERSION.SDK_INT >= 29 && yonetici != null) {
             try {
-                yonetici.registerAudioRecordingCallback(
-                    object : android.media.AudioManager.AudioRecordingCallback() {
-                        override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
-                            for (c in configs) {
-                                if (c.clientAudioSessionId != r.audioSessionId) continue
-                                android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynak silenced=${c.isClientSilenced}")
-                            }
+                val cb = object : android.media.AudioManager.AudioRecordingCallback() {
+                    override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
+                        for (c in configs) {
+                            if (c.clientAudioSessionId != r.audioSessionId) continue
+                            android.util.Log.i("TvAsistan", "TANI kayit: kaynak=$kaynak silenced=${c.isClientSilenced}")
                         }
-                    },
-                    android.os.Handler(android.os.Looper.getMainLooper())
-                )
+                    }
+                }
+                geriCagrilar.add(cb)
+                yonetici.registerAudioRecordingCallback(cb, android.os.Handler(android.os.Looper.getMainLooper()))
             } catch (_: Exception) {
             }
         }
@@ -188,6 +189,14 @@ class Mikrofon(
         try { kayit?.stop() } catch (_: Exception) {}
         kayit?.release()
         kayit = null
+        // Geri çağrıları sök; aksi halde her açma denemesinde bir geri çağrı birikip AudioManager'da kalıyordu
+        val yonetici = sesYoneticisi
+        if (android.os.Build.VERSION.SDK_INT >= 29 && yonetici != null) {
+            for (cb in geriCagrilar) {
+                try { yonetici.unregisterAudioRecordingCallback(cb) } catch (_: Exception) {}
+            }
+        }
+        geriCagrilar.clear()
     }
 }
 
