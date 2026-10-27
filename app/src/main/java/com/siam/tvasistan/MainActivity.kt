@@ -222,8 +222,8 @@ class MainActivity : Activity() {
 
         sutun.addView(yazi("Telefon mikrofonu", 22f, true))
         sutun.addView(yazi(
-            "Telefonda Jülide sayfasını açıp aşağıdaki kodu girin; telefon mikrofon olur ve tuşa basmadan " +
-                "konuşursunuz. Sayfa yalnız konuşma algılayınca ses gönderir.",
+            "Telefonda tv-asistan-web.vercel.app adresini açıp aşağıdaki kodu girin; telefon mikrofon olur ve " +
+                "tuşa basmadan konuşursunuz. Sayfa yalnız konuşma algılayınca ses gönderir.",
             14f, renk = Color.LTGRAY
         ))
         val kodTv = yazi("", 26f, true, renk = Color.rgb(196, 160, 255))
