@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
@@ -28,6 +29,10 @@ class Araclar(private val s: AsistanServisi) {
 
     /** "TV'yi kapat" ve uyku zamanlayıcısı. */
     val uyku = Uyku(s)
+
+    /** Kanal+/Kanal−/rakam tuşları (TV'nin kendi ağ hata ayıklaması üzerinden). */
+    val adb = Adb(s)
+    private val ayar = Ayarlar(s)
 
     // ---------------------------------------------------------------- tanımlar
 
@@ -91,6 +96,12 @@ class Araclar(private val s: AsistanServisi) {
             ), listOf("yon")))
         .put(fn("kanal_ac", "Canlı yayında bir TV kanalını açar (ör. ATV, Show TV, TRT 1, Kanal D) ya da kanal numarasına geçer ('7').",
             listOf(P("kanal", "STRING", "Kanal adı veya numarası, kullanıcının söylediği gibi")), listOf("kanal")))
+        .put(fn("kanal_kaydet", "Bir kanal adının kanal numarasını hatırlar (ör. ATV = 4). Kullanıcı 'ATV 4. kanalda' ya da sorduğunda numarayı söylerse kullan. sil=true ile kaydı siler.",
+            listOf(
+                P("kanal", "STRING", "Kanal adı"),
+                P("numara", "INTEGER", "Kanal numarası"),
+                P("sil", "BOOLEAN", "true: bu kanal kaydını sil")
+            ), listOf("kanal")))
         .put(fn("kanal_degistir", "Canlı yayında sonraki/önceki kanala geçer. Canlı TV açık değilse önce açar.",
             listOf(
                 P("yon", "STRING", "Yön", listOf("sonraki", "onceki")),
@@ -147,7 +158,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "YouTube'da X" → youtube_ara.
 - "Tarayıcıyı aç, X'i ara" → web_ara. Belirli site → url_ac.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
-- TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
+- TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal" → kanal_kaydet. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5).
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
 - Kullanıcı bir yeri işaret ediyorsa ("şuraya tıkla", "şuna bas", "şu düğme") → numaralari_goster, sonra kısaca "Numaraları gösterdim, hangisi?" diye sor; kullanıcı numara söyleyince numaraya_tikla.
@@ -192,6 +203,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "numaralari_goster" -> numaralariGoster()
             "kanal_ac" -> kanalAc(a.optString("kanal"))
             "kanal_degistir" -> kanalDegistir(a.optString("yon"), a.optInt("adet", 1))
+            "kanal_kaydet" -> kanalKaydet(a.optString("kanal"), a.optInt("numara", -1), a.optBoolean("sil", false))
             "numaraya_tikla" -> numarayaTikla(a.optInt("numara", -1), a.optBoolean("onayli", false))
             "ses" -> ses(a.optString("islem"), if (a.has("seviye")) a.optInt("seviye") else null)
             "medya" -> medya(a.optString("islem"))
@@ -762,9 +774,21 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
                 ?: return hata("'$sorgu' kanal listesinde yok. Bazı kanallar: " + liste.take(30).joinToString(", ") { "${it.numara} ${it.ad}".trim() })
             return if (Kanallar.ac(s, k)) tamam("${k.numara} ${k.ad} açıldı.".trim()) else hata("${k.ad} açılamadı.")
         }
-        // 2) Canlı TV uygulaması + ekrandaki kanal listesi
-        canliTvHazirla()?.let { return hata(it) }
+        // 2) Kanal numarası (söylenen ya da kanal_kaydet ile öğrenilen) → rakam tuşları
         val h = Uygulamalar.normal(sorgu).removeSuffix(" kanali").removeSuffix(" kanal").trim()
+        val numara = kanalNumarasi(h)
+        if (numara != null) {
+            canliTvHazirla()?.let { return hata(it) }
+            return try {
+                adb.tuslar(numara.map { Adb.rakamTusu(it) })
+                val ad = ayar.kanalHaritasi.entries.firstOrNull { it.value == numara && it.key != numara }?.key
+                tamam("$numara. kanal açılıyor${if (ad != null) " ($ad)" else ""}.")
+            } catch (e: Adb.Hata) {
+                hata(e.message ?: "Kanal açılamadı.")
+            }
+        }
+        // 3) Canlı TV uygulaması + ekrandaki kanal listesi
+        canliTvHazirla()?.let { return hata(it) }
         fun sec(o: Oge): JSONObject {
             val t = tiklanabilir(o.dugum)
             val ok = t?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true ||
@@ -792,9 +816,8 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         if (yeniMetinler.size < 3 || kaydirilabilir.isEmpty()) {
             tekBas("geri") // açılmış olabilecek menüyü kapat
             return hata(
-                "Bu TV'nin kanal listesi okunamıyor; kanal adla seçilemedi. Kullanıcıya kısaca söyle: " +
-                    "kanal numarasını biliyorsa 'sonraki/önceki kanal' ile gidebilir ya da bilgisayardan şu izin verilirse " +
-                    "kanallar adla açılır: adb shell pm grant com.siam.tvasistan com.android.providers.tv.permission.READ_EPG_DATA"
+                "'$sorgu' kanalının numarasını bilmiyorum (bu TV kanal listesini uygulamalara vermiyor). " +
+                    "Kullanıcıya kısaca '$sorgu kaçıncı kanalda?' diye sor; söylediği numarayı kanal_kaydet ile kaydedip kanal_ac ile aç."
             )
         }
         // Okunabilir liste: en fazla 6 sayfa kaydırarak ara (toplam ~5 sn)
@@ -806,9 +829,63 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return tamam("Kanal listesi açık ama '$sorgu' görünmüyor. ekrani_oku ile listeye bak ya da numaralari_goster kullan.")
     }
 
+    private val SAYI_KELIMELERI = mapOf(
+        "bir" to 1, "iki" to 2, "uc" to 3, "dort" to 4, "bes" to 5, "alti" to 6, "yedi" to 7, "sekiz" to 8,
+        "dokuz" to 9, "on" to 10, "dord" to 4, "yirmi" to 20, "otuz" to 30, "kirk" to 40, "elli" to 50, "altmis" to 60,
+        "yetmis" to 70, "seksen" to 80, "doksan" to 90, "yuz" to 100,
+    )
+
+    /** "7", "kanal 7", "yedinci", "yirmi bir" ya da kayıtlı kanal adı → numara metni. */
+    private fun kanalNumarasi(ham: String): String? {
+        val h = ham.removePrefix("kanal ").removeSuffix(" numara").removeSuffix(" numarali").trim()
+        Regex("^(\\d{1,4})$").find(h)?.let { return it.groupValues[1].trimStart('0').ifEmpty { "0" } }
+        fun deger(k: String): Int? = SAYI_KELIMELERI.entries
+            .filter { k.startsWith(it.key) && k.length - it.key.length <= 5 }
+            .maxByOrNull { it.key.length }?.value
+        val kelimeler = h.split(" ").filter { it.isNotEmpty() }
+        val degerler = kelimeler.map { deger(it) }
+        if (kelimeler.isNotEmpty() && degerler.all { it != null }) {
+            var top = 0
+            for (d in degerler) top = if (d == 100) (if (top == 0) 100 else top * 100) else top + d!!
+            if (top in 1..9999) return top.toString()
+        }
+        val harita = ayar.kanalHaritasi
+        harita[h]?.let { return it }
+        val hb = h.replace(" ", "")
+        return harita.entries.firstOrNull { it.key.replace(" ", "") == hb }?.value
+    }
+
+    private fun kanalKaydet(kanal: String, numara: Int, sil: Boolean): JSONObject {
+        val h = Uygulamalar.normal(kanal).removeSuffix(" kanali").removeSuffix(" kanal").trim()
+        if (h.isEmpty()) return hata("Kanal adı boş.")
+        val harita = ayar.kanalHaritasi.toMutableMap()
+        if (sil) {
+            harita.remove(h)
+            ayar.kanalHaritasi = harita
+            return tamam("$kanal kaydı silindi.")
+        }
+        if (numara !in 1..9999) return hata("Geçerli bir kanal numarası gerekli.")
+        harita[h] = numara.toString()
+        ayar.kanalHaritasi = harita
+        return tamam("Kaydedildi: $kanal = $numara. kanal. Kayıtlı kanallar: " + harita.entries.sortedBy { it.value.toIntOrNull() ?: 0 }.joinToString(", ") { "${it.value} ${it.key}" })
+    }
+
     private fun kanalDegistir(yon: String, adet: Int): JSONObject {
         canliTvHazirla()?.let { return hata(it) }
         val n = adet.coerceIn(1, 10)
+        // Asıl yol: gerçek KANAL+/KANAL− tuşu (bu TV'de yön tuşu genel eylemi kanal değiştirmiyor).
+        try {
+            val tus = if (yon == "onceki") Adb.KANAL_ASAGI else Adb.KANAL_YUKARI
+            repeat(n) { i ->
+                adb.tuslar(listOf(tus))
+                if (i < n - 1) SystemClock.sleep(900)
+            }
+            return tamam("${if (yon == "onceki") "Önceki" else "Sonraki"} kanala geçildi${if (n > 1) " ($n kanal)" else ""}.")
+        } catch (e: Adb.Hata) {
+            Log.w("TvAsistan", "Kanal tuşu gönderilemedi: ${e.message}")
+            if (adb.onayBekleniyor || e.message?.contains("izin") == true) return hata(e.message ?: "")
+            if (e.message?.contains("kapalı") == true) return hata(e.message!!)
+        }
         val tus = if (yon == "onceki") "asagi" else "yukari"
         var ok = 0
         repeat(n) {

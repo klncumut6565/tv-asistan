@@ -371,7 +371,6 @@ class MainActivity : Activity() {
     private fun tvVeIzinler(s: LinearLayout) {
         durumSatiri(s) { if (AsistanServisi.ornek != null) "Erişilebilirlik servisi açık" to Durum.IYI else "Erişilebilirlik servisi kapalı" to Durum.HATA }
         durumSatiri(s) { if (izinVar(Manifest.permission.RECORD_AUDIO)) "Mikrofon izni var" to Durum.IYI else "Mikrofon izni yok" to Durum.HATA }
-        durumSatiri(s) { if (izinVar(KANAL_IZNI)) "Kanal listesi izni var" to Durum.IYI else "Kanal listesi izni yok — kanallar adla açılamaz" to Durum.UYARI }
         durumSatiri(s) { if (ServisOnarim.izinVar(this)) "Otomatik onarım etkin" to Durum.IYI else "Otomatik onarım: izin yok (ADB)" to Durum.UYARI }
 
         s.ekle(ui.bolum("İzinler"))
@@ -383,6 +382,26 @@ class MainActivity : Activity() {
                 toast("Bu TV'de erişilebilirlik menüsü açılamadı — aşağıdaki ADB komutunu kullanın.")
             }
         })
+
+        s.ekle(ui.bolum("Kanal tuşları (Kanal + / Kanal − / numara)"))
+        s.ekle(ui.aciklama(
+            "Jülide'nin kanal değiştirebilmesi için TV'nin 'Ağ üzerinden hata ayıklama' (ADB) özelliği açık olmalı. " +
+                "Düğmeye basınca TV 'Hata ayıklamaya izin verilsin mi?' diye sorar: 'Her zaman izin ver'i işaretleyip " +
+                "İZİN VER'e basın. Bir kez yeterlidir. Bu TV kanal listesini uygulamalara vermediği için kanallar " +
+                "numarayla açılır; 'ATV 4. kanalda' derseniz Jülide adı da öğrenir."
+        ))
+        s.ekle(ui.dugme("Kanal tuşlarını etkinleştir / dene", vurgulu = true) {
+            toast("TV'ye bağlanılıyor… Ekranda soru çıkarsa İZİN VER'e basın.")
+            Thread {
+                val sonuc = try { Adb(this).dene(); "Kanal tuşları hazır ✓" } catch (e: Exception) { e.message ?: "Bağlanılamadı." }
+                runOnUiThread { toast(sonuc) }
+            }.start()
+        })
+        val harita = a.kanalHaritasi
+        if (harita.isNotEmpty()) {
+            s.ekle(ui.aciklama("Öğrenilen kanallar: " + harita.entries.sortedBy { it.value.toIntOrNull() ?: 0 }.joinToString(", ") { "${it.value} ${it.key}" }))
+            s.ekle(ui.dugme("Öğrenilen kanalları sil") { a.kanalHaritasi = emptyMap(); toast("Silindi."); kategoriEkrani(Kategori.TV) })
+        }
 
         s.ekle(ui.bolum("Bilgisayardan (ADB)"))
         s.ekle(ui.aciklama("Menüler yoksa ya da izin verilemiyorsa bir kez çalıştırın:"))

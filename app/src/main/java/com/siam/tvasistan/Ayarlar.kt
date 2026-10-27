@@ -67,6 +67,14 @@ class Ayarlar(ctx: Context) {
      * kumandanın Asistan tuşuyla geliyor; sürekli dinleme ancak USB mikrofon takılınca anlamlı.
      * Kullanıcı ayar ekranındaki onay kutusundan açar.
      */
+    /** Kullanıcının söylediği kanal adı → kanal numarası eşlemesi (ör. "atv" → "4"). JSON nesnesi. */
+    var kanalHaritasi: Map<String, String>
+        get() = try {
+            val j = org.json.JSONObject(p.getString("kanal_haritasi", "{}") ?: "{}")
+            j.keys().asSequence().associateWith { j.getString(it) }
+        } catch (_: Exception) { emptyMap() }
+        set(v) = p.edit().putString("kanal_haritasi", org.json.JSONObject(v).toString()).apply()
+
     var uyandirmaAktif: Boolean
         get() = p.getBoolean("uyandirma_aktif", false)
         set(v) = p.edit().putBoolean("uyandirma_aktif", v).apply()
