@@ -52,6 +52,16 @@ class Ayarlar(ctx: Context) {
         get() = p.getBoolean("oto_guncelleme", true)
         set(v) = p.edit().putBoolean("oto_guncelleme", v).apply()
 
+    /** Telefon mikrofonu (Vercel sayfası) — varsayılan kapalı; ayar ekranındaki onay kutusundan açılır. */
+    var telefonAktif: Boolean
+        get() = p.getBoolean("telefon_aktif", false)
+        set(v) = p.edit().putBoolean("telefon_aktif", v).apply()
+
+    /** Telefon sayfasına girilecek eşleştirme kodu (ilk istekte üretilir). */
+    var telefonKodu: String
+        get() = p.getString("telefon_kodu", null) ?: TelefonKoprusu.yeniKod().also { telefonKodu = it }
+        set(v) = p.edit().putString("telefon_kodu", v).apply()
+
     /**
      * "Jülide" uyandırma kelimesi. VARSAYILAN KAPALI: bu TV'nin dahili mikrofonu ses vermiyor, ses yalnız
      * kumandanın Asistan tuşuyla geliyor; sürekli dinleme ancak USB mikrofon takılınca anlamlı.

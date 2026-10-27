@@ -1,0 +1,9 @@
+{
+  "name": "Jülide Mikrofon",
+  "short_name": "Jülide",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1720",
+  "theme_color": "#0f1720",
+  "lang": "tr"
+}

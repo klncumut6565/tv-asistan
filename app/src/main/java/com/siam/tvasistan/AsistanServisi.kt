@@ -84,6 +84,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private var sessizCikis: SessizCikis? = null
     /** "Jülide" uyandırma dinleyicisi (yalnız sohbet açıkken; TV sesi varken beslenir). */
     @Volatile private var uyandirma: Uyandirma? = null
+
+    // ---- Telefon mikrofonu (TelefonKoprusu) ----
+    private var telefon: TelefonKoprusu? = null
+    /** Oturum açılırken (Gemini bağlanırken) telefondan gelen ilk sesler burada bekler (en çok ~4 sn). */
+    private val telefonTampon = ArrayDeque<ByteArray>()
+    @Volatile private var sonTelefonSesi = 0L
     /** Uyandırmadan önceki son ~3 sn mikrofon sesi ("Jülide, TRT Haber'i aç" kaybolmasın). */
     private val sonSesler = ArrayDeque<ByteArray>()
     @Volatile private var tamponuGonder = false
@@ -126,6 +132,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         araclar = Araclar(this)
         ornek = this
         ServisOnarim.kaydet(this)
+        telefonuAyarla()
         Log.i(ETIKET, "Erişilebilirlik servisi bağlandı")
         guncellemeDongusu()
     }
@@ -198,10 +205,63 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     override fun onDestroy() {
         if (::araclar.isInitialized) araclar.uyku.iptal()
+        telefon?.durdur()
+        telefon = null
         bitir()
         ornek = null
         kapsam.cancel()
         super.onDestroy()
+    }
+
+    // ------------------------------------------------------------ telefon mikrofonu
+
+    /** Ayara göre telefon köprüsünü başlatır/durdurur (servis bağlanınca ve ayar değişince). */
+    fun telefonuAyarla() {
+        val kod = ayarlar.telefonKodu
+        telefon?.durdur()
+        telefon = null
+        if (!ayarlar.telefonAktif || kod.isBlank()) return
+        telefon = TelefonKoprusu(kod, sesGeldi = { telefonSesi(it) }) { d ->
+            Log.i(ETIKET, "Telefon: $d")
+            if (d == "telefon bağlandı") telefon?.durumGonder(if (durum == Durum.DINLIYOR) "Jülide dinliyor" else "Hazır — konuşunca Jülide açılır")
+        }.also { it.baslat() }
+    }
+
+    /** Telefondan PCM geldi (okhttp iş parçacığı). */
+    private fun telefonSesi(pcm: ByteArray) {
+        val simdi = SystemClock.elapsedRealtime()
+        val yeniKonusma = simdi - sonTelefonSesi > 1_500
+        sonTelefonSesi = simdi
+        if (yeniKonusma) ana.post { telefonKonusmasiBasladi() }
+        val m = mikrofon
+        if (m != null && durum == Durum.DINLIYOR) {
+            m.disaridanEkle(pcm)
+        } else {
+            synchronized(telefonTampon) {
+                telefonTampon.addLast(pcm)
+                var toplam = telefonTampon.sumOf { it.size }
+                while (toplam > 4 * 32_000 && telefonTampon.isNotEmpty()) toplam -= telefonTampon.removeFirst().size
+            }
+        }
+    }
+
+    /**
+     * Telefonda yeni bir konuşma başladı: sohbet kapalıysa açılır; açıksa kumanda tuşuna basılmış gibi
+     * dinleme penceresi açılır (video çalıyorsa duraklatılır). Jülide konuşurken telefonun duyduğu ses
+     * Jülide'nin kendi sesi olabileceği için onu susturmaz (yarı çift yönlü kural sesi zaten atar).
+     */
+    private fun telefonKonusmasiBasladi() {
+        when (durum) {
+            Durum.BOSTA -> oturumBaslat()
+            Durum.BAGLANIYOR -> {}
+            Durum.DINLIYOR -> {
+                if (oynatici?.caliyor() == true) return
+                konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
+                if (medyaAktif) konusOdagiAl()
+                medyaSessizUyarisi = false
+                panel.durum("Dinliyorum (telefon)…")
+            }
+        }
     }
 
     // ------------------------------------------------------------ kumanda tuşu
@@ -358,6 +418,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 durum = Durum.DINLIYOR
                 sonEtkinlik = SystemClock.elapsedRealtime()
                 panel.durum("Jülide dinliyor…")
+                // Oturumu telefondan gelen konuşma açtıysa, bağlanırken biriken sesi şimdi ilet.
+                val bekleyen = synchronized(telefonTampon) { telefonTampon.toList().also { telefonTampon.clear() } }
+                if (SystemClock.elapsedRealtime() - sonTelefonSesi < 8_000) bekleyen.forEach { m.disaridanEkle(it) }
+                telefon?.durumGonder("Jülide dinliyor")
                 zamanlayici()
             } catch (e: Exception) {
                 Log.e(ETIKET, "Oturum başlatılamadı", e)
@@ -569,6 +633,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     fun bitir() {
         val oncekiDurum = durum
+        synchronized(telefonTampon) { telefonTampon.clear() }
+        if (oncekiDurum != Durum.BOSTA) telefon?.durumGonder("Sohbet kapandı — konuşunca yeniden açılır")
         durum = Durum.BOSTA
         yenidenBaglaniyor = false
         mikrofon?.durdur()
@@ -687,6 +753,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             // hemen ikinci komutu verebilsin (TV sesi varken konuşma eşiği yükseltilir).
             konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, SystemClock.elapsedRealtime() + 8000)
             if (durum == Durum.DINLIYOR && !bekleyenKapat) panel.durum("Jülide dinliyor…")
+            val cevap = asistanMetin.toString().trim()
+            if (cevap.isNotEmpty()) telefon?.durumGonder("Jülide: $cevap")
         }
     }
 

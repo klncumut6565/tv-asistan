@@ -47,6 +47,20 @@ class Mikrofon(
      */
     @Volatile private var hemenYenile = false
 
+    // ---- Telefon mikrofonu (Vercel sayfası → Supabase Realtime → TelefonKoprusu) ----
+    private val disSes = java.util.concurrent.ConcurrentLinkedQueue<ByteArray>()
+    @Volatile private var sonDisSes = 0L
+
+    /**
+     * Dışarıdan (telefondan) gelen 16 kHz mono PCM. Mikrofon iş parçacığında 40 ms'lik parçalara bölünüp
+     * aynı işleme hattına verilir. Telefon sesi akarken TV'nin kendi (sıfır) mikrofon verisi atlanır;
+     * yoksa iki akış iç içe geçip Gemini'ye giden sesin zamanlaması bozulurdu.
+     */
+    fun disaridanEkle(pcm: ByteArray) {
+        disSes.add(pcm)
+        sonDisSes = SystemClock.elapsedRealtime()
+    }
+
     companion object {
         /** Tuşa basıldıktan sonra kumanda sesini bekleme penceresi. */
         private const val TUS_PENCERESI_MS = 3_000L
@@ -54,6 +68,8 @@ class Mikrofon(
         private const val SIFIR_PARCA_ESIK = 10
         /** Yedek yenileme: anında yenilemeden sonra kumanda sesi 1,5 sn içinde gelmezse bir kez daha. */
         private const val YENILEME_ARALIGI_MS = 1_500L
+        /** Telefon sesinin son parçasından sonra TV mikrofonunun bu kadar süre atlanması. */
+        private const val DIS_SES_SURESI_MS = 600L
         /** Kapatma ile yeniden açma arasındaki kısa ara. */
         private const val TEMIZ_ARA_MS = 150L
 
@@ -210,6 +226,18 @@ class Mikrofon(
 
             while (calisiyor) {
                 val n = rec.read(tampon, 0, tampon.size)
+                // Telefondan gelen ses varsa önce onu ver (40 ms'lik parçalar halinde).
+                while (true) {
+                    val d = disSes.poll() ?: break
+                    var o = 0
+                    while (o < d.size) {
+                        val u = minOf(1280, d.size - o)
+                        parca(d.copyOfRange(o, o + u))
+                        o += u
+                    }
+                }
+                // Telefon sesi akarken (son parçadan sonraki 0,6 sn) TV mikrofonunun verisini atla.
+                if (SystemClock.elapsedRealtime() - sonDisSes < DIS_SES_SURESI_MS) continue
                 if (n > 0) {
                     ardisikHata = 0
                     // Gerçek bir odada ortam gürültüsü sıfır olmaz; tam sıfır = ses gelmiyor.

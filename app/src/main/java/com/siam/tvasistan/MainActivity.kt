@@ -220,6 +220,38 @@ class MainActivity : Activity() {
             uygulamalariYaz()
         })
 
+        sutun.addView(yazi("Telefon mikrofonu", 22f, true))
+        sutun.addView(yazi(
+            "Telefonda Jülide sayfasını açıp aşağıdaki kodu girin; telefon mikrofon olur ve tuşa basmadan " +
+                "konuşursunuz. Sayfa yalnız konuşma algılayınca ses gönderir.",
+            14f, renk = Color.LTGRAY
+        ))
+        val kodTv = yazi("", 26f, true, renk = Color.rgb(196, 160, 255))
+        fun kodYaz() {
+            kodTv.text = "Eşleştirme kodu: ${a.telefonKodu}"
+        }
+        sutun.addView(CheckBox(this).apply {
+            text = "Telefon mikrofonunu kullan"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            isChecked = a.telefonAktif
+            isFocusable = true
+            setPadding(px(8), px(12), px(8), px(12))
+            setOnCheckedChangeListener { _, acik ->
+                a.telefonAktif = acik
+                AsistanServisi.ornek?.telefonuAyarla()
+                toast(if (acik) "Telefon mikrofonu AÇIK." else "Telefon mikrofonu KAPALI.")
+            }
+        })
+        kodYaz()
+        sutun.addView(kodTv)
+        sutun.addView(dugme("Yeni eşleştirme kodu üret") {
+            a.telefonKodu = TelefonKoprusu.yeniKod()
+            kodYaz()
+            AsistanServisi.ornek?.telefonuAyarla()
+            toast("Yeni kod: ${a.telefonKodu} — telefondaki sayfaya bu kodu girin.")
+        })
+
         sutun.addView(yazi("6) Güncelleme", 22f, true))
         guncellemeTv = yazi("", 16f, renk = Color.LTGRAY)
         sutun.addView(guncellemeTv)

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1720">
+<title>Jülide Mikrofon</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --zemin: #0f1720;
+    --kart: #172231;
+    --cizgi: #263446;
+    --yazi: #eef2f7;
+    --soluk: #93a3b8;
+    --mor: #a77bff;
+    --mor-koyu: #6d3fe0;
+    --yesil: #3ddc97;
+    --kirmizi: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #2a1d4a 0%, var(--zemin) 60%);
+    color: var(--yazi);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { margin: 8px 0 0; font-size: 22px; font-weight: 650; letter-spacing: .2px; text-align: center; }
+  .alt { color: var(--soluk); font-size: 14px; text-align: center; margin: 0; }
+
+  .kure-alan { display: flex; justify-content: center; padding: 18px 0 6px; }
+  .kure {
+    width: 168px; height: 168px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #d6c2ff 0%, var(--mor) 35%, var(--mor-koyu) 75%, #2b1260 100%);
+    box-shadow: 0 0 0 0 rgba(167,123,255,.0), 0 18px 60px rgba(109,63,224,.35);
+    opacity: .35; transform: scale(.92);
+    transition: opacity .3s, transform .08s linear, box-shadow .08s linear;
+  }
+  .kure.acik { opacity: 1; }
+  .kure.konusuyor { box-shadow: 0 0 0 10px rgba(167,123,255,.18), 0 0 70px rgba(167,123,255,.65); }
+
+  .durum { text-align: center; font-size: 17px; min-height: 26px; }
+  .durum.hata { color: var(--kirmizi); }
+  .durum.iyi { color: var(--yesil); }
+
+  .kart { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 16px; padding: 16px; }
+  label { display: block; font-size: 13px; color: var(--soluk); margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%; font-size: 24px; letter-spacing: 4px; text-transform: uppercase; text-align: center;
+    padding: 12px; border-radius: 12px; border: 1px solid var(--cizgi); background: #0d141d; color: var(--yazi);
+  }
+  input[type=range] { width: 100%; accent-color: var(--mor); }
+  .satir { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--soluk); }
+
+  button {
+    width: 100%; font-size: 18px; font-weight: 650; padding: 16px; border-radius: 14px; border: 0;
+    background: var(--mor); color: #160a33; cursor: pointer;
+  }
+  button.ikincil { background: transparent; color: var(--yazi); border: 1px solid var(--cizgi); font-weight: 500; }
+  button:disabled { opacity: .5; }
+
+  .cevap { font-size: 15px; color: var(--yazi); white-space: pre-wrap; min-height: 22px; }
+  .cevap:empty::before { content: "Jülide'nin cevapları burada görünür."; color: var(--soluk); }
+  .ipucu { font-size: 13px; color: var(--soluk); margin: 0; }
+  .gizli { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Jülide · Telefon Mikrofonu</h1>
+  <p class="alt">Telefon mikrofon olur; TV'deki Jülide'yle tuşa basmadan konuşursunuz.</p>
+
+  <div class="kure-alan"><div id="kure" class="kure"></div></div>
+  <div id="durum" class="durum">Hazır</div>
+
+  <section id="kurulum" class="kart">
+    <label for="kod">TV'deki eşleştirme kodu (Jülide ayarları → Telefon mikrofonu)</label>
+    <input id="kod" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="ABCD2345">
+  </section>
+
+  <button id="baslat">Başlat</button>
+  <button id="duraklat" class="ikincil gizli">Duraklat</button>
+
+  <section class="kart">
+    <div class="satir"><span>Hassasiyet</span><span id="hassasDeger"></span></div>
+    <input id="hassas" type="range" min="1" max="10" step="1" value="6">
+    <p class="ipucu">Jülide sizi duymuyorsa artırın; TV sesini konuşma sanıyorsa azaltın.</p>
+  </section>
+
+  <section class="kart">
+    <label>Jülide</label>
+    <div id="cevap" class="cevap"></div>
+  </section>
+
+  <p class="ipucu">Ekran açık ve bu sayfa önde kalmalı; telefon kilitlenirse mikrofon durur. Ses yalnız konuşma algılandığında gönderilir.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  // Supabase Realtime: yalnız yayın (broadcast) kanalı; veritabanı kullanılmaz.
+  const SUPABASE_URL = "https://eiacwimxjpggomngsnyo.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpYWN3aW14anBnZ29tbmdzbnlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNDE5ODAsImV4cCI6MjA5NzcxNzk4MH0.OTUmblVqYTatRt8IUqjuDCAC0ABdYTg6Gy6mBS-wI8w";
+
+  const HEDEF_ORAN = 16000;          // TV'nin beklediği örnekleme hızı
+  const CERCEVE = 320;               // 20 ms @ 16 kHz
+  const PARCA_CERCEVE = 12;          // 240 ms'lik gönderim parçası
+  const ONCESI_CERCEVE = 20;         // konuşma başlamadan önceki 400 ms de gönderilir
+  const KUYRUK_MS = 900;             // konuşma bittikten sonra 0,9 sn daha gönder
+
+  const $ = (id) => document.getElementById(id);
+  const kure = $("kure"), durumEl = $("durum"), kodEl = $("kod"), baslatBtn = $("baslat"),
+        duraklatBtn = $("duraklat"), hassasEl = $("hassas"), cevapEl = $("cevap");
+
+  const sakla = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const oku = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+
+  kodEl.value = (oku("julide_kod") || "").toUpperCase();
+  hassasEl.value = oku("julide_hassas") || "6";
+  const hassasYaz = () => { $("hassasDeger").textContent = hassasEl.value; };
+  hassasYaz();
+  hassasEl.addEventListener("input", () => { hassasYaz(); sakla("julide_hassas", hassasEl.value); });
+
+  function durum(metin, tur) {
+    durumEl.textContent = metin;
+    durumEl.className = "durum" + (tur ? " " + tur : "");
+  }
+
+  let istemci = null, kanal = null, bagli = false;
+  let baglam = null, akis = null, dugum = null, kilit = null;
+  let calisiyor = false, duraklatildi = false;
+
+  // ---- ses işleme durumu ----
+  let kaynakOrani = 48000, birikim = new Float32Array(0);
+  let gurultu = 0.004, konusuyor = false, sonKonusma = 0, ustUste = 0;
+  const oncesi = [];      // Int16Array çerçeveleri (konuşma öncesi)
+  let gonderilecek = [];  // Int16Array çerçeveleri (gönderim tamponu)
+
+  function esik() {
+    // Hassasiyet 1..10 → sabit alt sınır ve gürültü çarpanı
+    const h = Number(hassasEl.value);
+    const taban = 0.03 - h * 0.0026;          // 1: ~0.027  10: ~0.004
+    const carpan = 4.2 - h * 0.25;            // 1: ~3.95   10: ~1.7
+    return Math.max(taban, gurultu * carpan);
+  }
+
+  function base64(int16) {
+    const b = new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength);
+    let s = "";
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+
+  function gonder(cerceveler) {
+    if (!cerceveler.length || !kanal || !bagli) return;
+    const toplam = cerceveler.reduce((a, c) => a + c.length, 0);
+    const pcm = new Int16Array(toplam);
+    let o = 0;
+    for (const c of cerceveler) { pcm.set(c, o); o += c.length; }
+    kanal.send({ type: "broadcast", event: "ses", payload: { d: base64(pcm) } });
+  }
+
+  function cerceveIsle(f32) {
+    // RMS ve görsel seviye
+    let t = 0;
+    for (let i = 0; i < f32.length; i++) t += f32[i] * f32[i];
+    const rms = Math.sqrt(t / f32.length);
+    const simdi = performance.now();
+    const e = esik();
+    const ses = rms > e;
+    ustUste = ses ? ustUste + 1 : 0;
+    if (!konusuyor && !ses) gurultu = gurultu * 0.97 + rms * 0.03;
+
+    const i16 = new Int16Array(f32.length);
+    for (let i = 0; i < f32.length; i++) {
+      const v = Math.max(-1, Math.min(1, f32[i]));
+      i16[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+    }
+
+    const olcek = 0.92 + Math.min(0.25, rms * 4);
+    kure.style.transform = `scale(${olcek.toFixed(3)})`;
+
+    if (duraklatildi) { konusuyor = false; return; }
+
+    if (!konusuyor && ustUste >= 2) {
+      konusuyor = true;
+      sonKonusma = simdi;
+      gonderilecek = oncesi.splice(0);       // konuşma öncesini de ekle
+      kure.classList.add("konusuyor");
+      durum("Konuşuyorsunuz…", "iyi");
+    }
+
+    if (konusuyor) {
+      if (ses) sonKonusma = simdi;
+      gonderilecek.push(i16);
+      if (gonderilecek.length >= PARCA_CERCEVE) { gonder(gonderilecek); gonderilecek = []; }
+      if (simdi - sonKonusma > KUYRUK_MS) {
+        gonder(gonderilecek); gonderilecek = [];
+        konusuyor = false;
+        kure.classList.remove("konusuyor");
+        durum("Dinliyor", "iyi");
+      }
+    } else {
+      oncesi.push(i16);
+      if (oncesi.length > ONCESI_CERCEVE) oncesi.shift();
+    }
+  }
+
+  function sesGeldi(girdi) {
+    // Kaynak hızından 16 kHz'e: her çıkış örneği için kutu ortalaması (basit alçak geçiren + seyreltme).
+    const oran = kaynakOrani / HEDEF_ORAN;
+    const yeni = new Float32Array(birikim.length + girdi.length);
+    yeni.set(birikim); yeni.set(girdi, birikim.length);
+    const cikisSayisi = Math.floor(yeni.length / oran);
+    const cikis = new Float32Array(cikisSayisi);
+    for (let i = 0; i < cikisSayisi; i++) {
+      const bas = Math.floor(i * oran), son = Math.min(yeni.length, Math.floor((i + 1) * oran));
+      let t = 0;
+      for (let j = bas; j < son; j++) t += yeni[j];
+      cikis[i] = t / Math.max(1, son - bas);
+    }
+    birikim = yeni.slice(Math.floor(cikisSayisi * oran));
+    // 20 ms'lik çerçevelere böl
+    if (!sesGeldi.kalan) sesGeldi.kalan = new Float32Array(0);
+    const tum = new Float32Array(sesGeldi.kalan.length + cikis.length);
+    tum.set(sesGeldi.kalan); tum.set(cikis, sesGeldi.kalan.length);
+    let o = 0;
+    for (; o + CERCEVE <= tum.length; o += CERCEVE) cerceveIsle(tum.subarray(o, o + CERCEVE));
+    sesGeldi.kalan = tum.slice(o);
+  }
+
+  const ISLEMCI = `
+    class Toplayici extends AudioWorkletProcessor {
+      process(girdiler) {
+        const k = girdiler[0];
+        if (k && k[0]) this.port.postMessage(k[0].slice(0));
+        return true;
+      }
+    }
+    registerProcessor("toplayici", Toplayici);`;
+
+  async function ekranAcikKalsin() {
+    try { if ("wakeLock" in navigator) kilit = await navigator.wakeLock.request("screen"); } catch (_) {}
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && calisiyor) { ekranAcikKalsin(); baglam && baglam.resume(); }
+  });
+
+  function kanalaBaglan(kod) {
+    return new Promise((coz, reddet) => {
+      if (!window.supabase) return reddet(new Error("Bağlantı kütüphanesi yüklenemedi (internet?)."));
+      istemci = istemci || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+        realtime: { params: { eventsPerSecond: 20 } },
+      });
+      kanal = istemci.channel("julide-" + kod, { config: { broadcast: { self: false, ack: false } } });
+      kanal.on("broadcast", { event: "durum" }, ({ payload }) => {
+        const m = (payload && payload.m) || "";
+        if (m.startsWith("Jülide: ")) cevapEl.textContent = m.slice(8);
+        else if (m) durum(m, "iyi");
+      });
+      let ilk = true;
+      kanal.subscribe((st) => {
+        if (st === "SUBSCRIBED") {
+          bagli = true;
+          kanal.send({ type: "broadcast", event: "merhaba", payload: {} });
+          if (ilk) { ilk = false; coz(); } else durum("Yeniden bağlandı", "iyi");
+        } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
+          bagli = false;
+          if (ilk) { ilk = false; reddet(new Error("Sunucuya bağlanılamadı.")); }
+          else if (calisiyor) durum("Bağlantı koptu, yeniden deneniyor…", "hata");
+        }
+      });
+    });
+  }
+
+  async function baslat() {
+    const kod = (kodEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (kod.length < 6) { durum("TV'deki 8 haneli kodu girin.", "hata"); kodEl.focus(); return; }
+    sakla("julide_kod", kod);
+    baslatBtn.disabled = true;
+    durum("Mikrofon izni isteniyor…");
+    try {
+      akis = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
+      baglam = new (window.AudioContext || window.webkitAudioContext)();
+      kaynakOrani = baglam.sampleRate;
+      const url = URL.createObjectURL(new Blob([ISLEMCI], { type: "application/javascript" }));
+      await baglam.audioWorklet.addModule(url);
+      const kaynak = baglam.createMediaStreamSource(akis);
+      dugum = new AudioWorkletNode(baglam, "toplayici");
+      dugum.port.onmessage = (e) => sesGeldi(e.data);
+      kaynak.connect(dugum);
+      // Bazı tarayıcılar çıkışa bağlanmayan düğümü çalıştırmaz: sessiz kazançla bağla.
+      const sus = baglam.createGain(); sus.gain.value = 0;
+      dugum.connect(sus).connect(baglam.destination);
+
+      durum("TV'ye bağlanılıyor…");
+      await kanalaBaglan(kod);
+      calisiyor = true;
+      await ekranAcikKalsin();
+      kure.classList.add("acik");
+      $("kurulum").classList.add("gizli");
+      baslatBtn.textContent = "Durdur";
+      baslatBtn.disabled = false;
+      duraklatBtn.classList.remove("gizli");
+      durum("Dinliyor — konuşmaya başlayın", "iyi");
+    } catch (e) {
+      durdur();
+      const izin = e && (e.name === "NotAllowedError" || e.name === "SecurityError");
+      durum(izin ? "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin verin." : (e.message || String(e)), "hata");
+    }
+  }
+
+  function durdur() {
+    calisiyor = false; konusuyor = false; gonderilecek = []; oncesi.length = 0;
+    try { kanal && bagli && kanal.send({ type: "broadcast", event: "hoscakal", payload: {} }); } catch (_) {}
+    try { kanal && istemci && istemci.removeChannel(kanal); } catch (_) {}
+    kanal = null; bagli = false;
+    try { akis && akis.getTracks().forEach((t) => t.stop()); } catch (_) {}
+    try { baglam && baglam.close(); } catch (_) {}
+    try { kilit && kilit.release(); } catch (_) {}
+    akis = null; baglam = null; dugum = null; kilit = null;
+    kure.classList.remove("acik", "konusuyor"); kure.style.transform = "";
+    $("kurulum").classList.remove("gizli");
+    baslatBtn.textContent = "Başlat"; baslatBtn.disabled = false;
+    duraklatBtn.classList.add("gizli"); duraklatildi = false; duraklatBtn.textContent = "Duraklat";
+  }
+
+  baslatBtn.addEventListener("click", () => { calisiyor ? (durdur(), durum("Durduruldu")) : baslat(); });
+  duraklatBtn.addEventListener("click", () => {
+    duraklatildi = !duraklatildi;
+    duraklatBtn.textContent = duraklatildi ? "Devam et" : "Duraklat";
+    durum(duraklatildi ? "Duraklatıldı — ses gönderilmiyor" : "Dinliyor", duraklatildi ? "" : "iyi");
+    if (duraklatildi) kure.classList.remove("konusuyor");
+  });
+  kodEl.addEventListener("keydown", (e) => { if (e.key === "Enter") baslat(); });
+})();
+</script>
+</body>
+</html>

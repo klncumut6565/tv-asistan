@@ -15,6 +15,10 @@ Sesli komutla:
 - Ayarlar — "Wi-Fi ayarlarını aç", "Ses ayarlarını aç", "YouTube'un uygulama bilgisini aç"
   (devre dışı bırakma/kaldırma düğmesine Jülide basmaz; kullanıcı kumandayla basar)
 
+**Telefon mikrofonu:** `web/` klasörü Vercel'de yayınlanan sayfadır. Telefonda açılıp TV'deki eşleştirme kodu
+girilince telefon mikrofon olur (tuşa basmadan konuşma). Ses yalnız konuşma algılanınca Supabase Realtime yayın
+kanalı üzerinden TV'ye gider (veritabanı kullanılmaz). Jülide ayarları → "Telefon mikrofonunu kullan".
+
 CleanYourTV incelemesi ve yol haritası: [`docs/CLEANYOURTV_ENTEGRASYON_RAPORU.md`](docs/CLEANYOURTV_ENTEGRASYON_RAPORU.md)
 
 ## Mimari
