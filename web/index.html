@@ -70,6 +70,9 @@
   .cevap:empty::before { content: "Jülide'nin cevapları burada görünür."; color: var(--soluk); }
   .ipucu { font-size: 13px; color: var(--soluk); margin: 0; }
   .gizli { display: none !important; }
+  #karanlik { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; align-items: flex-end;
+    justify-content: center; padding-bottom: 40px; color: #333; font-size: 14px; }
+  #uyanik { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   details.ayar { color: var(--soluk); font-size: 14px; }
   details.ayar summary { cursor: pointer; text-align: center; padding: 8px; list-style: none; }
   details.ayar summary::-webkit-details-marker { display: none; }
@@ -88,6 +91,7 @@
   <button id="baslat">Başlat</button>
   <button id="julide" class="gizli">Jülide'yi aç</button>
   <button id="duraklat" class="ikincil gizli">Duraklat</button>
+  <button id="karart" class="ikincil gizli">🌙 Ekranı karart (mikrofon açık kalır)</button>
 
   <section class="kart">
     <label>Jülide</label>
@@ -107,8 +111,10 @@
     </section>
   </details>
 
-  <p class="ipucu">Sayfa kapanınca ya da arka plana geçince mikrofon kapanır; sayfaya dönünce kendiliğinden yeniden açılır. Ses yalnız konuşma algılandığında gönderilir.</p>
+  <p class="ipucu">Çalışırken ekran kendiliğinden kapanmaz. iPhone, kilit tuşuyla ekran kapatılınca ya da başka uygulamaya geçilince mikrofonu her web sayfası için keser (Apple sınırı); bu yüzden kilit tuşu yerine “Ekranı karart”ı kullanın. Sayfaya dönünce mikrofon kendiliğinden yeniden açılır.</p>
 </main>
+<div id="karanlik" class="gizli">Jülide dinliyor · açmak için dokunun</div>
+<video id="uyanik" src="uyanik.mp4" muted playsinline loop preload="auto"></video>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -272,9 +278,29 @@
     }
     registerProcessor("toplayici", Toplayici);`;
 
+  // Ekran kapanmasın: tarayıcının ekran kilidi + iPhone'da (özellikle ana ekrana eklenmiş sayfada
+  // ekran kilidi güvenilmez) görünmez, sessiz, döngüdeki küçük video.
+  const uyanikVideo = $("uyanik"), karanlik = $("karanlik"), karartBtn = $("karart");
   async function ekranAcikKalsin() {
-    try { if ("wakeLock" in navigator) kilit = await navigator.wakeLock.request("screen"); } catch (_) {}
+    try {
+      if ("wakeLock" in navigator && !kilit) {
+        kilit = await navigator.wakeLock.request("screen");
+        kilit.addEventListener("release", () => {
+          kilit = null;
+          if (calisiyor && document.visibilityState === "visible") ekranAcikKalsin();
+        });
+      }
+    } catch (_) {}
+    try { uyanikVideo.muted = true; await uyanikVideo.play(); } catch (_) {}
   }
+  function ekranSerbest() {
+    try { kilit && kilit.release(); } catch (_) {}
+    kilit = null;
+    try { uyanikVideo.pause(); } catch (_) {}
+    karanlik.classList.add("gizli");
+  }
+  karartBtn.addEventListener("click", () => karanlik.classList.remove("gizli"));
+  karanlik.addEventListener("click", () => karanlik.classList.add("gizli"));
   // Sayfa kapanır ya da arka plana geçerse mikrofonu tamamen kapat (izin göstergesi söner);
   // sayfaya dönülünce, kullanıcı daha önce başlatmışsa kendiliğinden yeniden aç.
   let donunceAc = false;
@@ -347,6 +373,7 @@
       baslatBtn.textContent = "Durdur";
       baslatBtn.disabled = false;
       duraklatBtn.classList.remove("gizli");
+      karartBtn.classList.remove("gizli");
       julideDugmesi();
       durum("Dinliyor — konuşmaya başlayın", "iyi");
     } catch (e) {
@@ -363,12 +390,12 @@
     kanal = null; bagli = false;
     try { akis && akis.getTracks().forEach((t) => t.stop()); } catch (_) {}
     try { baglam && baglam.close(); } catch (_) {}
-    try { kilit && kilit.release(); } catch (_) {}
+    ekranSerbest();
     akis = null; baglam = null; dugum = null; kilit = null;
     kure.classList.remove("acik", "konusuyor"); kure.style.transform = "";
     baslatBtn.textContent = "Başlat"; baslatBtn.disabled = false;
     duraklatBtn.classList.add("gizli"); duraklatildi = false; duraklatBtn.textContent = "Duraklat";
-    julideBtn.classList.add("gizli"); oturumAcik = null; julideKonusuyor = false;
+    julideBtn.classList.add("gizli"); karartBtn.classList.add("gizli"); oturumAcik = null; julideKonusuyor = false;
   }
 
   function julideDugmesi() {
@@ -402,7 +429,8 @@
     else { tvyeGonder("kapat"); durum("Jülide kapatılıyor…"); }
   });
 
-  baslatBtn.addEventListener("click", () => { calisiyor ? (durdur(), durum("Durduruldu")) : baslat(); });
+  baslatBtn.addEventListener("click", () => {
+    if (!calisiyor) { try { uyanikVideo.muted = true; uyanikVideo.play().catch(() => {}); } catch (_) {} } calisiyor ? (durdur(), durum("Durduruldu")) : baslat(); });
   duraklatBtn.addEventListener("click", () => {
     duraklatildi = !duraklatildi;
     duraklatBtn.textContent = duraklatildi ? "Devam et" : "Duraklat";
