@@ -544,7 +544,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     /** Araç: numara rozetlerini çiz / kaldır. */
-    fun numaralariCiz(l: List<Pair<Int, android.graphics.Rect>>) = panel.numaralar(l)
+    fun numaralariCiz(l: List<Pair<Int, android.graphics.Rect>>): Boolean = panel.numaralar(l)
     fun numaralariGizle() = panel.numaralariGizle()
 
     /** Araç: kullanıcı "tamam/kapat" dedi — asistanın veda cümlesi bitince kapat. */

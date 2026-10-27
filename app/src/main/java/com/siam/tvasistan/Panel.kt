@@ -87,17 +87,32 @@ class Panel(private val servis: AccessibilityService) {
         }
     }
 
-    /** Tıklanabilir öğelerin üstüne numara rozetleri çizer; 30 sn sonra kendiliğinden kalkar. */
-    fun numaralar(l: List<Pair<Int, android.graphics.Rect>>) {
+    /**
+     * Tıklanabilir öğelerin üstüne numara rozetleri çizer; 45 sn sonra kendiliğinden kalkar.
+     * Katman her seferinde yeniden eklenir (kürenin ÜSTÜNDE kalsın) ve ekrana GERÇEKTEN
+     * çizildiği doğrulanır. Çizildiyse true döner.
+     */
+    fun numaralar(l: List<Pair<Int, android.graphics.Rect>>): Boolean {
+        val cizildi = java.util.concurrent.CountDownLatch(1)
         ana.post {
-        val n = numara ?: NumaraKatmani(servis).also { v ->
-            try { wm.addView(v, tamEkran()); numara = v } catch (_: Exception) { return@post }
+            ana.removeCallbacks(numaraGizleyici)
+            numara?.let { try { wm.removeView(it) } catch (_: Exception) {} }
+            numara = null
+            val v = NumaraKatmani(servis)
+            v.ogeler = l
+            v.cizilince = { cizildi.countDown() }
+            try {
+                wm.addView(v, tamEkran())
+                numara = v
+            } catch (e: Exception) {
+                android.util.Log.w("JulideNumara", "numara katmanı eklenemedi: ${e.message}")
+                return@post
+            }
+            v.invalidate()
+            ana.postDelayed(numaraGizleyici, 45_000)
         }
-        n.ogeler = l
-        n.invalidate()
-        ana.removeCallbacks(numaraGizleyici)
-        ana.postDelayed(numaraGizleyici, 30_000)
-        }
+        if (Looper.myLooper() == Looper.getMainLooper()) return true // ana iş parçacığında bekleme yapılamaz
+        return try { cizildi.await(2500, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { false }
     }
 
     fun numaralariGizle() {
@@ -122,17 +137,19 @@ class Panel(private val servis: AccessibilityService) {
     /** Numara rozetleri: öğenin çevresinde ince mor çerçeve, sol üstte mor rozet içinde numara. */
     private class NumaraKatmani(ctx: Context) : View(ctx) {
         @Volatile var ogeler: List<Pair<Int, android.graphics.Rect>> = emptyList()
+        var cizilince: (() -> Unit)? = null
+        init { setWillNotDraw(false) }
         private val d = resources.displayMetrics.density
         private val konum = IntArray(2)
         private val cerceve = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = 2f * d; color = Color.argb(200, 192, 132, 252)
+            style = Paint.Style.STROKE; strokeWidth = 3f * d; color = Color.argb(235, 250, 204, 21)
         }
         private val rozet = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(126, 34, 206) }
         private val kenar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = 1.5f * d; color = Color.WHITE
+            style = Paint.Style.STROKE; strokeWidth = 2.5f * d; color = Color.WHITE
         }
         private val yazi = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE; textAlign = Paint.Align.CENTER; textSize = 15f * d
+            color = Color.WHITE; textAlign = Paint.Align.CENTER; textSize = 22f * d
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 
@@ -145,14 +162,15 @@ class Panel(private val servis: AccessibilityService) {
                 val t = r.top + oy
                 c.drawRoundRect(l, t, r.right + ox, r.bottom + oy, 6f * d, 6f * d, cerceve)
                 val metin = no.toString()
-                val gen = max(24f * d, yazi.measureText(metin) + 12f * d)
-                val yuk = 22f * d
+                val gen = max(34f * d, yazi.measureText(metin) + 16f * d)
+                val yuk = 32f * d
                 val bx = l.coerceAtLeast(0f)
                 val by = (t - yuk / 2f).coerceAtLeast(0f)
                 c.drawRoundRect(bx, by, bx + gen, by + yuk, yuk / 2f, yuk / 2f, rozet)
                 c.drawRoundRect(bx, by, bx + gen, by + yuk, yuk / 2f, yuk / 2f, kenar)
                 c.drawText(metin, bx + gen / 2f, by + yuk / 2f - (yazi.descent() + yazi.ascent()) / 2f, yazi)
             }
+            if (ogeler.isNotEmpty()) cizilince?.let { cizilince = null; it() }
         }
     }
 
