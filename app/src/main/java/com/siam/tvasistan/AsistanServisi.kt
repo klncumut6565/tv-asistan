@@ -221,7 +221,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         telefon?.durdur()
         telefon = null
         if (!ayarlar.telefonAktif || kod.isBlank()) return
-        telefon = TelefonKoprusu(kod, sesGeldi = { telefonSesi(it) }) { d ->
+        telefon = TelefonKoprusu(kod, sesGeldi = { telefonSesi(it) }, durumDegisti = { d ->
             Log.i(ETIKET, "Telefon: $d")
             when (d) {
                 "telefon bağlandı" -> ana.post { if (durum != Durum.BAGLANIYOR) halBildir() }
@@ -229,7 +229,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 "ac" -> ana.post { if (durum == Durum.BOSTA) oturumBaslat() }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
-        }.also { it.baslat() }
+        }).also { it.baslat() }
     }
 
     /** Telefona sohbet ve konuşma durumunu bildirir (sayfa düğmeyi ve dinleme eşiğini buna göre ayarlar). */

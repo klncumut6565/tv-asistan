@@ -32,6 +32,10 @@ class TelefonKoprusu(
     private val sesGeldi: (ByteArray) -> Unit,
     /** Telefon bağlandı/ayrıldı bilgisi (okhttp iş parçacığında). */
     private val durumDegisti: (String) -> Unit = {},
+    /** Kanal adı öneki ("julide-" telefon mikrofonu, "julide-anahtar-" API anahtarı kurulumu). */
+    kanalOn: String = "julide-",
+    /** Diğer olaylar (ör. "anahtar"); okhttp iş parçacığında çağrılır. */
+    private val olayGeldi: (String, JSONObject) -> Unit = { _, _ -> },
 ) {
     companion object {
         private const val ETIKET = "TvAsistan"
@@ -54,7 +58,7 @@ class TelefonKoprusu(
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
     private val ana = Handler(Looper.getMainLooper())
-    private val konu = "realtime:julide-$kod"
+    private val konu = "realtime:$kanalOn$kod"
 
     @Volatile private var ws: WebSocket? = null
     @Volatile private var acik = false
@@ -95,6 +99,12 @@ class TelefonKoprusu(
         gonder(JSONObject().put("topic", konu).put("event", "broadcast").put("payload", yuk))
     }
 
+    /** Kanala serbest bir olay yayınlar. */
+    fun olayGonder(olay: String, yuk: JSONObject) {
+        val b = JSONObject().put("type", "broadcast").put("event", olay).put("payload", yuk)
+        gonder(JSONObject().put("topic", konu).put("event", "broadcast").put("payload", b))
+    }
+
     private fun gonder(j: JSONObject) {
         j.put("ref", (++ref).toString())
         try { ws?.send(j.toString()) } catch (_: Exception) {}
@@ -133,6 +143,7 @@ class TelefonKoprusu(
                                 "hoscakal" -> durumDegisti("telefon ayrıldı")
                                 "ac" -> durumDegisti("ac")
                                 "kapat" -> durumDegisti("kapat")
+                                else -> olayGeldi(p.optString("event"), ic)
                             }
                         }
                         "phx_reply" -> {

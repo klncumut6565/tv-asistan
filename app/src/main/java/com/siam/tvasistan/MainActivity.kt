@@ -61,6 +61,13 @@ class MainActivity : Activity() {
     private val kategoriKartlari = mutableMapOf<Kategori, View>()
     /** Ekrandaki canlı durum alanları (saniyede bir yenilenir). */
     private val yenilenecekler = mutableListOf<() -> Unit>()
+    /** Açıkken telefondan API anahtarı bekleyen kurulum (yalnız Yapay zekâ ekranında). */
+    private var kurulum: AnahtarKurulum? = null
+
+    private fun kurulumuDurdur() {
+        kurulum?.durdur()
+        kurulum = null
+    }
 
     private val yenileyici = object : Runnable {
         override fun run() {
@@ -76,12 +83,14 @@ class MainActivity : Activity() {
         guncellemeTv = ui.yazi("", 18f, Renk.SOLUK)
         kok = FrameLayout(this).apply { setBackgroundColor(Renk.ZEMIN) }
         setContentView(kok)
-        anaEkran()
+        // Anahtar yoksa doğrudan kurulum ekranı: karekodu okut, anahtarı telefondan yapıştır.
+        if (a.geminiAnahtari.isBlank()) kategoriEkrani(Kategori.YAPAY_ZEKA) else anaEkran()
     }
 
     override fun onResume() {
         super.onResume()
         ana.post(yenileyici)
+        if (acik == Kategori.YAPAY_ZEKA && kurulum == null) kategoriEkrani(Kategori.YAPAY_ZEKA)
         guncellemeDenetle(kur = false)
         // Servis listeden düştüyse hemen; listede görünüp bağlanmadıysa ("çökmüş") 3 sn tanıyıp onar.
         ServisOnarim.onar(this)
@@ -90,6 +99,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         ana.removeCallbacks(yenileyici)
+        kurulumuDurdur()
         super.onPause()
     }
 
@@ -132,6 +142,7 @@ class MainActivity : Activity() {
     // ================================================================ ana ekran
 
     private fun anaEkran() {
+        kurulumuDurdur()
         acik = null
         kategoriKartlari.clear()
         val s = sutun()
@@ -208,6 +219,7 @@ class MainActivity : Activity() {
     // ================================================================ kategori ekranları
 
     private fun kategoriEkrani(k: Kategori) {
+        kurulumuDurdur()
         acik = k
         val s = sutun()
         s.ekle(ui.yazi("‹  Geri: ana ekran", 15f, Renk.SOLUK))
@@ -244,9 +256,32 @@ class MainActivity : Activity() {
 
     private fun yapayZeka(s: LinearLayout) {
         durumSatiri(s) { if (a.geminiAnahtari.isNotBlank()) "Gemini anahtarı kayıtlı" to Durum.IYI else "Gemini anahtarı girilmedi" to Durum.HATA }
-        s.ekle(ui.bolum("Gemini API anahtarı"))
+        s.ekle(ui.bolum("Telefonla kur (önerilen)"))
         s.ekle(ui.aciklama(
-            "aistudio.google.com → Get API key. Uzun anahtarı telefondaki Google TV uygulamasının klavyesiyle " +
+            "1) Karekodu telefonun kamerasıyla okutun.  2) Açılan sayfada \"Ücretsiz anahtar al\"a basıp Google " +
+                "hesabınızla anahtar oluşturun ve kopyalayın.  3) Sayfaya dönüp yapıştırın, \"TV'ye kaydet\"e basın. " +
+                "Anahtar telefonda şifrelenip yalnız bu TV'ye gelir; hiçbir sunucuda saklanmaz."
+        ))
+        val kk = ui.yatay().apply { gravity = Gravity.CENTER_VERTICAL }
+        val kkResim = ImageView(this).apply { contentDescription = "API anahtarı kurulum karekodu" }
+        val kkDurum = ui.yazi("Telefon bekleniyor…", 20f, Renk.ACIK_LILA, kalin = true)
+        kk.addView(kkResim, LinearLayout.LayoutParams(ui.dp(260), ui.dp(260)).apply { rightMargin = ui.dp(28) })
+        kk.addView(kkDurum, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        s.ekle(kk, ust = 10, alt = 10)
+        val yeni = AnahtarKurulum(this) { ok, mesaj ->
+            runOnUiThread {
+                kkDurum.text = (if (ok) "✓ " else "✗ ") + mesaj
+                kkDurum.setTextColor(if (ok) Renk.YESIL else Renk.KIRMIZI)
+                toast(mesaj)
+                if (ok) yenilenecekler.forEach { it() }
+            }
+        }
+        Karekod.bitmap(yeni.adres, ui.dp(260))?.let { kkResim.setImageBitmap(it) }
+        kurulum = yeni.also { it.baslat() }
+
+        s.ekle(ui.bolum("Ya da elle girin"))
+        s.ekle(ui.aciklama(
+            "aistudio.google.com/apikey → Create API key. Uzun anahtarı telefondaki Google TV uygulamasının klavyesiyle " +
                 "yapıştırabilirsiniz. Anahtar yalnızca bu TV'de, şifreli saklanır."
         ))
         val anahtar = ui.alan("AIza…", a.geminiAnahtari, sifre = true)

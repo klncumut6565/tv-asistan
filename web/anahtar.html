@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1720">
+<meta name="referrer" content="no-referrer">
+<title>Jülide Kurulumu</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --zemin: #0f1720;
+    --kart: #172231;
+    --cizgi: #263446;
+    --yazi: #eef2f7;
+    --soluk: #93a3b8;
+    --mor: #a77bff;
+    --mor-koyu: #6d3fe0;
+    --yesil: #3ddc97;
+    --kirmizi: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #2a1d4a 0%, var(--zemin) 60%);
+    color: var(--yazi);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { margin: 8px 0 0; font-size: 22px; font-weight: 650; letter-spacing: .2px; text-align: center; }
+  .alt { color: var(--soluk); font-size: 14px; text-align: center; margin: 0; }
+
+  .kure-alan { display: flex; justify-content: center; padding: 18px 0 6px; }
+  .kure {
+    width: 184px; height: 184px; border-radius: 50%;
+    background: #2b1260 url("julide.jpg") center / cover no-repeat;
+    border: 3px solid rgba(167,123,255,.55);
+    box-shadow: 0 0 0 0 rgba(167,123,255,.0), 0 18px 60px rgba(109,63,224,.35);
+    filter: saturate(.55) brightness(.75); transform: scale(.95);
+    transition: filter .3s, transform .08s linear, box-shadow .08s linear;
+  }
+  .kure.acik { filter: none; border-color: var(--mor); }
+  .kure.konusuyor { box-shadow: 0 0 0 10px rgba(167,123,255,.18), 0 0 70px rgba(167,123,255,.65); }
+
+  .durum { text-align: center; font-size: 17px; min-height: 26px; }
+  .durum.hata { color: var(--kirmizi); }
+  .durum.iyi { color: var(--yesil); }
+
+  .kart { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 16px; padding: 16px; }
+  label { display: block; font-size: 13px; color: var(--soluk); margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%; font-size: 24px; letter-spacing: 4px; text-transform: uppercase; text-align: center;
+    padding: 12px; border-radius: 12px; border: 1px solid var(--cizgi); background: #0d141d; color: var(--yazi);
+  }
+  input[type=range] { width: 100%; accent-color: var(--mor); }
+  .satir { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--soluk); }
+
+  button {
+    width: 100%; font-size: 18px; font-weight: 650; padding: 16px; border-radius: 14px; border: 0;
+    background: var(--mor); color: #160a33; cursor: pointer;
+  }
+  button.ikincil { background: transparent; color: var(--yazi); border: 1px solid var(--cizgi); font-weight: 500; }
+  button:disabled { opacity: .5; }
+
+  .cevap { font-size: 15px; color: var(--yazi); white-space: pre-wrap; min-height: 22px; }
+  .cevap:empty::before { content: "Jülide'nin cevapları burada görünür."; color: var(--soluk); }
+  .ipucu { font-size: 13px; color: var(--soluk); margin: 0; }
+  .gizli { display: none !important; }
+  #karanlik { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; align-items: flex-end;
+    justify-content: center; padding-bottom: 40px; color: #333; font-size: 14px; }
+  #uyanik { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  details.ayar { color: var(--soluk); font-size: 14px; }
+  details.ayar summary { cursor: pointer; text-align: center; padding: 8px; list-style: none; }
+  details.ayar summary::-webkit-details-marker { display: none; }
+  details.ayar[open] summary { margin-bottom: 8px; }
+  details.ayar .kart + .kart { margin-top: 12px; }
+</style>
+<style>
+  .kure { width: 120px; height: 120px; filter: none; transform: none; }
+  ol.adimlar { margin: 0; padding-left: 22px; color: var(--soluk); font-size: 14px; }
+  ol.adimlar li { margin: 4px 0; }
+  ol.adimlar b { color: var(--yazi); }
+  a.dugme { display: block; text-align: center; text-decoration: none; font-size: 18px; font-weight: 650;
+    padding: 16px; border-radius: 14px; background: var(--mor); color: #160a33; }
+  textarea { width: 100%; min-height: 84px; font: 16px/1.4 ui-monospace, Menlo, monospace; padding: 12px;
+    border-radius: 12px; border: 1px solid var(--cizgi); background: #0d141d; color: var(--yazi); resize: vertical;
+    word-break: break-all; }
+  .ikili { display: flex; gap: 10px; }
+  .ikili button { flex: 1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Jülide · API anahtarı kurulumu</h1>
+  <p class="alt">Jülide, sizin kendi ücretsiz Google Gemini anahtarınızla çalışır.</p>
+  <div class="kure-alan"><div class="kure acik"></div></div>
+
+  <section class="kart">
+    <label>1 · Anahtarı alın</label>
+    <ol class="adimlar">
+      <li>Aşağıdaki düğmeyle <b>Google AI Studio</b>'yu açın ve Google hesabınızla giriş yapın.</li>
+      <li><b>Create API key</b> (API anahtarı oluştur) düğmesine basın.</li>
+      <li>Oluşan anahtarın yanındaki <b>kopyala</b> simgesine basın ve bu sayfaya dönün.</li>
+    </ol>
+    <p></p>
+    <a class="dugme" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Ücretsiz anahtar al ↗</a>
+  </section>
+
+  <section class="kart">
+    <label for="anahtar">2 · Anahtarı yapıştırın</label>
+    <textarea id="anahtar" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="AIza…"></textarea>
+    <p></p>
+    <div class="ikili">
+      <button id="yapistir" class="ikincil">📋 Yapıştır</button>
+      <button id="temizle" class="ikincil">Temizle</button>
+    </div>
+  </section>
+
+  <button id="kaydet">3 · TV'ye kaydet</button>
+  <div id="durum" class="durum"></div>
+
+  <p class="ipucu">Anahtar bu telefonda şifrelenir ve yalnız karekodu okuttuğunuz TV'ye gider; hiçbir sunucuda ya da veritabanında saklanmaz. Şifre çözme anahtarı karekodun içindedir ve sunucuya gönderilmez. Anahtarınızı kimseyle paylaşmayın; Google AI Studio'dan dilediğiniz zaman silebilirsiniz.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  const SUPABASE_URL = "https://eiacwimxjpggomngsnyo.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpYWN3aW14anBnZ29tbmdzbnlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNDE5ODAsImV4cCI6MjA5NzcxNzk4MH0.OTUmblVqYTatRt8IUqjuDCAC0ABdYTg6Gy6mBS-wI8w";
+
+  const $ = (id) => document.getElementById(id);
+  const anahtarEl = $("anahtar"), kaydetBtn = $("kaydet"), durumEl = $("durum");
+  function durum(m, tur) { durumEl.textContent = m; durumEl.className = "durum" + (tur ? " " + tur : ""); }
+
+  const kod = (new URLSearchParams(location.search).get("kod") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const sirMetin = (new URLSearchParams(location.hash.slice(1)).get("s") || "");
+  function b64url(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  }
+  const b64 = (u8) => { let s = ""; u8.forEach((b) => (s += String.fromCharCode(b))); return btoa(s); };
+
+  let sir = null;
+  try { sir = b64url(sirMetin); } catch (_) {}
+  if (kod.length < 6 || !sir || sir.length !== 32) {
+    kaydetBtn.disabled = true;
+    durum("Bu sayfayı TV'deki karekodu okutarak açın (Jülide → Yapay zekâ).", "hata");
+  }
+
+  const temiz = (s) => (s || "").replace(/\s+/g, "").replace(/^["']|["']$/g, "");
+
+  $("yapistir").addEventListener("click", async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) { anahtarEl.value = temiz(t); durum(""); }
+      else durum("Panoda yazı yok. Anahtarı AI Studio'dan kopyalayın.", "hata");
+    } catch (_) {
+      anahtarEl.focus();
+      durum("Kutuya uzun basıp “Yapıştır”ı seçin.");
+    }
+  });
+  $("temizle").addEventListener("click", () => { anahtarEl.value = ""; durum(""); anahtarEl.focus(); });
+
+  async function sifrele(metin) {
+    const k = await crypto.subtle.importKey("raw", sir, "AES-GCM", false, ["encrypt"]);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = new TextEncoder();
+    const c = new Uint8Array(await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: enc.encode("julide-anahtar-" + kod) }, k, enc.encode(metin)));
+    return { iv: b64(iv), c: b64(c) };
+  }
+
+  let istemci = null, kanal = null, zaman = null;
+  function bitir() {
+    clearTimeout(zaman);
+    try { kanal && istemci && istemci.removeChannel(kanal); } catch (_) {}
+    kanal = null;
+    kaydetBtn.disabled = false;
+  }
+
+  kaydetBtn.addEventListener("click", async () => {
+    const anahtar = temiz(anahtarEl.value);
+    anahtarEl.value = anahtar;
+    if (!/^[A-Za-z0-9_\-]{30,80}$/.test(anahtar)) {
+      durum("Anahtar eksik ya da hatalı görünüyor. AI Studio'daki anahtarı tam olarak kopyalayın.", "hata");
+      return;
+    }
+    if (!window.supabase) { durum("Bağlantı kütüphanesi yüklenemedi. İnternetinizi kontrol edin.", "hata"); return; }
+    kaydetBtn.disabled = true;
+    durum("TV'ye bağlanılıyor…");
+    let yuk;
+    try { yuk = await sifrele(anahtar); } catch (e) { bitir(); durum("Şifreleme yapılamadı: " + e.message, "hata"); return; }
+    istemci = istemci || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    kanal = istemci.channel("julide-anahtar-" + kod, { config: { broadcast: { self: false, ack: false } } });
+    kanal.on("broadcast", { event: "sonuc" }, ({ payload }) => {
+      const p = payload || {};
+      bitir();
+      if (p.ok) {
+        durum("✓ " + (p.m || "Kaydedildi."), "iyi");
+        anahtarEl.value = "";
+        kaydetBtn.textContent = "Kaydedildi ✓";
+        kaydetBtn.disabled = true;
+      } else durum("✗ " + (p.m || "Kaydedilemedi."), "hata");
+    });
+    kanal.subscribe((st) => {
+      if (st === "SUBSCRIBED") {
+        durum("Anahtar TV'ye gönderildi, deneniyor…");
+        kanal.send({ type: "broadcast", event: "anahtar", payload: yuk });
+        zaman = setTimeout(() => {
+          bitir();
+          durum("TV yanıt vermedi. TV'de Jülide → Yapay zekâ ekranı açık olmalı; karekodu yeniden okutup tekrar deneyin.", "hata");
+        }, 20000);
+      } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT") {
+        bitir();
+        durum("Sunucuya bağlanılamadı. İnternetinizi kontrol edin.", "hata");
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
