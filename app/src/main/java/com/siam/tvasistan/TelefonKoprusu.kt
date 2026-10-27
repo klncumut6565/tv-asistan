@@ -88,6 +88,13 @@ class TelefonKoprusu(
         gonder(JSONObject().put("topic", konu).put("event", "broadcast").put("payload", yuk))
     }
 
+    /** Telefona sohbetin açık olup olmadığını ve Jülide'nin konuşup konuşmadığını bildirir. */
+    fun halGonder(oturumAcik: Boolean, konusuyor: Boolean) {
+        val yuk = JSONObject().put("type", "broadcast").put("event", "hal")
+            .put("payload", JSONObject().put("oturum", oturumAcik).put("konusuyor", konusuyor))
+        gonder(JSONObject().put("topic", konu).put("event", "broadcast").put("payload", yuk))
+    }
+
     private fun gonder(j: JSONObject) {
         j.put("ref", (++ref).toString())
         try { ws?.send(j.toString()) } catch (_: Exception) {}
@@ -124,6 +131,8 @@ class TelefonKoprusu(
                                 }
                                 "merhaba" -> durumDegisti("telefon bağlandı")
                                 "hoscakal" -> durumDegisti("telefon ayrıldı")
+                                "ac" -> durumDegisti("ac")
+                                "kapat" -> durumDegisti("kapat")
                             }
                         }
                         "phx_reply" -> {
