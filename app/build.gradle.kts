@@ -73,6 +73,8 @@ android {
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // Telefon sayfasının karekodu (yalnız çekirdek kodlayıcı, Apache 2.0)
+    implementation("com.google.zxing:core:3.5.3")
     // "Jülide" uyandırma kelimesi: internetsiz konuşma tanıma (Apache 2.0)
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.alphacephei:vosk-android:0.3.47@aar")

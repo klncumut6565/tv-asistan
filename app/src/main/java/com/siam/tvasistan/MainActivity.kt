@@ -20,12 +20,16 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
 /** Kurulum ekranı: giriş, izinler, erişilebilirlik ve tetik tuşu. */
+/** TV sağlayıcısındaki kanal listesini okuma izni (Kanallar.kt). */
+private const val KANAL_IZNI = "com.android.providers.tv.permission.READ_EPG_DATA"
+
 class MainActivity : Activity() {
     private lateinit var a: Ayarlar
     private lateinit var durumTv: TextView
@@ -121,7 +125,8 @@ class MainActivity : Activity() {
 
         sutun.addView(yazi("2) İzinler", 22f, true))
         sutun.addView(dugme("Mikrofon izni ver") {
-            val izinler = mutableListOf(Manifest.permission.RECORD_AUDIO)
+            // Kanal listesi izni de istenir: verilirse Jülide kanalları adıyla bulup açar ("ATV'yi aç").
+            val izinler = mutableListOf(Manifest.permission.RECORD_AUDIO, KANAL_IZNI)
             if (Build.VERSION.SDK_INT >= 33) izinler += Manifest.permission.POST_NOTIFICATIONS
             requestPermissions(izinler.toTypedArray(), 1)
         })
@@ -227,8 +232,14 @@ class MainActivity : Activity() {
             14f, renk = Color.LTGRAY
         ))
         val kodTv = yazi("", 26f, true, renk = Color.rgb(196, 160, 255))
+        val karekodTv = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(px(240), px(240)).apply { topMargin = px(8); bottomMargin = px(8) }
+            contentDescription = "Telefon sayfasının karekodu"
+        }
         fun kodYaz() {
             kodTv.text = "Eşleştirme kodu: ${a.telefonKodu}"
+            // Karekod sayfayı kod gömülü açar: okutunca kod otomatik dolar, yalnız "Başlat"a basılır.
+            Karekod.bitmap(Karekod.adres(a.telefonKodu), px(240))?.let { karekodTv.setImageBitmap(it) }
         }
         sutun.addView(CheckBox(this).apply {
             text = "Telefon mikrofonunu kullan"
@@ -244,6 +255,8 @@ class MainActivity : Activity() {
             }
         })
         kodYaz()
+        sutun.addView(yazi("Telefonun kamerasıyla okutun:", 15f, renk = Color.LTGRAY))
+        sutun.addView(karekodTv)
         sutun.addView(kodTv)
         sutun.addView(dugme("Yeni eşleştirme kodu üret") {
             a.telefonKodu = TelefonKoprusu.yeniKod()
@@ -331,13 +344,14 @@ class MainActivity : Activity() {
         val servis = if (AsistanServisi.ornek != null) "✔ açık" else "✘ kapalı"
         val onarim = if (ServisOnarim.izinVar(this)) "✔ etkin" else "✘ izin yok (aşağıdaki pm grant komutu)"
         val mik = if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "✔ var" else "✘ yok"
+        val kanal = if (checkSelfPermission(KANAL_IZNI) == PackageManager.PERMISSION_GRANTED) "✔ var" else "✘ yok (\"Mikrofon izni ver\" ya da ADB)"
         val tus = when {
             a.tusOgrenme -> "ŞİMDİ KUMANDADA BİR TUŞA BASIN…"
             a.tetikTusu > 0 -> KeyEvent.keyCodeToString(a.tetikTusu)
             else -> "Varsayılan (Asistan / Arama tuşu)"
         }
         val uyan = if (Uyandirma.modelHazirMi(this)) "✔ hazır" else Uyandirma.durum
-        durumTv.text = "Gemini anahtarı: $giris\nErişilebilirlik servisi: $servis\nOtomatik onarım: $onarim\nMikrofon izni: $mik\nTetik tuşu: $tus\n\"Jülide\" uyandırma modeli: $uyan"
+        durumTv.text = "Gemini anahtarı: $giris\nErişilebilirlik servisi: $servis\nOtomatik onarım: $onarim\nMikrofon izni: $mik\nKanal listesi izni: $kanal\nTetik tuşu: $tus\n\"Jülide\" uyandırma modeli: $uyan"
     }
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_LONG).show()

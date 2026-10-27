@@ -33,6 +33,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## ZXing (core)
+
+Telefon sayfasının karekodu için `com.google.zxing:core` (Apache License 2.0) kullanılır.
+
 ## Vosk
 
 Uyandırma kelimesi için `com.alphacephei:vosk-android` (Apache License 2.0) kullanılır.

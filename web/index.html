@@ -119,6 +119,12 @@
   const sakla = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   const oku = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
 
+  // Karekoddan gelindiyse (?kod=XXXXXXXX) kodu doldur ve sakla; adres çubuğundan da kaldır.
+  const adresKodu = (new URLSearchParams(location.search).get("kod") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (adresKodu.length >= 6) {
+    sakla("julide_kod", adresKodu);
+    try { history.replaceState(null, "", location.pathname); } catch (_) {}
+  }
   kodEl.value = (oku("julide_kod") || "").toUpperCase();
   hassasEl.value = oku("julide_hassas") || "6";
   const hassasYaz = () => { $("hassasDeger").textContent = hassasEl.value; };
@@ -339,6 +345,7 @@
     if (duraklatildi) kure.classList.remove("konusuyor");
   });
   kodEl.addEventListener("keydown", (e) => { if (e.key === "Enter") baslat(); });
+  if (adresKodu.length >= 6) durum("Kod alındı — Başlat'a basın", "iyi");
 })();
 </script>
 </body>
