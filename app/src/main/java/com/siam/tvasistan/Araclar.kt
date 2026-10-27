@@ -118,7 +118,8 @@ class Araclar(private val s: AsistanServisi) {
                 P("sayfa", "STRING", "Açılacak ayar sayfası", Cihaz.SAYFALAR.keys.toList() + "uygulama_bilgisi"),
                 P("uygulama", "STRING", "Yalnızca sayfa=uygulama_bilgisi için: uygulamanın adı")
             ), listOf("sayfa")))
-        .put(fn("tv_kapat", "TELEVİZYONUN KENDİSİNİ kapatır (bekleme/uyku). Yalnızca kullanıcı açıkça TV'yi/televizyonu kapatmak istediğinde çağır; uygulama kapatmak için uygulama_kapat, sohbeti bitirmek için oturumu_kapat kullan."))
+        .put(fn("tv_kapat", "TELEVİZYONUN KENDİSİNİ kapatır (bekleme/uyku). İKİ ADIMLIDIR: önce onayli=false ile çağır (TV kapanmaz, kullanıcıya sorman istenir), kullanıcı SESLİ 'evet/kapat/onaylıyorum' derse onayli=true ile tekrar çağır. Uygulama kapatmak için uygulama_kapat, sohbeti bitirmek için oturumu_kapat kullan.",
+            listOf(P("onayli", "BOOLEAN", "Kullanıcı 'Televizyonu kapatayım mı?' sorusuna SESLİ olarak evet dediyse true; ilk çağrıda false"))))
         .put(fn("uyku_zamanlayicisi", "Belirli bir süre sonra TV'yi kapatan zamanlayıcıyı kurar, iptal eder veya kalan süreyi söyler.",
             listOf(
                 P("islem", "STRING", "Yapılacak işlem", listOf("kur", "iptal", "durum")),
@@ -161,7 +162,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "Ayarları aç", "Wi-Fi/ağ ayarları", "ses ayarları", "bluetooth ayarları" vb. → ayarlari_ac.
 - UYGULAMA DEVRE DIŞI BIRAKMA / KALDIRMA / VERİ SİLME / DURMAYA ZORLA istenirse: bunu kendin YAPAMAZSIN. ayarlari_ac (sayfa=uygulama_bilgisi, uygulama=adı) ile o uygulamanın bilgi sayfasını aç ve kullanıcıya ilgili düğmeye KUMANDAYLA kendisinin basmasını söyle. Bu düğmelere tikla/numaraya_tikla ile sen basma. Jülide'yi, canlı TV'yi, ana ekranı ve sistem uygulamalarını devre dışı bırakmanın TV'yi bozabileceğini hatırlat.
 - GİRİŞ KAYNAĞI: "HDMI 1'e geç", "ikinci HDMI", "kaynağı değiştir", "PlayStation'a geç", "uyduya/antene dön", "TV'ye geç" → kaynak_degistir. "Hangi girişler var" → kaynaklari_listele. Kanal adı (ATV, TRT 1…) söylenirse kaynak_degistir DEĞİL kanal_ac kullan.
-- "TV'yi kapat", "televizyonu kapat", "TV'yi uyut" → tv_kapat; önce kısaca "Televizyonu kapatıyorum, iyi geceler" gibi bir veda et (TV birkaç saniye sonra kapanır). Yalnızca "kapat" denirse bu TV değil, ekrandaki uygulamadır → uygulama_kapat. Emin değilsen sor.
+- TELEVİZYONU KAPATMA (onaylı): "TV'yi kapat", "televizyonu kapat", "TV'yi uyut" → ÖNCE tv_kapat(onayli=false) çağır ve kullanıcıya YALNIZCA "Televizyonu kapatayım mı?" diye sor. Kullanıcı açıkça "evet", "kapat", "onaylıyorum", "tamam kapat" derse tv_kapat(onayli=true) çağır ve kısaca veda et ("Televizyonu kapatıyorum, iyi geceler"). "Hayır", "vazgeç" ya da alakasız bir cevap gelirse KAPATMA ("Peki, kapatmıyorum" de). "Sayfayı kapat", "bunu kapat", "uygulamayı kapat", yalnızca "kapat" → bunlar TV değildir: uygulama_kapat. Emin değilsen sor.
 - "30 dakika sonra kapat", "bir saat sonra TV'yi kapat", "uyku zamanlayıcısı kur" → uyku_zamanlayicisi (islem=kur, dakika). "Zamanlayıcıyı iptal et", "kapatma" → islem=iptal. "Ne kadar kaldı" → islem=durum.
 - SAAT / TARİH / GÜN: "Saat kaç", "bugün ayın kaçı", "hangi gündeyiz" → saat_tarih. Saati veya tarihi ASLA kendin tahmin etme; her soruda aracı yeniden çağır (sohbet uzun sürebilir, eski değer geçerli değildir).
 Bir araç hata dönerse bunu dürüstçe ve kısaca söyle, gerekirse başka yol dene.
@@ -200,7 +201,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             }
             "cihaz_durumu" -> Cihaz.durum(s, oturumDurumu())
             "ayarlari_ac" -> ayarlariAc(a.optString("sayfa"), a.optString("uygulama"))
-            "tv_kapat" -> tvKapat()
+            "tv_kapat" -> tvKapat(a.optBoolean("onayli", false))
             "saat_tarih" -> saatTarih()
             "kaynak_degistir" -> kaynakDegistir(a.optString("kaynak"))
             "kaynaklari_listele" -> {
@@ -265,8 +266,21 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
     // --- TV'yi kapatma ve uyku zamanlayıcısı
 
-    private fun tvKapat(): JSONObject {
+    /** tv_kapat'ın ilk (onaysız) çağrı anı: onay ancak bundan sonraki 60 sn içinde geçerli. */
+    @Volatile private var tvKapatSoruAni = 0L
+
+    private fun tvKapat(onayli: Boolean): JSONObject {
         if (!uyku.destekleniyor()) return hata("Bu TV'nin Android sürümünde TV'yi uygulamadan kapatmak desteklenmiyor.")
+        val simdi = SystemClock.elapsedRealtime()
+        // Önce soru: "sayfayı kapat" gibi yanlış anlaşılan bir sözle TV kapanmasın. Gemini doğrudan
+        // onayli=true gönderse bile, son 60 sn içinde soru sorulmadıysa yine önce sorulur.
+        if (!onayli || simdi - tvKapatSoruAni > 60_000) {
+            tvKapatSoruAni = simdi
+            return JSONObject()
+                .put("onay_gerekli", true)
+                .put("sonuc", "TV KAPATILMADI. Kullanıcıya yalnızca 'Televizyonu kapatayım mı?' diye sor. Açıkça evet derse tv_kapat(onayli=true) çağır; değilse kapatma.")
+        }
+        tvKapatSoruAni = 0L
         uyku.iptal()
         uyku.kapatmayaBasla()
         return tamam("TV birkaç saniye içinde kapanacak. Kullanıcıya kısa bir veda et.")
