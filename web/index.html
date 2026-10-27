@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#0f1720">
 <title>Jülide Mikrofon</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --zemin: #0f1720;
@@ -34,13 +36,14 @@
 
   .kure-alan { display: flex; justify-content: center; padding: 18px 0 6px; }
   .kure {
-    width: 168px; height: 168px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #d6c2ff 0%, var(--mor) 35%, var(--mor-koyu) 75%, #2b1260 100%);
+    width: 184px; height: 184px; border-radius: 50%;
+    background: #2b1260 url("julide.jpg") center / cover no-repeat;
+    border: 3px solid rgba(167,123,255,.55);
     box-shadow: 0 0 0 0 rgba(167,123,255,.0), 0 18px 60px rgba(109,63,224,.35);
-    opacity: .35; transform: scale(.92);
-    transition: opacity .3s, transform .08s linear, box-shadow .08s linear;
+    filter: saturate(.55) brightness(.75); transform: scale(.95);
+    transition: filter .3s, transform .08s linear, box-shadow .08s linear;
   }
-  .kure.acik { opacity: 1; }
+  .kure.acik { filter: none; border-color: var(--mor); }
   .kure.konusuyor { box-shadow: 0 0 0 10px rgba(167,123,255,.18), 0 0 70px rgba(167,123,255,.65); }
 
   .durum { text-align: center; font-size: 17px; min-height: 26px; }
@@ -67,6 +70,11 @@
   .cevap:empty::before { content: "Jülide'nin cevapları burada görünür."; color: var(--soluk); }
   .ipucu { font-size: 13px; color: var(--soluk); margin: 0; }
   .gizli { display: none !important; }
+  details.ayar { color: var(--soluk); font-size: 14px; }
+  details.ayar summary { cursor: pointer; text-align: center; padding: 8px; list-style: none; }
+  details.ayar summary::-webkit-details-marker { display: none; }
+  details.ayar[open] summary { margin-bottom: 8px; }
+  details.ayar .kart + .kart { margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -77,26 +85,28 @@
   <div class="kure-alan"><div id="kure" class="kure"></div></div>
   <div id="durum" class="durum">Hazır</div>
 
-  <section id="kurulum" class="kart">
-    <label for="kod">TV'deki eşleştirme kodu (Jülide ayarları → Telefon mikrofonu)</label>
-    <input id="kod" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="ABCD2345">
-  </section>
-
   <button id="baslat">Başlat</button>
   <button id="duraklat" class="ikincil gizli">Duraklat</button>
-
-  <section class="kart">
-    <div class="satir"><span>Hassasiyet</span><span id="hassasDeger"></span></div>
-    <input id="hassas" type="range" min="1" max="10" step="1" value="6">
-    <p class="ipucu">Jülide sizi duymuyorsa artırın; TV sesini konuşma sanıyorsa azaltın.</p>
-  </section>
 
   <section class="kart">
     <label>Jülide</label>
     <div id="cevap" class="cevap"></div>
   </section>
 
-  <p class="ipucu">Ekran açık ve bu sayfa önde kalmalı; telefon kilitlenirse mikrofon durur. Ses yalnız konuşma algılandığında gönderilir.</p>
+  <details id="ayar" class="ayar">
+    <summary>⚙ Ayarlar</summary>
+    <section id="kurulum" class="kart">
+      <label for="kod">TV'deki eşleştirme kodu (Jülide → Ses ve mikrofon)</label>
+      <input id="kod" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="ABCD2345">
+    </section>
+    <section class="kart">
+      <div class="satir"><span>Hassasiyet</span><span id="hassasDeger"></span></div>
+      <input id="hassas" type="range" min="1" max="10" step="1" value="6">
+      <p class="ipucu">Jülide sizi duymuyorsa artırın; TV sesini konuşma sanıyorsa azaltın.</p>
+    </section>
+  </details>
+
+  <p class="ipucu">Sayfa kapanınca ya da arka plana geçince mikrofon kapanır; sayfaya dönünce kendiliğinden yeniden açılır. Ses yalnız konuşma algılandığında gönderilir.</p>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -126,6 +136,8 @@
     try { history.replaceState(null, "", location.pathname); } catch (_) {}
   }
   kodEl.value = (oku("julide_kod") || "").toUpperCase();
+  const ayarEl = $("ayar");
+  if (kodEl.value.length < 6) ayarEl.open = true;   // kod yoksa göster; varsa gizli kalsın
   hassasEl.value = oku("julide_hassas") || "6";
   const hassasYaz = () => { $("hassasDeger").textContent = hassasEl.value; };
   hassasYaz();
@@ -252,9 +264,18 @@
   async function ekranAcikKalsin() {
     try { if ("wakeLock" in navigator) kilit = await navigator.wakeLock.request("screen"); } catch (_) {}
   }
+  // Sayfa kapanır ya da arka plana geçerse mikrofonu tamamen kapat (izin göstergesi söner);
+  // sayfaya dönülünce, kullanıcı daha önce başlatmışsa kendiliğinden yeniden aç.
+  let donunceAc = false;
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && calisiyor) { ekranAcikKalsin(); baglam && baglam.resume(); }
+    if (document.visibilityState === "hidden") {
+      if (calisiyor) { donunceAc = true; durdur(); durum("Arka planda — mikrofon kapalı"); }
+    } else if (donunceAc) {
+      donunceAc = false;
+      baslat();
+    }
   });
+  window.addEventListener("pagehide", () => { if (calisiyor) durdur(); });
 
   function kanalaBaglan(kod) {
     return new Promise((coz, reddet) => {
@@ -285,7 +306,7 @@
 
   async function baslat() {
     const kod = (kodEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (kod.length < 6) { durum("TV'deki 8 haneli kodu girin.", "hata"); kodEl.focus(); return; }
+    if (kod.length < 6) { ayarEl.open = true; durum("TV'deki 8 haneli kodu girin.", "hata"); kodEl.focus(); return; }
     sakla("julide_kod", kod);
     baslatBtn.disabled = true;
     durum("Mikrofon izni isteniyor…");
@@ -310,7 +331,7 @@
       calisiyor = true;
       await ekranAcikKalsin();
       kure.classList.add("acik");
-      $("kurulum").classList.add("gizli");
+      ayarEl.open = false;
       baslatBtn.textContent = "Durdur";
       baslatBtn.disabled = false;
       duraklatBtn.classList.remove("gizli");
@@ -332,7 +353,6 @@
     try { kilit && kilit.release(); } catch (_) {}
     akis = null; baglam = null; dugum = null; kilit = null;
     kure.classList.remove("acik", "konusuyor"); kure.style.transform = "";
-    $("kurulum").classList.remove("gizli");
     baslatBtn.textContent = "Başlat"; baslatBtn.disabled = false;
     duraklatBtn.classList.add("gizli"); duraklatildi = false; duraklatBtn.textContent = "Duraklat";
   }
