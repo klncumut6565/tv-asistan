@@ -76,8 +76,11 @@ object Kanallar {
     /** Canlı yayın uygulamasının paketi (kanal URI'sini açabilen ya da adı uyan uygulama). */
     fun canliTvPaketi(ctx: Context): String? {
         val pm = ctx.packageManager
+        // Vestel/MediaTek: canlı TV her zaman bu paket (kuruluysa önce o)
+        try { pm.getPackageInfo(SistemPaketleri.CANLI_TV, 0); return SistemPaketleri.CANLI_TV } catch (_: Exception) {}
         val niyet = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUri(1))
-        pm.queryIntentActivities(niyet, PackageManager.MATCH_DEFAULT_ONLY).firstOrNull()?.activityInfo?.packageName?.let { return it }
+        pm.queryIntentActivities(niyet, PackageManager.MATCH_DEFAULT_ONLY)
+            .map { it.activityInfo.packageName }.firstOrNull { it !in SistemPaketleri.CANLI_TV_DEGIL }?.let { return it }
         val hepsi = Uygulamalar.liste(ctx, hepsi = true)
         for (ad in CANLI_TV_ADLARI) {
             hepsi.firstOrNull { Uygulamalar.normal(it.ad) == ad }?.let { return it.paket }

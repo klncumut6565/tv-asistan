@@ -142,6 +142,7 @@ class TelefonKoprusu(
                                 "merhaba" -> durumDegisti("telefon bağlandı")
                                 "hoscakal" -> durumDegisti("telefon ayrıldı")
                                 "ac" -> durumDegisti("ac")
+                                "tv_ac" -> durumDegisti("tv_ac")
                                 "kapat" -> durumDegisti("kapat")
                                 else -> olayGeldi(p.optString("event"), ic)
                             }

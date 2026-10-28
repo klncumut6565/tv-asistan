@@ -1,0 +1,43 @@
+# Toshiba 50UA3D63DT (Vestel "shandao", Android 14, firmware UKNV.260528.001) — temizlik listesi
+# Kaynak: CleanYourTV examples/cecotec-shandao. Aynı kart ve aynı firmware'deki Toshiba 65QA7D63DG'de
+# tamamı uygulanıp yeniden başlatmayla denenmiş: ana ekran, HDMI girişleri, canlı TV, kumanda çalışıyor.
+#
+# Paketler KALDIRILMAZ, yalnızca DEVRE DIŞI bırakılır. Geri almak: tv-temizlik.sh geri
+# Bir satırı uygulamak istemezsen başına # koy.
+#
+# KORUNANLAR (listede YOK, bilerek): Prime Video, TOD, YouTube, Google Asistan (katniss, kumanda tuşu),
+# Chromecast, Google TV ana ekranı, ekran koruyucu, öneri satırları, USB medya oynatıcı, Google TTS,
+# fusion.android.tv.demo (bazı Vestel'lerde Kaynak tuşu), tüm Vestel/MediaTek donanım servisleri.
+
+# Vestel telemetri, günlük ve "hızlandırıcı"
+com.vestel.vestelreporter                        # Vestel raporlayıcı (internet + açılışta başlar)
+com.vestel.smartlogger                           # Vestel günlük servisi
+com.vestel.tv.speedup                            # "hızlandırıcı" — günlükleri okur
+com.vestel.smartcenter                           # arayüzü yok, ~75 MB bellek, hangi uygulamayı açtığını izler
+
+# Google reklam, kişiselleştirme, geri bildirim
+com.android.adservices.api                       # reklam servisleri
+com.android.ondevicepersonalization.services     # reklam kişiselleştirme
+com.android.federatedcompute.services            # yukarıdakinin öğrenme servisi
+com.google.android.partnersetup                  # üretici takip
+com.google.android.feedback                      # Google geri bildirim
+com.android.tv.feedbackconsent                   # geri bildirim izin ekranları
+android.autoinstalls.config.vestel.medusa        # Vestel otomatik uygulama kurucu
+
+# Kullanılmayan hazır uygulamalar
+com.google.android.youtube.tvmusic               # YouTube Music (normal YouTube KALIR)
+com.google.android.videos                        # Google TV film mağazası
+com.google.android.play.games                    # Play Oyunlar
+com.mediatek.tv.freeviewplay                     # Freeview Play (yalnız İngiltere)
+com.smartdevice.tv.aircast                       # AirPlay uygulaması (kurulu değilse atlanır)
+
+# TV'de işe yaramayanlar
+com.android.healthconnect.controller             # Health Connect
+com.android.health.connect.backuprestore         # Health Connect yedek
+com.android.managedprovisioning                  # şirket profili kurulumu
+com.android.dynsystem                            # dinamik sistem güncelleme
+com.android.cts.ctsshim                          # test parçası
+com.android.cts.priv.ctsshim                     # test parçası
+com.google.android.syncadapters.calendar         # takvim eşitleme
+com.android.settings.intelligence                # Ayarlar içindeki arama kutusu (menüler çalışır)
+com.android.se                                   # Güvenli Öğe (eSIM/NFC — TV'de yok)

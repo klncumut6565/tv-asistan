@@ -122,6 +122,7 @@ object Uygulamalar {
 
     /** Arka plandaki uygulamanın sürecini sonlandırır (KILL_BACKGROUND_PROCESSES). */
     fun sonlandir(ctx: Context, paket: String) {
+        if (SistemPaketleri.korumaliMi(paket)) return
         try {
             ctx.getSystemService(ActivityManager::class.java).killBackgroundProcesses(paket)
         } catch (_: Exception) {

@@ -227,10 +227,32 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             when (d) {
                 "telefon bağlandı" -> ana.post { if (durum != Durum.BAGLANIYOR) halBildir() }
                 // Telefondaki "Jülide'yi aç / kapat" düğmesi
-                "ac" -> ana.post { if (durum == Durum.BOSTA) oturumBaslat() }
+                "ac" -> ana.post { ekraniUyandir(); if (durum == Durum.BOSTA) oturumBaslat() }
+                "tv_ac" -> ana.post { ekraniUyandir() }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
         }).also { it.baslat() }
+    }
+
+    /**
+     * TV bekleme modundaysa ekranı açar (telefondaki "TV'yi aç" / "Jülide'yi aç").
+     * Yalnızca TV beklemede ağa bağlı kalıyorsa işe yarar (Ayarlar → Ağ bekleme / Hızlı başlatma).
+     */
+    @Suppress("DEPRECATION")
+    fun ekraniUyandir(): Boolean {
+        val pm = getSystemService(android.os.PowerManager::class.java) ?: return false
+        if (pm.isInteractive) return true
+        return try {
+            pm.newWakeLock(
+                android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "julide:uyandir"
+            ).acquire(5_000)
+            Log.i(ETIKET, "TV uyandırıldı (telefon)")
+            true
+        } catch (e: Exception) {
+            Log.w(ETIKET, "TV uyandırılamadı: ${e.message}")
+            false
+        }
     }
 
     /** Telefona sohbet ve konuşma durumunu bildirir (sayfa düğmeyi ve dinleme eşiğini buna göre ayarlar). */

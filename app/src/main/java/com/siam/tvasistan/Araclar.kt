@@ -398,6 +398,9 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         if (paket == s.packageName || Uygulamalar.anaEkranPaketi(s) == paket) {
             return hata("Ana ekran veya Jülide kapatılamaz.")
         }
+        if (SistemPaketleri.korumaliMi(paket) && paket != SistemPaketleri.CANLI_TV) {
+            return hata("$gorunenAd bir TV sistem bileşeni; kapatılmaz.")
+        }
         // Önplandaysa ana ekrana dön; arka plana düşen süreç sonra sonlandırılır.
         if (s.aktifPaket == paket) {
             s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
