@@ -115,7 +115,15 @@ class GuncellemeAlici : BroadcastReceiver() {
             else -> {
                 Guncelleme.bitti()
                 val m = i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "kod $durum"
-                Toast.makeText(c, "Güncelleme yapılamadı: $m", Toast.LENGTH_LONG).show()
+                Log.e("TvAsistan", "Güncelleme kurulamadı: durum=$durum $m")
+                val aciklama = when (durum) {
+                    PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
+                        "İmza farklı: TV'deki Jülide eski anahtarla imzalı. Bir kez kaldırıp yeni APK'yı kurun."
+                    PackageInstaller.STATUS_FAILURE_STORAGE -> "TV'de yer yok."
+                    PackageInstaller.STATUS_FAILURE_ABORTED -> "Kurulum iptal edildi."
+                    else -> m
+                }
+                Toast.makeText(c, "Güncelleme yapılamadı: $aciklama", Toast.LENGTH_LONG).show()
             }
         }
     }

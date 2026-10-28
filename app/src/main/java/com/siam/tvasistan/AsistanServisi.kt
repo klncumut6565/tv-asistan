@@ -163,7 +163,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 val s = bekleyenSurum
                 // Film izlerken araya girmemek için onay yalnızca TV ana ekrandayken açılır.
-                if (s != null && durum == Durum.BOSTA && anaEkrandaMi() && !Guncelleme.kuruluyor) {
+                // Vestel/Toshiba'da ana ekran paketi farklı algılanabiliyor: hiçbir şey çalmıyorsa da kur.
+                if (s != null && durum == Durum.BOSTA && (anaEkrandaMi() || !medyaCaliyor()) && !Guncelleme.kuruluyor) {
                     guncellemeyiKur(s)
                 }
                 // Bekleyen sürüm yoksa 15 dk uyu; varsa ana ekrana dönülmesini dakikada bir kontrol et
@@ -171,6 +172,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             }
         }
     }
+
+    private fun medyaCaliyor(): Boolean = try {
+        getSystemService(android.media.AudioManager::class.java)?.isMusicActive == true
+    } catch (_: Exception) { true }
 
     private fun anaEkrandaMi(): Boolean {
         val ana = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
