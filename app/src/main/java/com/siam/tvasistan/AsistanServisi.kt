@@ -173,10 +173,6 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         }
     }
 
-    private fun medyaCaliyor(): Boolean = try {
-        getSystemService(android.media.AudioManager::class.java)?.isMusicActive == true
-    } catch (_: Exception) { true }
-
     private fun anaEkrandaMi(): Boolean {
         val ana = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
             ?.activityInfo?.packageName ?: return false
