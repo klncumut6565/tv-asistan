@@ -60,6 +60,12 @@ class Araclar(private val s: AsistanServisi) {
         .put(fn("uygulama_kapat", "Açık olan bir uygulamayı kapatır. Ad verilmezse şu an ekrandaki uygulamayı kapatır.",
             listOf(P("ad", "STRING", "Kapatılacak uygulamanın adı; boş bırakılırsa ekrandaki uygulama"))))
         .put(fn("uygulamalari_listele", "TV'de kurulu tüm uygulamaların adlarını döndürür."))
+        .put(fn("akilli_ara", "Kullanıcı bir film/dizi/şarkı/video/herhangi bir şeyi AÇ/İZLE/DİNLE/ARA dediğinde HER ZAMAN BUNU kullan. Platform söylenmemişse ŞU AN AÇIK uygulamada arar (YouTube açıksa YouTube'da, Prime/TOD açıksa orada, tarayıcı açıksa tarayıcıda). Platform söylenmişse ('tarayıcıdan', 'YouTube'da', 'Prime'da') oradan arar.",
+            listOf(
+                P("sorgu", "STRING", "Aranacak şey, ör. 'Cehennem Melekleri' ya da 'Yıldız Tilbe Delikanlım'"),
+                P("platform", "STRING", "YALNIZCA kullanıcı açıkça söylediyse: tarayıcı, YouTube, Prime Video, TOD... Söylemediyse BOŞ bırak."),
+                P("tur", "STRING", "film, dizi, muzik, video ya da diger", listOf("film", "dizi", "muzik", "video", "diger"))
+            ), listOf("sorgu")))
         .put(fn("abonelikte_ara", "Filmi/diziyi kullanıcının ABONE olduğu uygulamada arar: uygulamayı açar, arama kutusuna adı yazar. Sonra ekrani_oku ile sonucu bulup tikla, ardından Oynat/İzle'ye tikla.",
             listOf(
                 P("ad", "STRING", "Film veya dizi adı"),
@@ -154,9 +160,10 @@ Kullanıcı cümlesine "Jülide" diye başlayabilir (uyandırma kelimesi); bu sa
 Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulamak:
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
 - "X'i kapat", "bunu kapat", "uygulamadan çık" → uygulama_kapat (ad belirtilmemişse boş bırak).
-- FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. "X filmini bul/aç/izle" → abonelikte_ara (platform söylenmişse o, yoksa sırayla). Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
-- "YouTube'da X" → youtube_ara.
-- "Tarayıcıyı aç, X'i ara" → web_ara. Belirli site → url_ac.
+- BAĞLAM (ÇOK ÖNEMLİ): Hangi uygulamada olduğunu bil. Her araç sonucunda "simdi_acik_uygulama" alanı var; buna bak. "X'i aç / izle / dinle / bul / ara" (film, dizi, şarkı, video, ne olursa) → akilli_ara. Kullanıcı platform SÖYLEMEDİYSE platform'u BOŞ bırak: akilli_ara ŞU AN AÇIK uygulamada arar (ör. YouTube'da şarkı açıkken "Cehennem Melekleri filmini aç" → YouTube'da arar). Kullanıcı platform SÖYLEDİYSE ("tarayıcıdan aç", "Prime'da aç", "YouTube'dan") platform'a onu yaz. Kendi kafana göre platform değiştirme.
+- FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken film-dizi akilli_ara ile aboneliklerde aranır. Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
+- "YouTube'da X" → akilli_ara(platform=YouTube). "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
+- Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal" → kanal_kaydet. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5).
@@ -186,8 +193,15 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
     // ---------------------------------------------------------------- çalıştırıcı
 
-    fun calistir(ad: String, a: JSONObject): JSONObject = try {
+    fun calistir(ad: String, a: JSONObject): JSONObject {
+        val r = calistirIc(ad, a)
+        try { r.put("simdi_acik_uygulama", aktifUygulamaAdi()) } catch (_: Exception) {}
+        return r
+    }
+
+    private fun calistirIc(ad: String, a: JSONObject): JSONObject = try {
         when (ad) {
+            "akilli_ara" -> akilliAra(a.optString("sorgu"), a.optString("platform"), a.optString("tur"))
             "uygulama_ac" -> uygulamaAc(a.optString("ad"))
             "uygulama_kapat" -> uygulamaKapat(a.optString("ad"))
             "uygulamalari_listele" -> tamam(Uygulamalar.liste(s).joinToString(", ") { it.ad })
@@ -437,6 +451,64 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return tamam("${uyg.ad} içinde '$ad' arandı. Şimdi ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra Oynat/İzle'ye tikla.$ek")
     }
 
+    // --- BAĞLAM: Jülide hangi uygulamada olduğunu bilir
+
+    private fun aktifUygulamaAdi(): String {
+        val p = s.aktifPaket ?: return "bilinmiyor"
+        if (Uygulamalar.anaEkranPaketi(s) == p) return "ana ekran"
+        return Uygulamalar.liste(s, hepsi = true).firstOrNull { it.paket == p }?.ad ?: p
+    }
+
+    private fun tarayiciPaketleri(): Set<String> = try {
+        s.packageManager.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")), 0)
+            .map { it.activityInfo.packageName }.toSet()
+    } catch (_: Exception) { emptySet() }
+
+    private enum class Baglam { YOUTUBE, ABONELIK, TARAYICI, DIGER }
+
+    private fun baglamBul(paket: String?): Pair<Baglam, String?> {
+        if (paket == null) return Baglam.DIGER to null
+        val n = paket.lowercase()
+        if (n.contains("youtube")) return Baglam.YOUTUBE to "YouTube"
+        val ad = Uygulamalar.liste(s, hepsi = true).firstOrNull { it.paket == paket }?.ad
+        if (ad != null) {
+            val na = Uygulamalar.normal(ad)
+            abonelikler.firstOrNull { val nb = Uygulamalar.normal(it); na.contains(nb) || nb.contains(na) }
+                ?.let { return Baglam.ABONELIK to it }
+        }
+        if (paket in tarayiciPaketleri() && !n.contains("youtube")) return Baglam.TARAYICI to (ad ?: "tarayıcı")
+        return Baglam.DIGER to ad
+    }
+
+    private fun akilliAra(sorgu: String, platform: String, tur: String): JSONObject {
+        if (sorgu.isBlank()) return hata("Aranacak şey boş.")
+        val np = Uygulamalar.normal(platform)
+        // 1) Kullanıcı platform SÖYLEDİYSE: o platform
+        if (np.isNotBlank()) {
+            val sonuc = when {
+                Regex("tarayici|internet|google|web|chrome|browser").containsMatchIn(np) -> webAra(sorgu)
+                np.contains("youtube") || np == "yt" -> youtubeAra(sorgu)
+                else -> abonelikteAra(sorgu, platform)
+            }
+            return sonuc.put("baglam", "Kullanıcının söylediği platform kullanıldı: $platform.")
+        }
+        // 2) Platform yoksa: ŞU AN AÇIK uygulama
+        val (b, ad) = baglamBul(s.aktifPaket)
+        val sonuc = when (b) {
+            Baglam.YOUTUBE -> youtubeAra(sorgu)
+            Baglam.ABONELIK -> abonelikteAra(sorgu, ad ?: "")
+            Baglam.TARAYICI -> webAra(sorgu, s.aktifPaket)
+            // 3) Bağlam yoksa türe göre varsayılan
+            Baglam.DIGER -> when (tur) {
+                "muzik", "video" -> youtubeAra(sorgu)
+                "film", "dizi" -> abonelikteAra(sorgu, "")
+                else -> webAra(sorgu)
+            }
+        }
+        val not = if (b == Baglam.DIGER) "Açık uygulamada arama yok; türe göre seçildi." else "Şu an $ad açık olduğu için orada arandı."
+        return sonuc.put("baglam", not + " Bulunamazsa kullanıcıya kısaca söyle ve başka platform önermeden önce sor.")
+    }
+
     private fun icerikAra(q: String): JSONObject {
         if (q.isBlank()) return hata("Arama metni boş.")
         val genel = Intent("android.search.action.GLOBAL_SEARCH").putExtra(SearchManager.QUERY, q)
@@ -458,11 +530,13 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return hata("YouTube açılamadı.")
     }
 
-    private fun webAra(q: String): JSONObject {
+    private fun webAra(q: String, tarayici: String? = null): JSONObject {
         if (q.isBlank()) return hata("Arama metni boş.")
         val onceImza = ekranImzasi()
         val oncePaket = s.aktifPaket
-        if (!baslat(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${enc(q)}"))))
+        val adres = Uri.parse("https://www.google.com/search?q=${enc(q)}")
+        val ayniTarayicida = tarayici != null && baslat(Intent(Intent.ACTION_VIEW, adres).setPackage(tarayici))
+        if (!ayniTarayicida && !baslat(Intent(Intent.ACTION_VIEW, adres)))
             return hata("TV'de tarayıcı bulunamadı. Play Store'dan bir tarayıcı (ör. TV Bro, Puffin TV) kurulmalı.")
         return dogrula(onceImza, oncePaket, "Tarayıcıda '$q' araması")
     }
