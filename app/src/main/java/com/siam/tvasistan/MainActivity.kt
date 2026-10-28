@@ -325,7 +325,7 @@ class MainActivity : Activity() {
         s.ekle(ui.bolum("Telefon mikrofonu"))
         s.ekle(ui.aciklama(
             "Karekodu telefonun kamerasıyla okutun; sayfa açılır, kod kendiliğinden dolar, \"Başlat\"a basın. " +
-                "Telefon mikrofon olur, tuşa basmadan konuşursunuz. Adres: tv-asistan-web.vercel.app"
+                "Telefon mikrofon olur, tuşa basmadan konuşursunuz. Adres: klncumut6565.github.io/tv-asistan"
         ))
         s.ekle(ui.onay("Telefon mikrofonunu kullan", a.telefonAktif) { acikMi ->
             a.telefonAktif = acikMi

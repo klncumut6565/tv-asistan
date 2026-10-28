@@ -9,7 +9,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
 /** Telefon sayfasının karekodu: okutulunca sayfa eşleştirme koduyla birlikte açılır. */
 object Karekod {
-    const val SAYFA = "https://tv-asistan-web.vercel.app"
+    const val SAYFA = "https://klncumut6565.github.io/tv-asistan"
 
     /** Eşleştirme kodu gömülü sayfa adresi (sayfa ?kod= değerini otomatik doldurur). */
     fun adres(kod: String): String = "$SAYFA/?kod=$kod"

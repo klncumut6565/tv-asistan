@@ -1,0 +1,35 @@
+name: Telefon Sayfası (GitHub Pages)
+
+# web/ klasörünü GitHub Pages'e yayınlar: https://klncumut6565.github.io/tv-asistan/
+# (Bazı Türk internet sağlayıcıları *.vercel.app'i engellediği için.)
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/pages.yml']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  yayinla:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.dagit.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: dagit
+        uses: actions/deploy-pages@v4
