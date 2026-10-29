@@ -228,7 +228,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 "telefon bağlandı" -> ana.post { if (durum != Durum.BAGLANIYOR) halBildir() }
                 // Telefondaki "Jülide'yi aç / kapat" düğmesi
                 "ac" -> ana.post { ekraniUyandir(); if (durum == Durum.BOSTA) oturumBaslat() }
-                "tv_ac" -> ana.post { ekraniUyandir() }
+                // Telefondaki "TV'yi kapat" düğmesi (onay telefonda alınır)
+                "tv_kapat" -> ana.post {
+                    if (araclar.uyku.destekleniyor()) { araclar.uyku.iptal(); araclar.uyku.kapatmayaBasla(0) }
+                }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
         }).also { it.baslat() }

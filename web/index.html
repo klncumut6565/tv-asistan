@@ -90,7 +90,7 @@
 
   <button id="baslat">Başlat</button>
   <button id="julide" class="gizli">Jülide'yi aç</button>
-  <button id="tvac" class="ikincil gizli">📺 TV'yi aç</button>
+  <button id="tvkapat" class="ikincil gizli">⏻ TV'yi kapat</button>
   <button id="duraklat" class="ikincil gizli">Duraklat</button>
   <button id="karart" class="ikincil gizli">🌙 Ekranı karart (mikrofon açık kalır)</button>
 
@@ -400,7 +400,7 @@
   }
 
   function julideDugmesi() {
-    const tvBtn = document.getElementById("tvac");
+    const tvBtn = document.getElementById("tvkapat");
     if (!calisiyor) { julideBtn.classList.add("gizli"); tvBtn && tvBtn.classList.add("gizli"); return; }
     julideBtn.classList.remove("gizli");
     tvBtn && tvBtn.classList.remove("gizli");
@@ -432,8 +432,9 @@
     else { tvyeGonder("kapat"); durum("Jülide kapatılıyor…"); }
   });
 
-  document.getElementById("tvac").addEventListener("click", () => {
-    tvyeGonder("tv_ac"); durum("TV'ye açılma isteği gönderildi");
+  document.getElementById("tvkapat").addEventListener("click", () => {
+    if (!confirm("Televizyon kapatılsın mı?")) return;
+    tvyeGonder("tv_kapat"); durum("TV kapatılıyor…");
   });
 
   baslatBtn.addEventListener("click", () => {
