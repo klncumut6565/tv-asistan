@@ -66,6 +66,11 @@ class Araclar(private val s: AsistanServisi) {
                 P("platform", "STRING", "YALNIZCA kullanıcı açıkça söylediyse: tarayıcı, YouTube, Prime Video, TOD... Söylemediyse BOŞ bırak."),
                 P("tur", "STRING", "film, dizi, muzik, video ya da diger", listOf("film", "dizi", "muzik", "video", "diger"))
             ), listOf("sorgu")))
+        .put(fn("spotify_ara", "SPOTIFY'da şarkı/sanatçı/albüm arar (kullanıcının Spotify ÜYELİĞİ var). Sonuçları açar; sonra ekrani_oku ile listeye bakıp istenen şarkıya tikla. Kullanıcı 'herhangi biri / fark etmez' derse hemen_cal=true ile en iyi eşleşmeyi doğrudan çalar.",
+            listOf(
+                P("sorgu", "STRING", "Şarkı, sanatçı ya da ikisi, ör. 'Ahmet Kaya' ya da 'Ahmet Kaya Kendine İyi Bak'"),
+                P("hemen_cal", "BOOLEAN", "true: listeyi göstermeden en iyi eşleşmeyi çal (kullanıcı belirli şarkı istemediyse ve 'herhangi biri' dediyse)")
+            ), listOf("sorgu")))
         .put(fn("abonelikte_ara", "Filmi/diziyi kullanıcının ABONE olduğu uygulamada arar: uygulamayı açar, arama kutusuna adı yazar. Sonra ekrani_oku ile sonucu bulup tikla, ardından Oynat/İzle'ye tikla.",
             listOf(
                 P("ad", "STRING", "Film veya dizi adı"),
@@ -161,6 +166,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
 - "X'i kapat", "bunu kapat", "uygulamadan çık" → uygulama_kapat (ad belirtilmemişse boş bırak).
 - BAĞLAM (ÇOK ÖNEMLİ): Hangi uygulamada olduğunu bil. Her araç sonucunda "simdi_acik_uygulama" alanı var; buna bak. "X'i aç / izle / dinle / bul / ara" (film, dizi, şarkı, video, ne olursa) → akilli_ara. Kullanıcı platform SÖYLEMEDİYSE platform'u BOŞ bırak: akilli_ara ŞU AN AÇIK uygulamada arar (ör. YouTube'da şarkı açıkken "Cehennem Melekleri filmini aç" → YouTube'da arar). Kullanıcı platform SÖYLEDİYSE ("tarayıcıdan aç", "Prime'da aç", "YouTube'dan") platform'a onu yaz. Kendi kafana göre platform değiştirme.
+- MÜZİK: Kullanıcının SPOTIFY üyeliği var. "Spotify'dan X aç / çal" → spotify_ara (ya da akilli_ara platform=Spotify). Spotify açıkken ya da ana ekrandayken şarkı istenirse Spotify kullanılır; YouTube açıkken platform söylenmezse YouTube'da aranır. Sonuçlar gelince ekrani_oku ile bak: kullanıcı belirli şarkıyı söylediyse ONU, "herhangi biri / fark etmez / bir şarkısını aç" dediyse İLK ŞARKIYI seç (tikla). Kullanıcı "neler var" derse ilk birkaç şarkıyı oku ve hangisini istediğini sor; numara veya ad söyleyince ona tikla.
 - FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken film-dizi akilli_ara ile aboneliklerde aranır. Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
 - "YouTube'da X" → akilli_ara(platform=YouTube). "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
 - Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
@@ -201,6 +207,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
     private fun calistirIc(ad: String, a: JSONObject): JSONObject = try {
         when (ad) {
+            "spotify_ara" -> spotifyAra(a.optString("sorgu"), a.optBoolean("hemen_cal", false))
             "akilli_ara" -> akilliAra(a.optString("sorgu"), a.optString("platform"), a.optString("tur"))
             "uygulama_ac" -> uygulamaAc(a.optString("ad"))
             "uygulama_kapat" -> uygulamaKapat(a.optString("ad"))
@@ -433,26 +440,74 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
 
         // 2) Uygulamayı aç → Ara öğesine tıkla → adı yaz
-        if (!Uygulamalar.ac(s, uyg.paket)) return hata("${uyg.ad} açılamadı.")
-        var bekle = 0
-        while (s.aktifPaket != uyg.paket && bekle < 30) { SystemClock.sleep(200); bekle++ }
-        SystemClock.sleep(1800)
+        return arayuzdeAra(uyg.paket, uyg.ad, ad, ek, "doğru başlığa tikla, sonra Oynat/İzle'ye tikla.")
+    }
+
+    /** Uygulamayı açar, "Ara" öğesine tıklar, metni yazar ve gönderir (arama niyeti olmayan uygulamalar için). */
+    private fun arayuzdeAra(paket: String, gorunenAd: String, ad: String, ek: String, sonraki: String): JSONObject {
+        if (s.aktifPaket != paket) {
+            if (!Uygulamalar.ac(s, paket)) return hata("$gorunenAd açılamadı.")
+            var bekle = 0
+            while (s.aktifPaket != paket && bekle < 30) { SystemClock.sleep(200); bekle++ }
+            SystemClock.sleep(1800)
+        }
         if (yaziAlani() == null) {
             val araOgesi = ogeler().firstOrNull { o ->
                 val n = Uygulamalar.normal(o.metin)
                 n == "ara" || n == "arama" || n == "search" || n.startsWith("ara ") || n.contains("search")
             }
             val dugum = araOgesi?.let { tiklanabilir(it.dugum) }
-                ?: return tamam("${uyg.ad} açıldı ama arama düğmesi bulunamadı. ekrani_oku ile 'Ara' öğesini bulup tikla, sonra yaz ile '$ad' yaz.$ek")
+                ?: return tamam("$gorunenAd açıldı ama arama düğmesi bulunamadı. ekrani_oku ile 'Ara'/'Search' öğesini bulup tikla, sonra yaz ile '$ad' yaz.$ek")
             dugum.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             var b = 0
             while (yaziAlani() == null && b < 15) { SystemClock.sleep(200); b++ }
         }
         val y = yaz(ad, gonder = true)
-        if (y.has("hata")) return tamam("${uyg.ad} arama ekranı açıldı ama yazılamadı: ${y.optString("hata")}. ekrani_oku ile devam et.$ek")
+        if (y.has("hata")) return tamam("$gorunenAd arama ekranı açıldı ama yazılamadı: ${y.optString("hata")}. ekrani_oku ile devam et.$ek")
         SystemClock.sleep(2000)
-        return tamam("${uyg.ad} içinde '$ad' arandı. Şimdi ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra Oynat/İzle'ye tikla.$ek")
+        return tamam("$gorunenAd içinde '$ad' arandı. Şimdi ekrani_oku ile sonuçlara bak, $sonraki$ek")
     }
+
+    // --- SPOTIFY (müzik aboneliği)
+
+    private fun spotifyPaketi(): Uygulamalar.Uyg? =
+        Uygulamalar.bul(s, "Spotify").firstOrNull()
+            ?: Uygulamalar.liste(s).firstOrNull { it.paket.contains("spotify", true) }
+
+    private fun spotifyAra(sorgu: String, hemenCal: Boolean): JSONObject {
+        if (sorgu.isBlank()) return hata("Aranacak şarkı/sanatçı boş.")
+        val sp = spotifyPaketi() ?: return hata(
+            if (Uygulamalar.bul(s, "Spotify", pasifDahil = true).isNotEmpty()) "Spotify Jülide ayarlarında PASİF yapılmış."
+            else "Spotify TV'de kurulu değil."
+        )
+        val onceImza = ekranImzasi()
+        val oncePaket = s.aktifPaket
+        // A) "Herhangi biri / fark etmez": Spotify en iyi eşleşmeyi doğrudan çalar
+        if (hemenCal) {
+            val cal = Intent(android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).setPackage(sp.paket)
+                .putExtra(SearchManager.QUERY, sorgu)
+                .putExtra(android.provider.MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+            if (baslat(cal)) {
+                val d = dogrula(onceImza, oncePaket, "Spotify'da '$sorgu' çalma")
+                if (d.has("sonuc")) return d.put("not", "Spotify en iyi eşleşmeyi çalıyor. Emin olmak için ekrani_oku ile neyin çaldığına bakabilirsin.")
+            }
+        }
+        // B) Sonuç listesini göster: spotify:search: bağlantısı
+        if (baslat(Intent(Intent.ACTION_VIEW, Uri.parse("spotify:search:" + Uri.encode(sorgu))).setPackage(sp.paket))) {
+            val d = dogrula(onceImza, oncePaket, "Spotify'da '$sorgu' araması")
+            if (d.has("sonuc")) {
+                SystemClock.sleep(1500)
+                return d.put("sonraki", SPOTIFY_SONRAKI)
+            }
+        }
+        // C) Uygulama arayüzünden ara
+        return arayuzdeAra(sp.paket, sp.ad, sorgu, "", SPOTIFY_SONRAKI)
+    }
+
+    private val SPOTIFY_SONRAKI = "Şimdi ekrani_oku ile sonuçlara bak. Kullanıcı BELİRLİ bir şarkı söylediyse o başlığa tikla; " +
+        "'herhangi biri', 'fark etmez', 'bir şarkısını aç' dediyse listedeki İLK ŞARKIYA (sanatçı/albüm değil) tikla. " +
+        "Sonra çalmıyorsa 'Çal'/'Play' öğesine tikla. Ne seçtiğini kullanıcıya şarkı adıyla kısaca söyle. " +
+        "Kullanıcı seçeneklerden birini sorarsa ilk 3-5 şarkıyı adıyla oku."
 
     // --- BAĞLAM: Jülide hangi uygulamada olduğunu bilir
 
@@ -467,12 +522,13 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             .map { it.activityInfo.packageName }.toSet()
     } catch (_: Exception) { emptySet() }
 
-    private enum class Baglam { YOUTUBE, ABONELIK, TARAYICI, DIGER }
+    private enum class Baglam { YOUTUBE, SPOTIFY, ABONELIK, TARAYICI, DIGER }
 
     private fun baglamBul(paket: String?): Pair<Baglam, String?> {
         if (paket == null) return Baglam.DIGER to null
         val n = paket.lowercase()
         if (n.contains("youtube")) return Baglam.YOUTUBE to "YouTube"
+        if (n.contains("spotify")) return Baglam.SPOTIFY to "Spotify"
         val ad = Uygulamalar.liste(s, hepsi = true).firstOrNull { it.paket == paket }?.ad
         if (ad != null) {
             val na = Uygulamalar.normal(ad)
@@ -491,6 +547,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             val sonuc = when {
                 Regex("tarayici|internet|google|web|chrome|browser").containsMatchIn(np) -> webAra(sorgu)
                 np.contains("youtube") || np == "yt" -> youtubeAra(sorgu)
+                np.contains("spotify") || np.contains("spotfy") -> spotifyAra(sorgu, false)
                 else -> abonelikteAra(sorgu, platform)
             }
             return sonuc.put("baglam", "Kullanıcının söylediği platform kullanıldı: $platform.")
@@ -499,11 +556,13 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         val (b, ad) = baglamBul(s.aktifPaket)
         val sonuc = when (b) {
             Baglam.YOUTUBE -> youtubeAra(sorgu)
+            Baglam.SPOTIFY -> spotifyAra(sorgu, false)
             Baglam.ABONELIK -> abonelikteAra(sorgu, ad ?: "")
             Baglam.TARAYICI -> webAra(sorgu, s.aktifPaket)
             // 3) Bağlam yoksa türe göre varsayılan
             Baglam.DIGER -> when (tur) {
-                "muzik", "video" -> youtubeAra(sorgu)
+                "muzik" -> if (spotifyPaketi() != null) spotifyAra(sorgu, false) else youtubeAra(sorgu)
+                "video" -> youtubeAra(sorgu)
                 "film", "dizi" -> abonelikteAra(sorgu, "")
                 else -> webAra(sorgu)
             }
