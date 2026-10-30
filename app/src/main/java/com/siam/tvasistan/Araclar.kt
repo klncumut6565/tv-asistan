@@ -30,6 +30,9 @@ class Araclar(private val s: AsistanServisi) {
     /** "TV'yi kapat" ve uyku zamanlayıcısı. */
     val uyku = Uyku(s)
 
+    /** Tarayıcılar için sesle yönetilen imleç (fare oku ya da el işareti). */
+    val imlec = Imlec(s)
+
     /** Kanal+/Kanal−/rakam tuşları (TV'nin kendi ağ hata ayıklaması üzerinden). */
     val adb = Adb(s)
     private val ayar = Ayarlar(s)
@@ -66,6 +69,23 @@ class Araclar(private val s: AsistanServisi) {
                 P("platform", "STRING", "YALNIZCA kullanıcı açıkça söylediyse: tarayıcı, YouTube, Prime Video, TOD... Söylemediyse BOŞ bırak."),
                 P("tur", "STRING", "film, dizi, muzik, video ya da diger", listOf("film", "dizi", "muzik", "video", "diger"))
             ), listOf("sorgu")))
+        .put(fn("imlec", "Ekranda sesle yönetilen İMLEÇ (tarayıcıda link/düğme/video tıklamak için). Mod otomatik seçilir: sayfadaki linkler algılanabiliyorsa EL işareti, algılanamıyorsa FARE oku. islem: goster, gizle, tasi (yon+miktar), git (x,y yüzde), oge (bir yazının üstüne götür), tikla, cift_tikla.",
+            listOf(
+                P("islem", "STRING", "Ne yapılacak", listOf("goster", "gizle", "tasi", "git", "oge", "tikla", "cift_tikla")),
+                P("yon", "STRING", "tasi için yön", listOf("sag", "sol", "yukari", "asagi")),
+                P("miktar", "INTEGER", "tasi için adım (1 = biraz, 3 = orta, 6 = çok)"),
+                P("x", "NUMBER", "git için yatay konum yüzdesi (0 sol, 50 orta, 100 sağ)"),
+                P("y", "NUMBER", "git için dikey konum yüzdesi (0 üst, 50 orta, 100 alt)"),
+                P("metin", "STRING", "oge için ekrandaki yazı (link/düğme adı)"),
+                P("mod", "STRING", "İsteğe bağlı: kullanıcı açıkça isterse fare ya da el", listOf("fare", "el"))
+            ), listOf("islem")))
+        .put(fn("sayfa_boyutu", "Tarayıcıda SAYFAYI yakınlaştırır/uzaklaştırır (iki parmak hareketi). 'Sayfayı büyüt / küçült / yazılar küçük' gibi isteklerde.",
+            listOf(
+                P("islem", "STRING", "buyut ya da kucult", listOf("buyut", "kucult")),
+                P("miktar", "INTEGER", "1-3 (biraz = 1, çok = 3)")
+            ), listOf("islem")))
+        .put(fn("video_tam_ekran", "Sayfadaki videoyu TAM EKRAN yapar: önce tam ekran düğmesini arar, yoksa videoya dokunup kontrolleri açar, olmazsa videoya çift tıklar."))
+        .put(fn("video_oynat", "Sayfadaki videoyu BAŞLATIR: ortadaki oynat (▶) düğmesine imleçle tıklar; düğme algılanamazsa video alanının ortasına tıklar."))
         .put(fn("spotify_ara", "SPOTIFY'da şarkı/sanatçı/albüm arar (kullanıcının Spotify ÜYELİĞİ var). Sonuçları açar; sonra ekrani_oku ile listeye bakıp istenen şarkıya tikla. Kullanıcı 'herhangi biri / fark etmez' derse hemen_cal=true ile en iyi eşleşmeyi doğrudan çalar.",
             listOf(
                 P("sorgu", "STRING", "Şarkı, sanatçı ya da ikisi, ör. 'Ahmet Kaya' ya da 'Ahmet Kaya Kendine İyi Bak'"),
@@ -166,6 +186,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
 - "X'i kapat", "bunu kapat", "uygulamadan çık" → uygulama_kapat (ad belirtilmemişse boş bırak).
 - BAĞLAM (ÇOK ÖNEMLİ): Hangi uygulamada olduğunu bil. Her araç sonucunda "simdi_acik_uygulama" alanı var; buna bak. "X'i aç / izle / dinle / bul / ara" (film, dizi, şarkı, video, ne olursa) → akilli_ara. Kullanıcı platform SÖYLEMEDİYSE platform'u BOŞ bırak: akilli_ara ŞU AN AÇIK uygulamada arar (ör. YouTube'da şarkı açıkken "Cehennem Melekleri filmini aç" → YouTube'da arar). Kullanıcı platform SÖYLEDİYSE ("tarayıcıdan aç", "Prime'da aç", "YouTube'dan") platform'a onu yaz. Kendi kafana göre platform değiştirme.
+- TARAYICIDA FİLM: Kullanıcı tarayıcıdan film izlemek isterse: akilli_ara(platform=tarayıcı) → sonuç linkine tikla (yazıyla) ya da numaralari_goster → numaraya_tikla. Film sayfası açılınca video_oynat (ortadaki ▶), sonra video_tam_ekran. Reklam sekmesi/yeni sayfa açılırsa tus: geri ile dön ve tekrar dene. "Sayfayı büyüt/küçült", "yazılar küçük" → sayfa_boyutu. Kullanıcı "imleci göster", "sağa götür", "biraz aşağı", "şuna tıkla" derse → imlec (goster/tasi/git/oge/tikla). İmleç modu otomatik: linkler algılanıyorsa el işareti, algılanmıyorsa fare oku; kullanıcı açıkça "fare" ya da "el" isterse mod ile ver. İmleç taşındıktan sonra altındaki öğeyi kısaca söyle; tıklamadan önce emin değilsen sor.
 - MÜZİK: Kullanıcının SPOTIFY üyeliği var. "Spotify'dan X aç / çal" → spotify_ara (ya da akilli_ara platform=Spotify). Spotify açıkken ya da ana ekrandayken şarkı istenirse Spotify kullanılır; YouTube açıkken platform söylenmezse YouTube'da aranır. Sonuçlar gelince ekrani_oku ile bak: kullanıcı belirli şarkıyı söylediyse ONU, "herhangi biri / fark etmez / bir şarkısını aç" dediyse İLK ŞARKIYI seç (tikla). Kullanıcı "neler var" derse ilk birkaç şarkıyı oku ve hangisini istediğini sor; numara veya ad söyleyince ona tikla.
 - FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken film-dizi akilli_ara ile aboneliklerde aranır. Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
 - "YouTube'da X" → akilli_ara(platform=YouTube). "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
@@ -207,6 +228,10 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
     private fun calistirIc(ad: String, a: JSONObject): JSONObject = try {
         when (ad) {
+            "imlec" -> imlecAraci(a)
+            "sayfa_boyutu" -> sayfaBoyutu(a.optString("islem"), a.optInt("miktar", 1))
+            "video_tam_ekran" -> videoTamEkran()
+            "video_oynat" -> videoOynat()
             "spotify_ara" -> spotifyAra(a.optString("sorgu"), a.optBoolean("hemen_cal", false))
             "akilli_ara" -> akilliAra(a.optString("sorgu"), a.optString("platform"), a.optString("tur"))
             "uygulama_ac" -> uygulamaAc(a.optString("ad"))
@@ -466,6 +491,206 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         if (y.has("hata")) return tamam("$gorunenAd arama ekranı açıldı ama yazılamadı: ${y.optString("hata")}. ekrani_oku ile devam et.$ek")
         SystemClock.sleep(2000)
         return tamam("$gorunenAd içinde '$ad' arandı. Şimdi ekrani_oku ile sonuçlara bak, $sonraki$ek")
+    }
+
+
+    // ================================================================ TARAYICI: imleç, yakınlaştırma, video
+
+    private fun tarayicidaMi(): Boolean {
+        val p = s.aktifPaket ?: return false
+        return !p.contains("youtube", true) && p in tarayiciPaketleri()
+    }
+
+    /** Linkler algılanabiliyorsa EL, algılanamıyorsa (içerik gizli/uzaktan çizim) FARE. */
+    private fun secimModu(): Imlec.Mod {
+        if (!tarayicidaMi()) return Imlec.Mod.EL
+        val n = try { ogeler().size } catch (_: Exception) { 0 }
+        return if (n >= 8) Imlec.Mod.EL else Imlec.Mod.FARE
+    }
+
+    private fun modAdi(m: Imlec.Mod) = if (m == Imlec.Mod.EL) "el işareti" else "fare imleci"
+
+    private fun dokunVeGoster(x: Float, y: Float, cift: Boolean = false): Boolean {
+        if (!imlec.acik) imlec.goster(secimModu())
+        imlec.gitPx(x, y)
+        SystemClock.sleep(250)
+        imlec.basildiGoster()
+        return if (!cift) dokun(x, y) else {
+            val g = GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 0, 50))
+                .addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 160, 50))
+                .build()
+            s.dispatchGesture(g, null, null)
+        }
+    }
+
+    private fun imlecAraci(a: JSONObject): JSONObject {
+        if (korumaliEkran()) return hata(KORUMA_MESAJI)
+        val modIstek = when (a.optString("mod")) { "fare" -> Imlec.Mod.FARE; "el" -> Imlec.Mod.EL; else -> null }
+        return when (a.optString("islem")) {
+            "goster" -> {
+                val m = modIstek ?: secimModu()
+                imlec.goster(m)
+                tamam("İmleç ekranın ortasında (${modAdi(m)}). Kullanıcıya nereye götürmek istediğini sor ya da oge/git kullan.")
+            }
+            "gizle" -> { imlec.gizle(); tamam("İmleç gizlendi.") }
+            "tasi" -> {
+                if (!imlec.acik) imlec.goster(modIstek ?: secimModu())
+                imlec.tasi(a.optString("yon"), a.optInt("miktar", 2))
+                tamam("İmleç taşındı: ${imlecKonumu()}. Altındaki öğe: ${altindakiOge() ?: "yazı yok"}.")
+            }
+            "git" -> {
+                imlec.goster(modIstek ?: secimModu())
+                imlec.git(a.optDouble("x", 50.0).toFloat(), a.optDouble("y", 50.0).toFloat())
+                tamam("İmleç ${imlecKonumu()} konumunda. Altındaki öğe: ${altindakiOge() ?: "yazı yok"}.")
+            }
+            "oge" -> {
+                val r = ogeKutusu(a.optString("metin")) ?: return hata("Ekranda '${a.optString("metin")}' bulunamadı. ekrani_oku ya da numaralari_goster kullan.")
+                imlec.goster(modIstek ?: secimModu())
+                imlec.gitPx(r.exactCenterX(), r.exactCenterY())
+                tamam("İmleç '${a.optString("metin")}' üstünde. Kullanıcı onaylarsa imlec(tikla).")
+            }
+            "tikla", "cift_tikla" -> {
+                if (!imlec.acik) return hata("İmleç ekranda değil; önce imlec(goster/git/oge).")
+                val onceImza = ekranImzasi(); val oncePaket = s.aktifPaket
+                val alt = altindakiOge()
+                if (alt != null && HASSAS.containsMatchIn(Uygulamalar.normal(alt))) {
+                    return hata("İmlecin altındaki '$alt' hassas bir işlem. Kullanıcıya sesli sor.")
+                }
+                if (!dokunVeGoster(imlec.x, imlec.y, a.optString("islem") == "cift_tikla")) return hata("Tıklama gönderilemedi.")
+                dogrula(onceImza, oncePaket, "İmleçle tıklama")
+            }
+            else -> hata("Bilinmeyen imleç işlemi.")
+        }
+    }
+
+    private fun imlecKonumu(): String {
+        val dm = s.resources.displayMetrics
+        return "yatay %${(imlec.x * 100 / dm.widthPixels).toInt()}, dikey %${(imlec.y * 100 / dm.heightPixels).toInt()}"
+    }
+
+    /** İmlecin altındaki en küçük yazılı öğe. */
+    private fun altindakiOge(): String? = try {
+        val r = Rect()
+        ogeler().mapNotNull { o -> o.dugum.getBoundsInScreen(r); if (r.contains(imlec.x.toInt(), imlec.y.toInt())) o to r.width() * r.height() else null }
+            .minByOrNull { it.second }?.first?.metin?.take(60)
+    } catch (_: Exception) { null }
+
+    private fun ogeKutusu(metin: String): Rect? {
+        val h = Uygulamalar.normal(metin)
+        if (h.isEmpty()) return null
+        val o = ogeler().map { it to Uygulamalar.normal(it.metin) }
+            .filter { (_, n) -> n == h || n.contains(h) || (n.length >= 3 && h.contains(n)) }
+            .minByOrNull { (_, n) -> if (n == h) 0 else n.length }?.first ?: return null
+        return Rect().also { o.dugum.getBoundsInScreen(it) }
+    }
+
+    private fun sayfaBoyutu(islem: String, miktar: Int): JSONObject {
+        val dm = s.resources.displayMetrics
+        val cx = dm.widthPixels / 2f; val cy = dm.heightPixels / 2f
+        val kisa = dm.heightPixels * 0.06f; val uzun = dm.heightPixels * 0.30f
+        val buyut = islem != "kucult"
+        val onceImza = ekranImzasi(); val oncePaket = s.aktifPaket
+        repeat(miktar.coerceIn(1, 3)) {
+            val (bas, son) = if (buyut) kisa to uzun else uzun to kisa
+            val p1 = Path().apply { moveTo(cx - bas, cy); lineTo(cx - son, cy) }
+            val p2 = Path().apply { moveTo(cx + bas, cy); lineTo(cx + son, cy) }
+            val g = GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(p1, 0, 450))
+                .addStroke(GestureDescription.StrokeDescription(p2, 0, 450))
+                .build()
+            s.dispatchGesture(g, null, null)
+            SystemClock.sleep(700)
+        }
+        return if (degisimiBekle(onceImza, oncePaket, 2500)) tamam("Sayfa ${if (buyut) "büyütüldü" else "küçültüldü"} (DOĞRULANDI).")
+        else hata("Sayfa boyutu değişmedi; bu tarayıcı iki parmak yakınlaştırmayı desteklemiyor olabilir. Tarayıcının menüsünde 'Yakınlaştır/Zoom' öğesini ekrani_oku ile ara.")
+    }
+
+    private val TAM_EKRAN = Regex("(tam ekran|fullscreen|full screen|tam ekrana|enter full|genislet|buyuk ekran)")
+    private val OYNAT = Regex("\\b(oynat|play|baslat|izle|izlemeye basla|play video|videoyu oynat|devam et|watch|watch now|hemen izle)\\b")
+
+    private fun ogeBul(re: Regex, haric: Regex? = null): Oge? = ogeler()
+        .filter { o -> val n = Uygulamalar.normal(o.metin); re.containsMatchIn(n) && (haric == null || !haric.containsMatchIn(n)) }
+        .minByOrNull { Uygulamalar.normal(it.metin).length }
+
+    /** Sayfadaki video oynatıcının alanı (sınıf/ad/kimlikte video|player geçen en büyük öğe). */
+    private fun videoAlani(): Rect? {
+        val dm = s.resources.displayMetrics
+        val ekranAlan = dm.widthPixels.toLong() * dm.heightPixels
+        var enIyi: Rect? = null; var enAlan = 0L
+        val ipucu = Regex("(video|player|oynatici|jwplayer|plyr|vjs|iframe|embed)", RegexOption.IGNORE_CASE)
+        fun gez(n: AccessibilityNodeInfo, d: Int) {
+            if (d > 45) return
+            val metin = listOfNotNull(n.className, n.viewIdResourceName, n.contentDescription, n.text).joinToString(" ")
+            if (n.isVisibleToUser && ipucu.containsMatchIn(metin)) {
+                val r = Rect(); n.getBoundsInScreen(r)
+                val alan = r.width().toLong() * r.height()
+                if (alan > ekranAlan / 20 && alan > enAlan) { enAlan = alan; enIyi = r }
+            }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { gez(it, d + 1) }
+        }
+        for (k in kokler()) gez(k, 0)
+        return enIyi
+    }
+
+    private fun videoTamEkran(): JSONObject {
+        if (korumaliEkran()) return hata(KORUMA_MESAJI)
+        val onceImza = ekranImzasi(); val oncePaket = s.aktifPaket
+        // 1) Görünür tam ekran düğmesi
+        ogeBul(TAM_EKRAN)?.let { o ->
+            val r = Rect(); o.dugum.getBoundsInScreen(r)
+            imlec.goster(secimModu())
+            val tik = tiklanabilir(o.dugum)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+            if (!tik) dokunVeGoster(r.exactCenterX(), r.exactCenterY()) else { imlec.gitPx(r.exactCenterX(), r.exactCenterY()); imlec.basildiGoster() }
+            if (degisimiBekle(onceImza, oncePaket, 3000)) return tamam("'${o.metin}' tıklandı, video tam ekran (DOĞRULANDI).")
+        }
+        val dm = s.resources.displayMetrics
+        val v = videoAlani() ?: Rect(0, 0, dm.widthPixels, dm.heightPixels)
+        // 2) Videoya bir kez dokun → kontroller görünür → tam ekran düğmesini yeniden ara
+        val imza2 = ekranImzasi()
+        dokunVeGoster(v.exactCenterX(), v.exactCenterY())
+        SystemClock.sleep(700)
+        ogeBul(TAM_EKRAN)?.let { o ->
+            val r = Rect(); o.dugum.getBoundsInScreen(r)
+            if (tiklanabilir(o.dugum)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) dokunVeGoster(r.exactCenterX(), r.exactCenterY())
+            if (degisimiBekle(imza2, oncePaket, 3000)) return tamam("Tam ekran düğmesi tıklandı (DOĞRULANDI).")
+        }
+        // 3) Kontrol çubuğunun sağ alt köşesi (çoğu oynatıcıda tam ekran simgesi orada)
+        if (v.width() > 200 && v.height() > 120) {
+            val imza3 = ekranImzasi()
+            dokunVeGoster(v.right - v.width() * 0.04f, v.bottom - v.height() * 0.06f)
+            if (degisimiBekle(imza3, oncePaket, 2500) && !hataSayfasiMi()) return tamam("Oynatıcının sağ alt köşesindeki tam ekran simgesine tıklandı. Ekran değişti; tam ekran olup olmadığını ekrani_oku ile kontrol et.")
+        }
+        // 4) Çift tıklama (birçok web oynatıcısında tam ekran)
+        val imza4 = ekranImzasi()
+        dokunVeGoster(v.exactCenterX(), v.exactCenterY(), cift = true)
+        return if (degisimiBekle(imza4, oncePaket, 3000)) tamam("Videoya çift tıklandı; ekran değişti. Tam ekran olduysa söyle, değilse kullanıcıya imleçle tam ekran simgesini göstermeyi öner.")
+        else hata("Tam ekran yapılamadı. SAYFA DEĞİŞMEDİ: 'tam ekran yaptım' DEME. imlec(goster) ile kullanıcıya tam ekran simgesini birlikte bulmayı öner.")
+    }
+
+    private fun videoOynat(): JSONObject {
+        if (korumaliEkran()) return hata(KORUMA_MESAJI)
+        val onceImza = ekranImzasi(); val oncePaket = s.aktifPaket
+        // 1) Görünür oynat düğmesi (playlist/player/display hariç)
+        ogeBul(OYNAT, Regex("(playlist|oynatma listesi|fragman|trailer)"))?.let { o ->
+            val r = Rect(); o.dugum.getBoundsInScreen(r)
+            if (tiklanabilir(o.dugum)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                imlec.goster(secimModu()); imlec.gitPx(r.exactCenterX(), r.exactCenterY()); imlec.basildiGoster()
+            } else dokunVeGoster(r.exactCenterX(), r.exactCenterY())
+            val d = dogrula(onceImza, oncePaket, "'${o.metin}' (oynat) tıklaması")
+            if (d.has("sonuc")) return d
+        }
+        // 2) Video alanının (yoksa ekranın) ORTASINA imleçle tıkla — ortadaki ▶ simgesi
+        val dm = s.resources.displayMetrics
+        val v = videoAlani() ?: Rect(0, 0, dm.widthPixels, dm.heightPixels)
+        val imza2 = ekranImzasi()
+        dokunVeGoster(v.exactCenterX(), v.exactCenterY())
+        val d = dogrula(imza2, oncePaket, "Videonun ortasındaki oynat simgesine tıklama")
+        if (d.has("sonuc")) return d.put("not", "Reklam sekmesi açıldıysa geri tuşuyla dön (tus: geri) ve tekrar video_oynat çağır.")
+        // 3) Kumandanın orta tuşu
+        val imza3 = ekranImzasi()
+        if (tekBas("tamam")) return dogrula(imza3, s.aktifPaket, "Orta tuş (Tamam) ile oynatma")
+        return d
     }
 
     // --- SPOTIFY (müzik aboneliği)
@@ -1130,7 +1355,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
         for (k in kokler()) gez(k, 0)
         // Tarayıcı/WebView: tüm sayfa tek büyük tıklanabilir düğüm olabilir → yazılı öğeleri kendi kutularıyla numarala
-        if (bulunan.size < 3) {
+        if (bulunan.size < 3 || tarayicidaMi()) {
             for (o in ogeler()) {
                 if (bulunan.size >= 80) break
                 val r = Rect()

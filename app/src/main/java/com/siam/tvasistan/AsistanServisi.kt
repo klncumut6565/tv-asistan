@@ -705,6 +705,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             panel.numaralariGizle()
             panel.gizle()
         }
+        if (::araclar.isInitialized) araclar.imlec.gizle()
         sonraKurulacak?.let { s ->
             sonraKurulacak = null
             ana.postDelayed({ guncellemeyiKur(s) }, 1500)
