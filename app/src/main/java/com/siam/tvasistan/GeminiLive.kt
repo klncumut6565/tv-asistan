@@ -42,6 +42,8 @@ class GeminiLive(private val d: Dinleyici) {
         @Volatile private var sonCalisan: String? = null
         /** Google Arama aracını kabul etmeyen model/sürüm çiftleri (bir kez denenir, sonra aramasız bağlanılır). */
         private val aramasizlar = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        /** Kotası dolan modeller → ne zamana kadar sona atılacağı (ms). */
+        private val kotaDolu = java.util.concurrent.ConcurrentHashMap<String, Long>()
         private val ORTAK_HTTP: OkHttpClient by lazy {
             OkHttpClient.Builder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -72,8 +74,12 @@ class GeminiLive(private val d: Dinleyici) {
         if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — Jülide uygulamasını açıp anahtarı kaydedin.")
         sesAdi = y.ses
         val surumler = listOf("v1beta", "v1alpha")
-        val sira = y.modeller.sortedByDescending { it.ad == sonCalisan }
+        val simdi = System.currentTimeMillis()
+        val sira = y.modeller.sortedWith(
+            compareBy<Uzak.Model> { (kotaDolu[it.ad] ?: 0L) > simdi }.thenByDescending { it.ad == sonCalisan }
+        )
         val hatalar = mutableListOf<String>()
+        val kotasiDolan = mutableSetOf<String>()
         for (m in sira) {
             for (s in surumler) {
                 val anahtarCift = "${m.ad}/$s"
@@ -86,10 +92,20 @@ class GeminiLive(private val d: Dinleyici) {
                         sonCalisan = m.ad
                         Log.i(ETIKET, "Bağlandı: ${m.etiket} / $s / arama=$arama")
                         return
+                    } catch (e: KotaHatasi) {
+                        // Ücretsiz planda Google Arama kotası 0'dır: aramayla kota hatası → aramasız dene.
+                        // Aramasız da kota doluysa bu modelin kotası bitmiştir → SIRADAKİ MODELE geç.
+                        ws?.cancel()
+                        ws = null
+                        hatalar += "${m.etiket}/$s${if (arama) "+arama" else ""}: kota"
+                        if (arama) { aramasizlar += anahtarCift; continue }
+                        kotasiDolan += m.ad
+                        kotaDolu[m.ad] = System.currentTimeMillis() + 3 * 3600_000L
+                        break
                     } catch (e: KaliciHata) {
                         ws?.cancel()
                         ws = null
-                        throw e // anahtar geçersiz / kota dolu: diğer modelleri denemek boşuna
+                        throw e // anahtar geçersiz: diğer modelleri denemek boşuna
                     } catch (e: IOException) {
                         hatalar += "${m.etiket}/$s${if (arama) "+arama" else ""}: ${e.message}"
                         ws?.cancel()
@@ -98,6 +114,9 @@ class GeminiLive(private val d: Dinleyici) {
                     }
                 }
             }
+        }
+        if (kotasiDolan.size >= sira.size) {
+            throw KaliciHata("Gemini kotası tüm modellerde doldu (${kotasiDolan.size} model denendi). Kota genelde gece yarısı (Pasifik saati, TR 10:00) sıfırlanır.")
         }
         throw IOException("Gemini Live bağlanamadı. " + hatalar.lastOrNull().orEmpty())
     }
@@ -123,9 +142,9 @@ class GeminiLive(private val d: Dinleyici) {
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 val kod = response?.code
-                val kalici = when (kod) {
-                    401, 403 -> KaliciHata("Gemini API anahtarı geçersiz veya yetkisiz (HTTP $kod). Anahtarı uygulamadan yeniden kaydedin.")
-                    429 -> KaliciHata("Gemini kotası doldu; biraz sonra tekrar deneyin.")
+                val kalici = when {
+                    kod == 401 || kod == 403 -> KaliciHata("Gemini API anahtarı geçersiz veya yetkisiz (HTTP $kod). Anahtarı uygulamadan yeniden kaydedin.")
+                    kod == 429 || kotaMi(t.message) -> KotaHatasi("Gemini kotası doldu (${m.etiket}).")
                     else -> null
                 }
                 if (kalici != null && !hazir.isCompleted) {
@@ -143,12 +162,20 @@ class GeminiLive(private val d: Dinleyici) {
                     hazir.completeExceptionally(
                         when {
                             reason.contains("API key", true) -> KaliciHata("Gemini API anahtarı geçersiz. Anahtarı uygulamadan yeniden kaydedin.")
-                            reason.contains("quota", true) -> KaliciHata("Gemini kotası doldu; biraz sonra tekrar deneyin.")
+                            kotaMi(reason) -> KotaHatasi("Gemini kotası doldu (${m.etiket}): $reason")
                             else -> IOException("Bağlantı kapandı ($code) $reason")
                         }
                     )
                 }
-                else if (webSocket === ws && !kapatildi) d.kapandi()
+                else if (webSocket === ws && !kapatildi) {
+                    // Oturum ortasında kota: büyük olasılıkla Google Arama (ücretsiz planda kotası 0).
+                    if (kotaMi(reason)) {
+                        if (arama) aramasizlar += "${m.ad}/$surum"
+                        else kotaDolu[m.ad] = System.currentTimeMillis() + 3 * 3600_000L
+                        Log.w(ETIKET, "Oturum kota nedeniyle kapandı (arama=$arama): $reason")
+                    }
+                    d.kapandi()
+                }
             }
         }
 
@@ -290,5 +317,13 @@ class GeminiLive(private val d: Dinleyici) {
     }
 }
 
-/** Yeniden denemenin anlamsız olduğu hata (geçersiz anahtar, dolu kota). */
-class KaliciHata(mesaj: String) : IOException(mesaj)
+/** Yeniden denemenin anlamsız olduğu hata (geçersiz anahtar, tüm modellerde dolu kota). */
+open class KaliciHata(mesaj: String) : IOException(mesaj)
+
+/** Tek bir modelin (ya da Google Arama'nın) kotası doldu: sıradaki seçenek denenir. */
+class KotaHatasi(mesaj: String) : IOException(mesaj)
+
+internal fun kotaMi(m: String?): Boolean {
+    val k = m?.lowercase() ?: return false
+    return "quota" in k || "resource_exhausted" in k || "resource exhausted" in k || "rate limit" in k || "exceeded" in k
+}

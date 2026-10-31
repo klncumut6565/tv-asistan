@@ -69,6 +69,11 @@ class Araclar(private val s: AsistanServisi) {
                 P("platform", "STRING", "YALNIZCA kullanıcı açıkça söylediyse: tarayıcı, YouTube, Prime Video, TOD... Söylemediyse BOŞ bırak."),
                 P("tur", "STRING", "film, dizi, muzik, video ya da diger", listOf("film", "dizi", "muzik", "video", "diger"))
             ), listOf("sorgu")))
+        .put(fn("internette_ara", "ÜCRETSİZ internet araması: güncel ya da genel BİLGİ sorularında (bugünkü maçlar, skor, haber, hava, döviz, kişi, olay, tarif, ürün...) kullan. Tarayıcı AÇMAZ; sonuçları (başlık, kaynak, tarih, özet, sayfa metni) döndürür, sen de cevabı sesli söylersin.",
+            listOf(
+                P("sorgu", "STRING", "Arama metni; tarih gerekiyorsa açık tarih yaz (ör. '31 Ekim 2026 maç programı')"),
+                P("haber", "BOOLEAN", "Güncel haber/olay/maç/skor ise true")
+            ), listOf("sorgu")))
         .put(fn("imlec", "Ekranda sesle yönetilen İMLEÇ (tarayıcıda link/düğme/video tıklamak için). Mod otomatik seçilir: sayfadaki linkler algılanabiliyorsa EL işareti, algılanamıyorsa FARE oku. islem: goster, gizle, tasi (yon+miktar), git (x,y yüzde), oge (bir yazının üstüne götür), tikla, cift_tikla.",
             listOf(
                 P("islem", "STRING", "Ne yapılacak", listOf("goster", "gizle", "tasi", "git", "oge", "tikla", "cift_tikla")),
@@ -210,7 +215,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - TELEVİZYONU KAPATMA (onaylı): "TV'yi kapat", "televizyonu kapat", "TV'yi uyut" → ÖNCE tv_kapat(onayli=false) çağır ve kullanıcıya YALNIZCA "Televizyonu kapatayım mı?" diye sor. Kullanıcı açıkça "evet", "kapat", "onaylıyorum", "tamam kapat" derse tv_kapat(onayli=true) çağır ve kısaca veda et ("Televizyonu kapatıyorum, iyi geceler"). "Hayır", "vazgeç" ya da alakasız bir cevap gelirse KAPATMA ("Peki, kapatmıyorum" de). "Sayfayı kapat", "bunu kapat", "uygulamayı kapat", yalnızca "kapat" → bunlar TV değildir: uygulama_kapat. Emin değilsen sor.
 - "30 dakika sonra kapat", "bir saat sonra TV'yi kapat", "uyku zamanlayıcısı kur" → uyku_zamanlayicisi (islem=kur, dakika). "Zamanlayıcıyı iptal et", "kapatma" → islem=iptal. "Ne kadar kaldı" → islem=durum.
 - SAAT / TARİH / GÜN: "Saat kaç", "bugün ayın kaçı", "hangi gündeyiz" → saat_tarih. Saati veya tarihi ASLA kendin tahmin etme; her soruda aracı yeniden çağır (sohbet uzun sürebilir, eski değer geçerli değildir).
-GÜNCEL VE GENEL BİLGİ (ÇOK ÖNEMLİ): Sen yalnızca TV kumandası değilsin; her konuda bilgi veren bir asistansın. Bugün hangi maçlar var, skorlar, puan durumu, haberler, hava durumu, döviz/altın, ünlüler, bilim, tarih, tarifler, ürün özellikleri gibi sorularda TARAYICI AÇMA: Google Arama aracını KENDİN kullan ve cevabı doğrudan sesli söyle. web_ara / url_ac yalnızca kullanıcı açıkça "tarayıcıda aç / ekranda göster" derse.
+GÜNCEL VE GENEL BİLGİ (ÇOK ÖNEMLİ): Sen yalnızca TV kumandası değilsin; her konuda bilgi veren bir asistansın. Bugün hangi maçlar var, skorlar, puan durumu, haberler, hava durumu, döviz/altın, ünlüler, bilim, tarih, tarifler, ürün özellikleri gibi sorularda TARAYICI AÇMA: internette_ara aracını çağır (yerleşik Google Arama aracın varsa onu da kullanabilirsin) ve cevabı doğrudan sesli söyle. Sonuç yetersizse sorguyu değiştirip bir kez daha internette_ara çağır. web_ara / url_ac yalnızca kullanıcı açıkça "tarayıcıda aç / ekranda göster" derse.
 - Tarih gerektiren sorularda (bugün, yarın, bu hafta) önce saat_tarih ile TV'nin tarihini al ve aramayı o tarihle yap.
 - Yalnızca arama sonuçlarında gerçekten bulunan bilgiyi söyle. Skor, saat, sayı, isim, tarih UYDURMA. Bulamadıysan ya da kaynaklar çelişiyorsa bunu açıkça söyle ("Kesin bilgi bulamadım").
 - Canlı/değişken bilgide (skor, döviz) bilginin hangi saate ait olduğunu belirt. Cevabın sonunda kaynağı kısaca an (ör. "TFF'nin sitesine göre").
@@ -236,6 +241,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
     private fun calistirIc(ad: String, a: JSONObject): JSONObject = try {
         when (ad) {
+            "internette_ara" -> com.siam.tvasistan.arastirma.UcretsizArama.ara(a.optString("sorgu"), a.optBoolean("haber", false))
             "imlec" -> imlecAraci(a)
             "sayfa_boyutu" -> sayfaBoyutu(a.optString("islem"), a.optInt("miktar", 1))
             "video_tam_ekran" -> videoTamEkran()
