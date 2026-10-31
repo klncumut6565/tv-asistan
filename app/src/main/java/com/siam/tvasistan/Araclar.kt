@@ -550,13 +550,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         imlec.gitPx(x, y)
         SystemClock.sleep(250)
         imlec.basildiGoster()
-        return if (!cift) dokun(x, y) else {
-            val g = GestureDescription.Builder()
-                .addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 0, 50))
-                .addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 160, 50))
-                .build()
-            s.dispatchGesture(g, null, null)
-        }
+        return hareket(x, y, cift)
     }
 
     private fun imlecAraci(a: JSONObject): JSONObject {
@@ -592,8 +586,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
                 if (alt != null && HASSAS.containsMatchIn(Uygulamalar.normal(alt))) {
                     return hata("İmlecin altındaki '$alt' hassas bir işlem. Kullanıcıya sesli sor.")
                 }
-                if (!dokunVeGoster(imlec.x, imlec.y, a.optString("islem") == "cift_tikla")) return hata("Tıklama gönderilemedi.")
-                dogrula(onceImza, oncePaket, "İmleçle tıklama")
+                imlecTikla(a.optString("islem") == "cift_tikla", onceImza, oncePaket)
             }
             else -> hata("Bilinmeyen imleç işlemi.")
         }
@@ -1011,12 +1004,96 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return hata("'${aday.metin}' bulundu ama tıklanamadı.$ACILMADI")
     }
 
-    private fun dokun(x: Float, y: Float): Boolean {
-        val yol = Path().apply { moveTo(x, y) }
-        val g = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(yol, 0, 60))
-            .build()
-        return s.dispatchGesture(g, null, null)
+    private fun dokun(x: Float, y: Float): Boolean = hareket(x, y, cift = false)
+
+    /**
+     * Dokunma hareketini gönderir ve sistemin GERÇEKTEN uygulayıp uygulamadığını bekler
+     * (dispatchGesture true dönse bile hareket iptal edilebilir: bazı TV'lerde dokunmatik ekran yok).
+     */
+    private fun hareket(x: Float, y: Float, cift: Boolean, sureMs: Long = 90): Boolean {
+        val b = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 0, sureMs))
+        if (cift) b.addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, sureMs + 110, sureMs))
+        val bitti = java.util.concurrent.CountDownLatch(1)
+        var tamam = false
+        val gonderildi = s.dispatchGesture(b.build(), object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(g: GestureDescription?) { tamam = true; bitti.countDown() }
+            override fun onCancelled(g: GestureDescription?) { tamam = false; bitti.countDown() }
+        }, null)
+        if (!gonderildi) { Log.w("TvAsistan", "Dokunma gönderilemedi ($x,$y)"); return false }
+        bitti.await(1500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        Log.i("TvAsistan", "Dokunma ($x,$y) cift=$cift → ${if (tamam) "uygulandı" else "İPTAL"}")
+        return tamam
+    }
+
+    /** İmlecin altındaki EN KÜÇÜK görünür düğüm (yazısız bağlantılar/görseller dahil). */
+    private fun imlecAltindakiDugum(x: Int, y: Int): AccessibilityNodeInfo? {
+        var enIyi: AccessibilityNodeInfo? = null
+        var enAlan = Long.MAX_VALUE
+        val r = Rect()
+        fun gez(n: AccessibilityNodeInfo, d: Int) {
+            if (d > 50) return
+            n.getBoundsInScreen(r)
+            if (n.isVisibleToUser && r.contains(x, y)) {
+                val alan = r.width().toLong() * r.height()
+                if (alan in 1 until enAlan) { enAlan = alan; enIyi = n }
+            }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { gez(it, d + 1) }
+        }
+        for (k in kokler()) gez(k, 0)
+        return enIyi
+    }
+
+    /**
+     * İmleçle tıklama — sırayla 4 yol denenir, her birinden sonra ekranın değişip değişmediğine bakılır:
+     *  1) İmlecin altındaki bağlantı/düğmeye erişilebilirlik TIKLAMASI (tarayıcı bağlantıları için en güvenilir)
+     *  2) O öğeye ODAK + kumandanın Tamam tuşu
+     *  3) Dokunma hareketi (çift tıklamada iki dokunuş)
+     *  4) Bağlantı yazısıyla arama (tikla)
+     */
+    private fun imlecTikla(cift: Boolean, onceImza: Int, oncePaket: String?): JSONObject {
+        val x = imlec.x; val y = imlec.y
+        imlec.basildiGoster()
+        val dugum = imlecAltindakiDugum(x.toInt(), y.toInt())
+        val hedef = dugum?.let { tiklanabilir(it) }
+        val ad = (dugum?.let { ilkMetin(it, 0) } ?: hedef?.let { ilkMetin(it, 0) })?.take(60)
+        val denenen = mutableListOf<String>()
+
+        fun degisti(imza: Int, paket: String?) = degisimiBekle(imza, paket, 3500) && !hataSayfasiMi()
+
+        // 1) Erişilebilirlik tıklaması
+        if (hedef != null) {
+            val i = ekranImzasi()
+            val ok = hedef.performAction(AccessibilityNodeInfo.ACTION_CLICK).also { if (cift && it) { SystemClock.sleep(150); hedef.performAction(AccessibilityNodeInfo.ACTION_CLICK) } }
+            denenen += "erişilebilirlik tıklaması (${if (ok) "gönderildi" else "reddedildi"})"
+            if (ok && degisti(i, oncePaket)) return tamam("İmleçle ${ad?.let { "'$it' " } ?: ""}tıklandı: DOĞRULANDI, sayfa değişti.")
+        }
+        // 2) Odak + Tamam tuşu
+        (hedef ?: dugum)?.let { n ->
+            val i = ekranImzasi()
+            n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            n.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+            SystemClock.sleep(150)
+            val ok = tekBas("tamam")
+            denenen += "odak + Tamam tuşu (${if (ok) "gönderildi" else "yok"})"
+            if (ok && degisti(i, s.aktifPaket)) return tamam("İmleçle ${ad?.let { "'$it' " } ?: ""}seçildi (Tamam tuşu): DOĞRULANDI.")
+        }
+        // 3) Dokunma hareketi
+        run {
+            val i = ekranImzasi()
+            val ok = hareket(x, y, cift)
+            denenen += "dokunma (${if (ok) "uygulandı" else "TV dokunmayı iptal etti"})"
+            if (ok && degisti(i, s.aktifPaket)) return tamam("İmleçle dokunuldu: DOĞRULANDI, sayfa değişti.")
+        }
+        // 4) Bağlantının yazısıyla tıkla
+        if (!ad.isNullOrBlank() && ad.length >= 3) {
+            val t = tikla(ad, onayli = false)
+            denenen += "yazıyla tıklama"
+            if (t.has("sonuc") && t.optString("sonuc").contains("DOĞRULANDI")) return t
+        }
+        Log.w("TvAsistan", "İmleç tıklaması başarısız: ${denenen.joinToString("; ")} (öğe: $ad)")
+        return hata("İmleçle açılamadı. Denenenler: ${denenen.joinToString(", ")}. İmlecin altındaki öğe: ${ad ?: "algılanamadı"}.$ACILMADI " +
+            "Önerilen: numaralari_goster ile bağlantıları numarala ve numaraya_tikla; ya da tus ile (aşağı/yukarı + tamam) bağlantıya gidip seç.")
     }
 
     private fun yaziAlani(): AccessibilityNodeInfo? {
