@@ -519,11 +519,13 @@ class MainActivity : Activity() {
 
     private fun guncellemeDenetle(kur: Boolean) {
         guncellemeTv.text = "Denetleniyor…"
+        toast("Güncellemeler denetleniyor…")
         Thread {
             val mesaj = try {
                 val yeni = Guncelleme.denetle()
                 when {
-                    yeni == null -> "En son sürüm kullanılıyor (${BuildConfig.VERSION_NAME})."
+                    yeni == null -> "Güncelleme yok. En son sürüm kullanılıyor (${BuildConfig.VERSION_NAME})."
+                    kur && Guncelleme.kuruluyor -> "Güncelleme ${yeni.ad} zaten indiriliyor/kuruluyor, lütfen bekleyin."
                     !kur -> "Yeni sürüm var: ${yeni.ad} — \"Güncellemeleri denetle ve kur\"a basın."
                     !packageManager.canRequestPackageInstalls() ->
                         "Yeni sürüm ${yeni.ad} var, ama önce 'Bilinmeyen kaynak iznini aç' ile izin verin."
@@ -536,7 +538,10 @@ class MainActivity : Activity() {
             } catch (ex: Exception) {
                 "Denetlenemedi: ${ex.message}"
             }
-            runOnUiThread { guncellemeTv.text = mesaj }
+            runOnUiThread {
+                guncellemeTv.text = mesaj
+                toast(mesaj)
+            }
         }.start()
     }
 }
