@@ -536,7 +536,10 @@ class MainActivity : Activity() {
                     }
                 }
             } catch (ex: Exception) {
-                "Denetlenemedi: ${ex.message}"
+                val m = (ex.message ?: ex.toString())
+                if (ex is javax.net.ssl.SSLException || m.contains("chain", true) || m.contains("certif", true) || m.contains("trust anchor", true))
+                    "Denetlenemedi: güvenli bağlantı kurulamadı. TV'nin TARİH/SAATİ yanlış olabilir (Ayarlar → Tarih ve saat → Ağdan otomatik) ya da modem GitHub'ı engelliyor."
+                else "Denetlenemedi: $m"
             }
             runOnUiThread {
                 guncellemeTv.text = mesaj
