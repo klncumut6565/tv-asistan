@@ -64,7 +64,7 @@ class AnahtarKurulum(
 
     private val kopru = TelefonKoprusu(
         kod,
-        sesGeldi = {},
+        sesGeldi = { _, _ -> },
         kanalOn = "julide-anahtar-",
         olayGeldi = { olay, yuk -> if (olay == "anahtar") geldi(yuk) },
     )
