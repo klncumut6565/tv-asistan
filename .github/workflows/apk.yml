@@ -24,7 +24,7 @@ jobs:
         run: |
           chmod +x gradlew
           set +e
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee derleme.log
+          ./gradlew assembleDebug testDebugUnitTest --stacktrace 2>&1 | tee derleme.log
           durum=${PIPESTATUS[0]}
           # Kotlin derleme hatalarını GitHub notu olarak göster (günlüğe erişmeden okunabilsin)
           grep -E "^e: " derleme.log | head -25 | while IFS= read -r satir; do echo "::error::${satir}"; done

@@ -56,6 +56,9 @@ class GeminiLive(private val d: Dinleyici) {
 
     private val http get() = ORTAK_HTTP
     private val aracYurutucu = Executors.newSingleThreadExecutor()
+    /** Uzun süren bilgi araçları ayrı kuyrukta: araştırma sürerken TV komutları (ses, kanal...) beklemez. */
+    private val bilgiYurutucu = Executors.newFixedThreadPool(2)
+    private val BILGI_ARACLARI = setOf("internette_arastir", "internette_ara", "doviz_kuru", "hava_durumu")
 
     @Volatile private var ws: WebSocket? = null
     @Volatile private var kapatildi = false
@@ -271,7 +274,8 @@ class GeminiLive(private val d: Dinleyici) {
 
     private fun aracCagrisi(tc: JSONObject) {
         val cagrilar = tc.optJSONArray("functionCalls") ?: return
-        aracYurutucu.execute {
+        val hepsiBilgi = (0 until cagrilar.length()).all { cagrilar.optJSONObject(it)?.optString("name") in BILGI_ARACLARI }
+        (if (hepsiBilgi) bilgiYurutucu else aracYurutucu).execute {
             val yanitlar = JSONArray()
             for (i in 0 until cagrilar.length()) {
                 val c = cagrilar.optJSONObject(i) ?: continue
@@ -314,6 +318,7 @@ class GeminiLive(private val d: Dinleyici) {
         ws?.close(1000, "bitti")
         ws = null
         aracYurutucu.shutdown()
+        bilgiYurutucu.shutdown()
     }
 }
 

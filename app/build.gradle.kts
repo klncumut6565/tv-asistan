@@ -78,4 +78,8 @@ dependencies {
     // "Jülide" uyandırma kelimesi: internetsiz konuşma tanıma (Apache 2.0)
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.alphacephei:vosk-android:0.3.47@aar")
+
+    // Birim testleri (JVM): Android'in org.json'u testlerde boş taslaktır, gerçeği eklenir
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
