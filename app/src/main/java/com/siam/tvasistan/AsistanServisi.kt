@@ -222,7 +222,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         telefon?.durdur()
         telefon = null
         if (!ayarlar.telefonAktif || kod.isBlank()) return
-        telefon = TelefonKoprusu(kod, sesGeldi = { telefonSesi(it) }, durumDegisti = { d ->
+        telefon = TelefonKoprusu(kod, sesGeldi = { pcm, meta -> telefonSesi(pcm, meta) }, durumDegisti = { d ->
             Log.i(ETIKET, "Telefon: $d")
             when (d) {
                 "telefon bağlandı" -> ana.post { if (durum != Durum.BAGLANIYOR) halBildir() }
@@ -264,9 +264,13 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     /** Telefondan PCM geldi (okhttp iş parçacığı). */
-    private fun telefonSesi(pcm: ByteArray) {
+    private fun telefonSesi(pcm: ByteArray, meta: JSONObject = JSONObject()) {
         val simdi = SystemClock.elapsedRealtime()
-        val yeniKonusma = simdi - sonTelefonSesi > 1_500
+        // YANKI KORUMASI (mobil veride gecikme): Jülide TV'den konuşurken telefon bunu henüz bilmiyorsa
+        // (jk=false) gelen ses büyük olasılıkla Jülide'nin kendi sesidir: söz kesilmez, modele gönderilmez.
+        if (meta.has("jk") && !meta.optBoolean("jk") && oynatici?.caliyor() == true) return
+        // Yeni konuşma: sayfa ilk parçayı b=1 ile işaretler; mobil ağdaki gecikmeli parçalar yeni konuşma sanılmaz.
+        val yeniKonusma = if (meta.has("b")) meta.optInt("b") == 1 else simdi - sonTelefonSesi > 1_500
         sonTelefonSesi = simdi
         if (yeniKonusma) ana.post { telefonKonusmasiBasladi() }
         // Sohbet kapalıyken telefon sesi YOK SAYILIR: sohbet yalnız telefondaki "Jülide'yi aç" düğmesiyle

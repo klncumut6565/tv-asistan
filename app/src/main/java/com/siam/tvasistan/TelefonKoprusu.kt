@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class TelefonKoprusu(
     private val kod: String,
     /** Gelen PCM parçası (okhttp iş parçacığında çağrılır). */
-    private val sesGeldi: (ByteArray) -> Unit,
+    private val sesGeldi: (ByteArray, JSONObject) -> Unit,
     /** Telefon bağlandı/ayrıldı bilgisi (okhttp iş parçacığında). */
     private val durumDegisti: (String) -> Unit = {},
     /** Kanal adı öneki ("julide-" telefon mikrofonu, "julide-anahtar-" API anahtarı kurulumu). */
@@ -137,7 +137,7 @@ class TelefonKoprusu(
                             when (p.optString("event")) {
                                 "ses" -> {
                                     val d = ic.optString("d")
-                                    if (d.isNotEmpty()) sesGeldi(Base64.decode(d, Base64.DEFAULT))
+                                    if (d.isNotEmpty()) sesGeldi(Base64.decode(d, Base64.DEFAULT), ic)
                                 }
                                 "merhaba" -> durumDegisti("telefon bağlandı")
                                 "hoscakal" -> durumDegisti("telefon ayrıldı")
@@ -173,7 +173,7 @@ class TelefonKoprusu(
         ana.removeCallbacks(nabiz)
         if (!acik) return
         val b = bekleme
-        bekleme = minOf(bekleme * 2, 60_000L)
+        bekleme = minOf(bekleme * 2, 10_000L)
         ana.postDelayed({ baglan() }, b)
     }
 }

@@ -40,6 +40,8 @@ class GeminiLive(private val d: Dinleyici) {
     companion object {
         private const val ETIKET = "GeminiLive"
         @Volatile private var sonCalisan: String? = null
+        /** Google Arama aracını kabul etmeyen model/sürüm çiftleri (bir kez denenir, sonra aramasız bağlanılır). */
+        private val aramasizlar = java.util.Collections.synchronizedSet(mutableSetOf<String>())
         private val ORTAK_HTTP: OkHttpClient by lazy {
             OkHttpClient.Builder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -59,6 +61,10 @@ class GeminiLive(private val d: Dinleyici) {
     var modelEtiketi: String? = null
         private set
 
+    /** Bu oturumda Gemini'nin yerleşik Google Araması açık mı. */
+    @Volatile var aramaAcik = false
+        private set
+
     /** Oturum devam tutamacı: bağlantı yenilenince sohbet bağlamı kaybolmaz. */
     @Volatile var tutamac: String? = null
 
@@ -70,27 +76,33 @@ class GeminiLive(private val d: Dinleyici) {
         val hatalar = mutableListOf<String>()
         for (m in sira) {
             for (s in surumler) {
-                try {
-                    tekBaglanti(anahtar, s, m, talimat, araclar)
-                    modelEtiketi = m.etiket
-                    sonCalisan = m.ad
-                    Log.i(ETIKET, "Bağlandı: ${m.etiket} / $s")
-                    return
-                } catch (e: KaliciHata) {
-                    ws?.cancel()
-                    ws = null
-                    throw e // anahtar geçersiz / kota dolu: diğer modelleri denemek boşuna
-                } catch (e: IOException) {
-                    hatalar += "${m.etiket}/$s: ${e.message}"
-                    ws?.cancel()
-                    ws = null
+                val anahtarCift = "${m.ad}/$s"
+                val denemeler = if (anahtarCift in aramasizlar) listOf(false) else listOf(true, false)
+                for (arama in denemeler) {
+                    try {
+                        tekBaglanti(anahtar, s, m, talimat, araclar, arama)
+                        modelEtiketi = m.etiket + if (arama) " + Google Arama" else ""
+                        aramaAcik = arama
+                        sonCalisan = m.ad
+                        Log.i(ETIKET, "Bağlandı: ${m.etiket} / $s / arama=$arama")
+                        return
+                    } catch (e: KaliciHata) {
+                        ws?.cancel()
+                        ws = null
+                        throw e // anahtar geçersiz / kota dolu: diğer modelleri denemek boşuna
+                    } catch (e: IOException) {
+                        hatalar += "${m.etiket}/$s${if (arama) "+arama" else ""}: ${e.message}"
+                        ws?.cancel()
+                        ws = null
+                        if (arama) aramasizlar += anahtarCift
+                    }
                 }
             }
         }
         throw IOException("Gemini Live bağlanamadı. " + hatalar.lastOrNull().orEmpty())
     }
 
-    private suspend fun tekBaglanti(anahtar: String, surum: String, m: Uzak.Model, talimat: String, araclar: JSONArray) {
+    private suspend fun tekBaglanti(anahtar: String, surum: String, m: Uzak.Model, talimat: String, araclar: JSONArray, arama: Boolean) {
         val hazir = CompletableDeferred<Unit>()
         val url = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.$surum." +
             "GenerativeService.BidiGenerateContent?key=" + URLEncoder.encode(anahtar, "UTF-8")
@@ -98,7 +110,7 @@ class GeminiLive(private val d: Dinleyici) {
 
         val dinleyici = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                webSocket.send(kurulumMesaji(m, talimat, araclar).toString())
+                webSocket.send(kurulumMesaji(m, talimat, araclar, arama).toString())
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -149,7 +161,7 @@ class GeminiLive(private val d: Dinleyici) {
         }
     }
 
-    private fun kurulumMesaji(m: Uzak.Model, talimat: String, araclar: JSONArray): JSONObject {
+    private fun kurulumMesaji(m: Uzak.Model, talimat: String, araclar: JSONArray, arama: Boolean): JSONObject {
         val bildirimler = JSONArray()
         for (i in 0 until araclar.length()) {
             val a = JSONObject(araclar.getJSONObject(i).toString())
@@ -174,7 +186,10 @@ class GeminiLive(private val d: Dinleyici) {
             .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", talimat))))
             .put("inputAudioTranscription", JSONObject())
             .put("outputAudioTranscription", JSONObject())
-            .put("tools", JSONArray().put(JSONObject().put("functionDeclarations", bildirimler)))
+            .put("tools", JSONArray().put(JSONObject().put("functionDeclarations", bildirimler)).apply {
+                // Gemini'nin yerleşik Google Araması: güncel bilgiyi (maçlar, haberler, döviz...) kendisi arar.
+                if (arama) put(JSONObject().put("googleSearch", JSONObject()))
+            })
             .put(
                 "realtimeInputConfig", JSONObject().put(
                     "automaticActivityDetection", JSONObject()

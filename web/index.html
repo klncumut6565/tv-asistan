@@ -176,7 +176,10 @@
     const e = Math.max(taban, gurultu * carpan);
     // Jülide konuşurken TV hoparlörünün sesi söz kesme sanılmasın: eşik yükselir, yalnız size yakın,
     // güçlü konuşma Jülide'nin sözünü keser.
-    return julideKonusuyor ? e * 2.5 : e;
+    if (julideKonusuyor) return e * 2.5;
+    // Mobil veride TV'nin "Jülide konuşuyor" bildirimi geç gelir: konuşmanız bittikten sonraki
+    // birkaç saniye Jülide'nin cevabı beklenir; TV hoparlörünün sesi söz kesme sanılmasın.
+    return performance.now() < cevapBekleniyor ? e * 1.8 : e;
   }
 
   function base64(int16) {
@@ -186,13 +189,36 @@
     return btoa(s);
   }
 
+  // Bağlantı kısa süre koparsa (mobil veri) ses kaybolmasın: en çok 3 sn biriktirilir, bağlanınca gönderilir.
+  let bekleyenSes = [], sira = 0, ilkParca = false, cevapBekleniyor = 0;
+  const BEKLEYEN_MS = 3000;
+
+  function yolla(yuk) {
+    if (kanal && bagli) {
+      try { kanal.send({ type: "broadcast", event: "ses", payload: yuk }); return; } catch (_) {}
+    }
+    const simdi = performance.now();
+    bekleyenSes.push({ t: simdi, yuk });
+    bekleyenSes = bekleyenSes.filter((x) => simdi - x.t < BEKLEYEN_MS);
+  }
+
+  function bekleyenleriGonder() {
+    const simdi = performance.now();
+    const l = bekleyenSes.filter((x) => simdi - x.t < BEKLEYEN_MS);
+    bekleyenSes = [];
+    for (const x of l) yolla(x.yuk);
+  }
+
   function gonder(cerceveler) {
-    if (!cerceveler.length || !kanal || !bagli) return;
+    if (!cerceveler.length) return;
     const toplam = cerceveler.reduce((a, c) => a + c.length, 0);
     const pcm = new Int16Array(toplam);
     let o = 0;
     for (const c of cerceveler) { pcm.set(c, o); o += c.length; }
-    kanal.send({ type: "broadcast", event: "ses", payload: { d: base64(pcm) } });
+    // b: konuşmanın ilk parçası · n: sıra · jk: telefon Jülide'nin konuştuğunu biliyor mu (yankı koruması)
+    const yuk = { d: base64(pcm), n: ++sira, b: ilkParca ? 1 : 0, jk: !!julideKonusuyor };
+    ilkParca = false;
+    yolla(yuk);
   }
 
   function cerceveIsle(f32) {
@@ -226,6 +252,7 @@
       konusuyor = true;
       sonKonusma = simdi;
       gonderilecek = oncesi.splice(0);       // konuşma öncesini de ekle
+      ilkParca = true;
       kure.classList.add("konusuyor");
       durum("Konuşuyorsunuz…", "iyi");
     }
@@ -237,6 +264,7 @@
       if (simdi - sonKonusma > KUYRUK_MS) {
         gonder(gonderilecek); gonderilecek = [];
         konusuyor = false;
+        cevapBekleniyor = simdi + 6000;
         kure.classList.remove("konusuyor");
         durum("Dinliyor", "iyi");
       }
@@ -319,7 +347,7 @@
     return new Promise((coz, reddet) => {
       if (!window.supabase) return reddet(new Error("Bağlantı kütüphanesi yüklenemedi (internet?)."));
       istemci = istemci || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
-        realtime: { params: { eventsPerSecond: 20 } },
+        realtime: { params: { eventsPerSecond: 20 }, heartbeatIntervalMs: 15000, timeout: 20000 },
       });
       kanal = istemci.channel("julide-" + kod, { config: { broadcast: { self: false, ack: false } } });
       kanal.on("broadcast", { event: "durum" }, ({ payload }) => {
@@ -333,6 +361,7 @@
         if (st === "SUBSCRIBED") {
           bagli = true;
           kanal.send({ type: "broadcast", event: "merhaba", payload: {} });
+          bekleyenleriGonder();
           if (ilk) { ilk = false; coz(); } else durum("Yeniden bağlandı", "iyi");
         } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
           bagli = false;
@@ -412,7 +441,9 @@
   function halGuncelle(h) {
     const onceki = oturumAcik;
     oturumAcik = !!h.oturum;
+    const oncekiKonusma = julideKonusuyor;
     julideKonusuyor = oturumAcik && !!h.konusuyor;
+    if (oncekiKonusma && !julideKonusuyor) cevapBekleniyor = 0; // Jülide sustu: normal hassasiyete dön
     julideDugmesi();
     if (!oturumAcik) {
       kure.classList.remove("acik", "konusuyor");
