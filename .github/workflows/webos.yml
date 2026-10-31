@@ -1,0 +1,38 @@
+name: webOS Paketi (LG TV)
+
+# webos/ klasörünü LG webOS .ipk paketine çevirir ve "webos-v…" etiketli ayrı bir sürüme ekler.
+# ÖNEMLİ: make_latest=false — Android Jülide'nin otomatik güncellemesi "en son sürüm"e bakar; webOS paketi onu etkilememeli.
+on:
+  push:
+    branches: [main]
+    paths: ['webos/**', '.github/workflows/webos.yml']
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  paketle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Sürüm numarası
+        run: |
+          jq --arg v "0.1.${{ github.run_number }}" '.version=$v' webos/appinfo.json > /tmp/a.json && mv /tmp/a.json webos/appinfo.json
+          cat webos/appinfo.json
+      - name: ares-package
+        run: |
+          npm i -g @webos-tools/cli@3
+          ares-package webos -o cikti
+          ls -la cikti
+          cp cikti/*.ipk julide-webos.ipk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: webos-v0.1.${{ github.run_number }}
+          name: Jülide webOS 0.1.${{ github.run_number }}
+          files: julide-webos.ipk
+          make_latest: false
+          prerelease: true

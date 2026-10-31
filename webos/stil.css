@@ -1,0 +1,29 @@
+:root { --zemin: #0f0b1a; --kart: #1c1530; --yazi: #f3effa; --soluk: #a99cc4; --mor: #a855f7; --iyi: #34d399; --hata: #f87171; }
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--zemin); color: var(--yazi);
+  font-family: "LG Smart UI", "Segoe UI", Roboto, sans-serif; }
+main { padding: 48px 72px; }
+header { display: flex; align-items: center; gap: 28px; }
+.logo { width: 110px; height: 110px; border-radius: 50%; box-shadow: 0 0 40px rgba(168, 85, 247, .5); }
+h1 { margin: 0; font-size: 64px; letter-spacing: 1px; }
+.alt { margin: 4px 0 0; color: var(--soluk); font-size: 26px; }
+.durum { margin: 28px 0 10px; font-size: 32px; padding: 16px 24px; border-radius: 14px; background: var(--kart); min-height: 70px; }
+.durum.iyi { border-left: 8px solid var(--iyi); }
+.durum.hata { border-left: 8px solid var(--hata); }
+.satir { display: flex; gap: 20px; min-height: 44px; }
+.soz { font-size: 24px; color: var(--soluk); flex: 1; }
+.kartlar { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 28px; margin-top: 18px; }
+.kart { background: var(--kart); border-radius: 22px; padding: 26px 30px; }
+.kart h2 { margin: 0 0 16px; font-size: 30px; }
+.qr { background: #fff; border-radius: 14px; padding: 12px; width: 300px; height: 300px; }
+.qr svg { width: 100%; height: 100%; }
+.kucuk { color: var(--soluk); font-size: 20px; margin: 12px 0 0; word-break: break-all; }
+.kod { font-size: 28px; margin: 10px 0 0; }
+.kod b { letter-spacing: 4px; color: var(--mor); }
+.islemler button { display: block; width: 100%; margin: 0 0 14px; padding: 18px 22px; font-size: 26px; border-radius: 14px;
+  border: 3px solid transparent; background: #2a2045; color: var(--yazi); text-align: left; }
+.islemler button:focus { outline: none; border-color: var(--mor); background: #3b2b63; transform: scale(1.02); }
+.teshis { white-space: pre-wrap; font-size: 18px; color: var(--soluk); max-height: 250px; overflow: hidden; margin: 6px 0 0; }
+details { margin-top: 20px; }
+summary { font-size: 22px; color: var(--soluk); }
+.gunluk { font-size: 18px; color: var(--soluk); max-height: 120px; overflow: hidden; font-family: monospace; }

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Jülide</title>
+<link rel="stylesheet" href="stil.css">
+</head>
+<body>
+<main>
+  <header>
+    <img src="largeIcon.png" alt="" class="logo">
+    <div>
+      <h1>Jülide</h1>
+      <p class="alt">Türkçe sesli asistan · LG webOS</p>
+    </div>
+  </header>
+
+  <div id="durum" class="durum">Yükleniyor…</div>
+  <div class="satir">
+    <div id="soz" class="soz"></div>
+    <div id="cevap" class="soz cevap"></div>
+  </div>
+
+  <section class="kartlar">
+    <div class="kart">
+      <h2>📱 Telefon mikrofonu</h2>
+      <div id="telefonQr" class="qr"></div>
+      <p class="kucuk" id="adres"></p>
+      <p class="kod">Kod: <b id="kod"></b></p>
+      <p id="telefon" class="kucuk">Telefon bekleniyor</p>
+    </div>
+    <div class="kart">
+      <h2>🔑 Gemini API anahtarı</h2>
+      <div id="anahtarQr" class="qr"></div>
+      <p id="anahtarDurum" class="kucuk"></p>
+    </div>
+    <div class="kart islemler">
+      <h2>İşlemler</h2>
+      <button id="sohbet">Sohbeti başlat</button>
+      <button id="lg">LG kontrolünü bağla</button>
+      <button id="teshis">Teşhis (bu TV neleri destekliyor?)</button>
+      <button id="yeniKod">Yeni eşleştirme kodu</button>
+      <pre id="teshisSonuc" class="teshis"></pre>
+    </div>
+  </section>
+
+  <details open><summary>Günlük</summary><div id="gunluk" class="gunluk"></div></details>
+</main>
+<script src="lib/supabase.js"></script>
+<script src="lib/paket.js"></script>
+<script src="js/lg.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/arastirma.js"></script>
+<script src="js/araclar.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
