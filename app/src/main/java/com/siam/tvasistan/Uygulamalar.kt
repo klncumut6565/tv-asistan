@@ -75,6 +75,24 @@ object Uygulamalar {
             .distinctBy { it.paket }
     }
 
+    /**
+     * Web sayfası açılacak tarayıcı: yalnızca Jülide ayarlarında AKTİF olanlardan seçilir
+     * (Android'in varsayılan tarayıcısı pasif yapılmış olsa bile ona gidilmez).
+     * Öncelik: tercih edilen paket (aktifse) → adı "Tarayıcı/Browser/Internet" olan → ilk aktif tarayıcı.
+     */
+    fun aktifTarayici(ctx: Context, tercih: String? = null): String? {
+        val aktifler = liste(ctx).map { it.paket }.toSet()
+        val l = tarayicilar(ctx).filter { it.paket in aktifler && it.paket != ctx.packageName }
+        if (l.isEmpty()) return null
+        tercih?.let { t -> l.firstOrNull { it.paket == t }?.let { return it.paket } }
+        return (l.firstOrNull { normal(it.ad).let { a -> a == "tarayici" || a.startsWith("tarayici") } }
+            ?: l.firstOrNull { normal(it.ad).let { a -> "tarayici" in a || "browser" in a || "internet" in a } }
+            ?: l.first()).paket
+    }
+
+    /** Paket Jülide ayarlarında pasif mi. */
+    fun pasifMi(ctx: Context, paket: String): Boolean = paket in Ayarlar(ctx).pasifUygulamalar
+
     private val TARAYICI_KELIMELERI = setOf("tarayici", "internet", "browser", "web", "chrome")
 
     /** İsme göre en iyi eşleşmeler (en iyisi başta). */

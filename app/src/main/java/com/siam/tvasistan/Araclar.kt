@@ -788,7 +788,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             abonelikler.firstOrNull { val nb = Uygulamalar.normal(it); na.contains(nb) || nb.contains(na) }
                 ?.let { return Baglam.ABONELIK to it }
         }
-        if (paket in tarayiciPaketleri() && !n.contains("youtube")) return Baglam.TARAYICI to (ad ?: "tarayıcı")
+        if (paket in tarayiciPaketleri() && !n.contains("youtube")) return Baglam.TARAYICI to (ad ?: "tarayıcı") // webAra pasifse başka aktif tarayıcı seçer
         return Baglam.DIGER to ad
     }
 
@@ -841,18 +841,21 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             return tamam("YouTube'da '$q' arandı.")
         val url = "https://www.youtube.com/results?search_query=${enc(q)}"
         if (baslat(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(yt))) return tamam("YouTube'da '$q' arandı.")
-        if (baslat(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) return tamam("YouTube araması tarayıcıda açıldı.")
+        Uygulamalar.aktifTarayici(s)?.let { p ->
+            if (baslat(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(p))) return tamam("YouTube araması tarayıcıda açıldı.")
+        }
         return hata("YouTube açılamadı.")
     }
+
+    private val TARAYICI_YOK = "Jülide ayarlarında AKTİF bir tarayıcı yok (kurulu tarayıcılar pasif yapılmış ya da hiç yok). Kullanıcı Jülide uygulamasından bir tarayıcıyı aktif yapmalı."
 
     private fun webAra(q: String, tarayici: String? = null): JSONObject {
         if (q.isBlank()) return hata("Arama metni boş.")
         val onceImza = ekranImzasi()
         val oncePaket = s.aktifPaket
         val adres = Uri.parse("https://www.google.com/search?q=${enc(q)}")
-        val ayniTarayicida = tarayici != null && baslat(Intent(Intent.ACTION_VIEW, adres).setPackage(tarayici))
-        if (!ayniTarayicida && !baslat(Intent(Intent.ACTION_VIEW, adres)))
-            return hata("TV'de tarayıcı bulunamadı. Play Store'dan bir tarayıcı (ör. TV Bro, Puffin TV) kurulmalı.")
+        val paket = Uygulamalar.aktifTarayici(s, tarayici) ?: return hata(TARAYICI_YOK)
+        if (!baslat(Intent(Intent.ACTION_VIEW, adres).setPackage(paket))) return hata(TARAYICI_YOK)
         return dogrula(onceImza, oncePaket, "Tarayıcıda '$q' araması")
     }
 
@@ -892,7 +895,8 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         if (ozelAdresMi(Uri.parse(adres).host)) return hata("Yerel ağ ve özel IP adresleri açılamaz.")
         val onceImza = ekranImzasi()
         val oncePaket = s.aktifPaket
-        if (!baslat(Intent(Intent.ACTION_VIEW, Uri.parse(adres)))) return hata("TV'de tarayıcı bulunamadı.")
+        val paket = Uygulamalar.aktifTarayici(s, s.aktifPaket) ?: return hata(TARAYICI_YOK)
+        if (!baslat(Intent(Intent.ACTION_VIEW, Uri.parse(adres)).setPackage(paket))) return hata(TARAYICI_YOK)
         return dogrula(onceImza, oncePaket, "$adres adresini açma")
     }
 
