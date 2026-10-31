@@ -27,8 +27,8 @@ import javax.crypto.Cipher
  * yok (content://android.media.tv/channel boş), bu yüzden kanal değiştirmenin tek güvenilir yolu gerçek
  * tuş basmaktır: "input keyevent".
  *
- * GÜVENLİK: dışarıya yalnız [tuslar] açıktır ve yalnız tamsayı tuş kodlarından "input keyevent ..." komutu
- * kurar; serbest kabuk komutu çalıştırılamaz. İlk bağlantıda TV ekranında "Hata ayıklamaya izin verilsin mi?"
+ * GÜVENLİK: dışarıya yalnız [tuslar] ve [dokun] açıktır; yalnız tamsayılardan "input keyevent ..." /
+ * "input tap X Y" komutu kurar; serbest kabuk komutu çalıştırılamaz. İlk bağlantıda TV ekranında "Hata ayıklamaya izin verilsin mi?"
  * sorusu çıkar; "Her zaman izin ver" işaretlenip onaylanınca bir daha sorulmaz. Anahtar yalnız bu TV'de,
  * uygulamanın özel klasöründe saklanır.
  *
@@ -72,6 +72,16 @@ class Adb(private val ctx: Context) {
     fun tuslar(kodlar: List<Int>) {
         require(kodlar.isNotEmpty() && kodlar.size <= 12 && kodlar.all { it in 1..400 })
         komut("input keyevent " + kodlar.joinToString(" "))
+    }
+
+    /**
+     * GERÇEK dokunma (input tap): dokunmatik ekranı olmayan TV'de de çalışır; tarayıcılar bunu gerçek tıklama
+     * olarak alır. GÜVENLİK: yalnız tamsayı koordinat kabul edilir, serbest komut kurulamaz.
+     */
+    fun dokun(x: Int, y: Int, cift: Boolean = false) {
+        require(x in 0..8000 && y in 0..8000)
+        val t = "input tap $x $y"
+        komut(if (cift) "$t; sleep 0.12; $t" else t)
     }
 
     /** Bağlantıyı dener (ayar ekranındaki "etkinleştir" düğmesi). */

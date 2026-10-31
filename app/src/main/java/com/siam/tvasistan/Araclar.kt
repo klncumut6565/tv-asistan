@@ -1011,6 +1011,16 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
      * (dispatchGesture true dönse bile hareket iptal edilebilir: bazı TV'lerde dokunmatik ekran yok).
      */
     private fun hareket(x: Float, y: Float, cift: Boolean, sureMs: Long = 90): Boolean {
+        // 1) GERÇEK dokunma: TV'nin kendi ADB'si üzerinden "input tap" (dokunmatik ekran gerekmez)
+        try {
+            adb.dokun(x.toInt(), y.toInt(), cift)
+            Log.i("TvAsistan", "ADB dokunma ($x,$y) cift=$cift → gönderildi")
+            return true
+        } catch (e: Exception) {
+            Log.w("TvAsistan", "ADB dokunma yapılamadı: ${e.message}; erişilebilirlik hareketi denenecek")
+            sonAdbHatasi = e.message
+        }
+        // 2) Erişilebilirlik hareketi (bazı TV'lerde iptal edilir)
         val b = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 0, sureMs))
         if (cift) b.addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, sureMs + 110, sureMs))
@@ -1025,6 +1035,8 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         Log.i("TvAsistan", "Dokunma ($x,$y) cift=$cift → ${if (tamam) "uygulandı" else "İPTAL"}")
         return tamam
     }
+
+    @Volatile private var sonAdbHatasi: String? = null
 
     /** İmlecin altındaki EN KÜÇÜK görünür düğüm (yazısız bağlantılar/görseller dahil). */
     private fun imlecAltindakiDugum(x: Int, y: Int): AccessibilityNodeInfo? {
@@ -1061,6 +1073,14 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
         fun degisti(imza: Int, paket: String?) = degisimiBekle(imza, paket, 3500) && !hataSayfasiMi()
 
+        // 0) GERÇEK dokunma (ADB input tap) — kumandanın OK tuşuyla aynı etki, imlecin tam altına
+        run {
+            val i = ekranImzasi()
+            val ok = hareket(x, y, cift)
+            denenen += if (sonAdbHatasi == null) "gerçek dokunma (ADB)" else "dokunma (ADB yok: $sonAdbHatasi)"
+            sonAdbHatasi = null
+            if (ok && degisti(i, oncePaket)) return tamam("İmleçle ${ad?.let { "'$it' " } ?: ""}tıklandı: DOĞRULANDI, sayfa değişti.")
+        }
         // 1) Erişilebilirlik tıklaması
         if (hedef != null) {
             val i = ekranImzasi()
@@ -1077,13 +1097,6 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             val ok = tekBas("tamam")
             denenen += "odak + Tamam tuşu (${if (ok) "gönderildi" else "yok"})"
             if (ok && degisti(i, s.aktifPaket)) return tamam("İmleçle ${ad?.let { "'$it' " } ?: ""}seçildi (Tamam tuşu): DOĞRULANDI.")
-        }
-        // 3) Dokunma hareketi
-        run {
-            val i = ekranImzasi()
-            val ok = hareket(x, y, cift)
-            denenen += "dokunma (${if (ok) "uygulandı" else "TV dokunmayı iptal etti"})"
-            if (ok && degisti(i, s.aktifPaket)) return tamam("İmleçle dokunuldu: DOĞRULANDI, sayfa değişti.")
         }
         // 4) Bağlantının yazısıyla tıkla
         if (!ad.isNullOrBlank() && ad.length >= 3) {
@@ -1137,6 +1150,14 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     }
 
     private fun tekBas(t: String): Boolean {
+        // Önce GERÇEK kumanda tuşu (ADB input keyevent): tarayıcıların kendi imleci/odağı bunu dinler.
+        val kod = when (t) {
+            "tamam" -> 23; "yukari" -> 19; "asagi" -> 20; "sol" -> 21; "sag" -> 22; "geri" -> 4
+            else -> null
+        }
+        if (kod != null) {
+            try { adb.tuslar(listOf(kod)); return true } catch (e: Exception) { Log.w("TvAsistan", "ADB tuşu ($t): ${e.message}") }
+        }
         when (t) {
             "geri" -> return s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             "ana_ekran" -> return s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
