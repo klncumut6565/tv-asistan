@@ -105,8 +105,13 @@ object Arastirmaci {
 
         // 3) Sayfa içeriği: sosyal medya hariç en iyi 3 kaynak paralel okunur
         val okunacak = degerlendirilen.filter { it.durum == IcerikDurumu.ALINMADI && it.tur != KaynakTuru.SOSYAL }.take(OKUMA_SINIRI)
-        val gorevler = okunacak.map { d ->
-            Callable {
+        val gorevler = okunacak.map { d -> Callable<Unit> { oku(d) } }
+        val kalan = (18_000 - (System.currentTimeMillis() - baslangic)).coerceAtLeast(3_000)
+        runCatching { havuz.invokeAll(gorevler, kalan, TimeUnit.MILLISECONDS) }
+        return paketle(sorgu, aramaMetni, degerlendirilen)
+    }
+
+    private fun oku(d: Degerlendirilmis) {
                 try {
                     val y = WebAlici.getir(d.aday.adres)
                     d.sayfaTarihi = Kaynak.tarihBul(y.metin)
@@ -119,11 +124,9 @@ object Arastirmaci {
                 } catch (e: Exception) {
                     d.durum = IcerikDurumu.BASARISIZ
                 }
-            }
-        }
-        val kalan = (18_000 - (System.currentTimeMillis() - baslangic)).coerceAtLeast(3_000)
-        runCatching { havuz.invokeAll(gorevler, kalan, TimeUnit.MILLISECONDS) }
+    }
 
+    private fun paketle(sorgu: String, aramaMetni: String, degerlendirilen: List<Degerlendirilmis>): JSONObject {
         // 4) Bağımsızlık ve kanıt düzeyi
         Kaynak.kopyalariIsaretle(degerlendirilen)
         val duzey = Kaynak.kanitDuzeyi(degerlendirilen)
