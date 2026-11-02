@@ -43,14 +43,12 @@ object Uzak {
     private val ADRES = "https://raw.githubusercontent.com/${BuildConfig.GUNCELLEME_REPO}/main/config/ayarlar.json"
     private val MODEL_DESENI = Regex("^models/gemini-[a-z0-9.\\-]{1,60}$")
     /**
-     * Gemini'nin resmî 30 hazır sesi (ai.google.dev/gemini-api/docs/speech-generation). Listede olmayan ad
-     * Gemini bağlantısını reddettirir; bu yüzden yalnız bunlar kabul edilir, gerisi "Kore"ye düşer.
+     * YALNIZ KADIN sesleri (Jülide kadın asistan): Google Cloud Gemini-TTS ses tablosunda "Female" olan 14 resmî ses
+     * (docs.cloud.google.com/text-to-speech/docs/gemini-tts). Listede olmayan ya da erkek ses adı → "Kore".
      */
     val SESLER = setOf(
-        "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe",
-        "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia",
-        "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix",
-        "Sadachbia", "Sadaltager", "Sulafat",
+        "Kore", "Sulafat", "Vindemiatrix", "Achernar", "Aoede", "Callirrhoe", "Despina",
+        "Autonoe", "Erinome", "Gacrux", "Laomedeia", "Leda", "Pulcherrima", "Zephyr",
     )
 
     /** Ses adını doğrular (büyük/küçük harf duyarsız); geçersizse Kore. */

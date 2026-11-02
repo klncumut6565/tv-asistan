@@ -11,10 +11,8 @@
     { ad: "models/gemini-2.5-flash-native-audio-preview-12-2025", etiket: "Gemini 2.5 Flash Native Audio" },
   ];
   const kotaDolu = {}; // model → zaman
-  // Gemini'nin resmî hazır sesleri; listede olmayan ad bağlantıyı bozar → Kore
-  const SESLER = ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus",
-    "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux",
-    "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"];
+  // Gemini'nin resmî KADIN sesleri; listede olmayan/erkek ad → Kore
+  const SESLER = ["Kore", "Sulafat", "Vindemiatrix", "Achernar", "Aoede", "Callirrhoe", "Despina", "Autonoe", "Erinome", "Gacrux", "Laomedeia", "Leda", "Pulcherrima", "Zephyr"]; // yalnız kadın sesleri
 
   const kotaMi = (m) => /quota|resource_exhausted|resource exhausted|rate limit|exceeded/i.test(m || "");
 

@@ -14,6 +14,8 @@ class UzakSesTest {
         assertEquals("Kore", Uzak.sesDogrula("Quip"))
         assertEquals("Kore", Uzak.sesDogrula(""))
         assertEquals("Kore", Uzak.sesDogrula(null))
-        assertEquals(30, Uzak.SESLER.size)
+        assertEquals("Kore", Uzak.sesDogrula("Achird"))   // erkek ses kabul edilmez
+        assertEquals("Kore", Uzak.sesDogrula("Puck"))
+        assertEquals(14, Uzak.SESLER.size)
     }
 }
