@@ -109,7 +109,12 @@ class Araclar(private val s: AsistanServisi) {
             ), listOf("ad")))
         .put(fn("icerik_ara", "TV'nin genel içerik araması (tüm uygulamalar). Film/dizi için KULLANMA; abonelikte_ara kullan.",
             listOf(P("sorgu", "STRING", "Aranacak film/dizi/kişi adı")), listOf("sorgu")))
-        .put(fn("youtube_ara", "YouTube uygulamasında arama yapar.",
+        .put(fn("youtube_oynat", "YouTube'da istenen videoyu/şarkıyı DOĞRUDAN BAŞLATIR (arama sonucuna tıklamaya gerek yok). 'YouTube'da X'i aç/oynat/çal/izle', 'Tarkan'ın şarkısını aç' gibi isteklerde BUNU kullan. Sonuçtaki diğer videolar listesini de döndürür; kullanıcı 'ikincisini aç' derse sira=2 ile tekrar çağır.",
+            listOf(
+                P("sorgu", "STRING", "Ne aranacak, ör. 'Yıldız Tilbe Delikanlım', 'Ahmet Kaya şarkıları'"),
+                P("sira", "INTEGER", "Kaçıncı sonuç açılsın (1 = ilk; kullanıcı 'ikincisi/başka bir tane' derse 2, 3...)")
+            ), listOf("sorgu")))
+        .put(fn("youtube_ara", "YouTube uygulamasında yalnızca ARAMA SONUÇLARINI gösterir (video başlatmaz). Kullanıcı 'YouTube'da ara / sonuçları göster' derse kullan; video açmak için youtube_oynat.",
             listOf(P("sorgu", "STRING", "Aranacak metin")), listOf("sorgu")))
         .put(fn("web_ara", "Tarayıcıda Google araması açar.",
             listOf(P("sorgu", "STRING", "Aranacak metin")), listOf("sorgu")))
@@ -200,7 +205,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - TARAYICIDA FİLM: Kullanıcı tarayıcıdan film izlemek isterse: akilli_ara(platform=tarayıcı) → sonuç linkine tikla (yazıyla) ya da numaralari_goster → numaraya_tikla. Film sayfası açılınca video_oynat (ortadaki ▶), sonra video_tam_ekran. Reklam sekmesi/yeni sayfa açılırsa tus: geri ile dön ve tekrar dene. "Sayfayı büyüt/küçült", "yazılar küçük" → sayfa_boyutu. Kullanıcı "imleci göster", "sağa götür", "biraz aşağı", "şuna tıkla" derse → imlec (goster/tasi/git/oge/tikla). İmleç modu otomatik: linkler algılanıyorsa el işareti, algılanmıyorsa fare oku; kullanıcı açıkça "fare" ya da "el" isterse mod ile ver. İmleç taşındıktan sonra altındaki öğeyi kısaca söyle; tıklamadan önce emin değilsen sor.
 - MÜZİK: Kullanıcının SPOTIFY üyeliği var. "Spotify'dan X aç / çal" → spotify_ara (ya da akilli_ara platform=Spotify). Spotify açıkken ya da ana ekrandayken şarkı istenirse Spotify kullanılır; YouTube açıkken platform söylenmezse YouTube'da aranır. Sonuçlar gelince ekrani_oku ile bak: kullanıcı belirli şarkıyı söylediyse ONU, "herhangi biri / fark etmez / bir şarkısını aç" dediyse İLK ŞARKIYI seç (tikla). Kullanıcı "neler var" derse ilk birkaç şarkıyı oku ve hangisini istediğini sor; numara veya ad söyleyince ona tikla.
 - FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken film-dizi akilli_ara ile aboneliklerde aranır. Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
-- "YouTube'da X" → akilli_ara(platform=YouTube). "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
+- "YouTube'da X'i aç / oynat / çal / izle", "X şarkısını aç" (YouTube açıkken ya da YouTube denildiğinde) → youtube_oynat: videoyu DOĞRUDAN başlatır, sonuç sayfasına tıklamaya gerek yok. "İkincisini / başka birini aç" → aynı sorgu ile sira=2, 3... Yalnızca "YouTube'da ara, sonuçları göster" denirse youtube_ara. "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
 - Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal" → kanal_kaydet. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
@@ -275,6 +280,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "abonelikte_ara" -> abonelikteAra(a.optString("ad"), a.optString("uygulama"))
             "icerik_ara" -> icerikAra(a.optString("sorgu"))
             "youtube_ara" -> youtubeAra(a.optString("sorgu"))
+            "youtube_oynat" -> youtubeOynat(a.optString("sorgu"), a.optInt("sira", 1))
             "web_ara" -> webAra(a.optString("sorgu"))
             "url_ac" -> urlAc(a.optString("url"))
             "ekrani_oku" -> ekraniOku()
@@ -832,6 +838,36 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         if (baslat(katniss)) return tamam("Google TV aramasında '$q' açıldı.")
         val web = webAra("$q izle")
         return if (web.has("sonuc")) tamam("TV araması yok, tarayıcıda arandı: '$q'.") else web
+    }
+
+    @Volatile private var sonYtSorgu = ""
+    @Volatile private var sonYtSonuclar: List<com.siam.tvasistan.arastirma.YouTubeBulucu.Video> = emptyList()
+
+    /** Video kimliğini bulup YouTube uygulamasına doğrudan açtırır; açıldığını doğrular. */
+    private fun youtubeOynat(q: String, sira: Int): JSONObject {
+        if (q.isBlank()) return hata("Ne açılacağı belirtilmedi.")
+        val yt = Uygulamalar.bul(s, "YouTube").firstOrNull { it.paket.contains("youtube", true) && !it.paket.contains("music", true) }?.paket
+            ?: return hata(if (Uygulamalar.bul(s, "YouTube", pasifDahil = true).isNotEmpty()) "YouTube Jülide ayarlarında PASİF yapılmış." else "YouTube TV'de kurulu değil.")
+        val sonuclar = if (q.equals(sonYtSorgu, true) && sonYtSonuclar.isNotEmpty()) sonYtSonuclar
+            else com.siam.tvasistan.arastirma.YouTubeBulucu.bul(q).also { sonYtSorgu = q; sonYtSonuclar = it }
+        if (sonuclar.isEmpty()) {
+            // Video bulunamadıysa en azından arama sonuçlarını göster
+            val y = youtubeAra(q)
+            return hata("'$q' için video kimliği bulunamadı (internet ya da YouTube erişimi). " +
+                (if (y.has("sonuc")) "Arama sonuçları ekranda; kullanıcıdan seçmesini iste ya da tus/numaralari_goster ile seç." else ""))
+        }
+        val i = (sira - 1).coerceIn(0, sonuclar.size - 1)
+        val v = sonuclar[i]
+        val onceImza = ekranImzasi(); val oncePaket = s.aktifPaket
+        val acildi = baslat(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${v.id}")).setPackage(yt))
+            || baslat(Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:${v.id}")).setPackage(yt))
+        if (!acildi) return hata("YouTube video açma isteğini kabul etmedi.$ACILMADI")
+        var b = 0
+        while (s.aktifPaket != yt && b < 25) { SystemClock.sleep(200); b++ }
+        val d = dogrula(onceImza, oncePaket, "YouTube'da '${v.baslik}' videosunu başlatma")
+        val digerleri = JSONArray(sonuclar.mapIndexed { n, x -> "${n + 1}. ${x.baslik.take(70)}${x.kanal?.let { " ($it)" } ?: ""}" })
+        return (if (s.aktifPaket == yt || d.has("sonuc")) tamam("Video başlatıldı (DOĞRULANDI): ${v.baslik}${v.kanal?.let { " — $it" } ?: ""}. Kullanıcıya hangi videoyu açtığını adıyla kısaca söyle.")
+            else d).put("diger_sonuclar", digerleri)
     }
 
     private fun youtubeAra(q: String): JSONObject {

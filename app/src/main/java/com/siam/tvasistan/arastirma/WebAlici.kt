@@ -33,7 +33,7 @@ object WebAlici {
 
     class Yanit(val adres: String, val metin: String, val tur: String)
 
-    fun getir(adres: String, sinir: Long = 700_000, httpIzin: Boolean = false): Yanit {
+    fun getir(adres: String, sinir: Long = 700_000, httpIzin: Boolean = false, ekBasliklar: Map<String, String> = emptyMap()): Yanit {
         var url = adres
         repeat(5) {
             if (!Kaynak.guvenliAdres(url) && !(httpIzin && url.startsWith("http://"))) throw IOException("Güvensiz adres: $url")
@@ -41,6 +41,7 @@ object WebAlici {
                 .header("User-Agent", TARAYICI)
                 .header("Accept-Language", "tr-TR,tr;q=0.9,en;q=0.5")
                 .header("Accept", "text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.5")
+                .apply { ekBasliklar.forEach { (k, v) -> header(k, v) } }
                 .build()
             http.newCall(istek).execute().use { r ->
                 if (r.isRedirect) {
