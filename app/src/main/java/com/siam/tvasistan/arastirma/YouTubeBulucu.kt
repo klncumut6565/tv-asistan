@@ -36,10 +36,13 @@ object YouTubeBulucu {
     internal fun sonucAyristir(html: String): List<Video> {
         val l = mutableListOf<Video>()
         val gorulen = mutableSetOf<String>()
-        for (m in Regex("\"videoRenderer\":\\{\"videoId\":\"([A-Za-z0-9_-]{11})\"").findAll(html)) {
+        val eslesmeler = Regex("\"videoRenderer\":\\{\"videoId\":\"([A-Za-z0-9_-]{11})\"").findAll(html).toList()
+        for ((n, m) in eslesmeler.withIndex()) {
             val id = m.groupValues[1]
             if (!gorulen.add(id)) continue
-            val parca = html.substring(m.range.first, minOf(html.length, m.range.first + 6000))
+            // Yalnız BU videonun kaydı (sonraki videonun "canlı" işareti karışmasın)
+            val son = minOf(html.length, m.range.first + 6000, eslesmeler.getOrNull(n + 1)?.range?.first ?: Int.MAX_VALUE)
+            val parca = html.substring(m.range.first, son)
             val baslik = Regex("\"title\":\\{\"runs\":\\[\\{\"text\":\"((?:[^\"\\\\]|\\\\.)*)\"").find(parca)?.groupValues?.get(1)
                 ?: Regex("\"title\":\\{\"accessibility\".*?\"label\":\"((?:[^\"\\\\]|\\\\.)*)\"").find(parca)?.groupValues?.get(1)
                 ?: continue
