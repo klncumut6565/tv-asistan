@@ -6,6 +6,14 @@ import android.content.Context
 class Ayarlar(ctx: Context) {
     private val p = ctx.applicationContext.getSharedPreferences("tv_asistan", Context.MODE_PRIVATE)
 
+    init {
+        // Bir kerelik: konuşma kopması sonrası ses düzeni sorunsuz sürüme (ada1f8f) döner — ses Kore, duygu uyumu kapalı.
+        // Kullanıcı sonra telefondan başka ses seçebilir; bu sıfırlama bir daha çalışmaz.
+        if (!p.getBoolean("ses_sifirlama_v1", false)) {
+            p.edit().putString("ses_tercihi", "").putInt("duygu_tercihi", 0).putBoolean("ses_sifirlama_v1", true).apply()
+        }
+    }
+
     /** Kullanıcının kendi Gemini API anahtarı (aistudio.google.com). APK'da/repoda YOKTUR. */
     var geminiAnahtari: String
         get() {
