@@ -77,6 +77,10 @@
   details.ayar summary { cursor: pointer; text-align: center; padding: 8px; list-style: none; }
   details.ayar summary::-webkit-details-marker { display: none; }
   details.ayar[open] summary { margin-bottom: 8px; }
+  select { width: 100%; font-size: 16px; padding: 12px; border-radius: 12px; background: transparent; color: var(--yazi); border: 1px solid var(--cizgi); margin: 8px 0; }
+  select option { color: #111; }
+  .onay { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--soluk); margin: 6px 0 12px; }
+  #sesKart button { margin-top: 4px; }
   details.ayar .kart + .kart { margin-top: 12px; }
   .tvdurum { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; color: var(--soluk); margin: -4px 0 4px; }
   .isik { width: 12px; height: 12px; border-radius: 50%; background: #6b7280; flex: none; }
@@ -114,6 +118,28 @@
       <div class="satir"><span>Hassasiyet</span><span id="hassasDeger"></span></div>
       <input id="hassas" type="range" min="1" max="10" step="1" value="6">
       <p class="ipucu">Jülide sizi duymuyorsa artırın; TV sesini konuşma sanıyorsa azaltın.</p>
+    </section>
+    <section class="kart" id="sesKart">
+      <label for="sesSec">🎙️ Jülide'nin sesi</label>
+      <select id="sesSec">
+        <option value="Sulafat">Sulafat — sıcak</option>
+        <option value="Vindemiatrix">Vindemiatrix — nazik</option>
+        <option value="Achernar">Achernar — yumuşak</option>
+        <option value="Aoede">Aoede — rahat, ferah</option>
+        <option value="Callirrhoe">Callirrhoe — sakin, rahat</option>
+        <option value="Despina">Despina — akıcı</option>
+        <option value="Kore">Kore — kararlı (eski varsayılan)</option>
+        <option value="Gacrux">Gacrux — olgun</option>
+        <option value="Erinome">Erinome — net</option>
+        <option value="Autonoe">Autonoe — parlak</option>
+        <option value="Zephyr">Zephyr — parlak</option>
+        <option value="Leda">Leda — genç</option>
+        <option value="Laomedeia">Laomedeia — neşeli</option>
+        <option value="Pulcherrima">Pulcherrima — atılgan</option>
+      </select>
+      <label class="onay"><input type="checkbox" id="duygu"> Duygu uyumu (deneysel: tonunu sizin ses tonunuza uydurur)</label>
+      <button id="sesKaydet" class="ikincil">Kaydet ve TV'ye gönder</button>
+      <p class="ipucu" id="sesDurum">Yalnız kadın sesleri. Sohbet açıksa Jülide yeni sesle yeniden başlar.</p>
     </section>
   </details>
 
@@ -495,7 +521,14 @@
     isikMetin.textContent = acik ? ("TV açık · Jülide " + (sonOturum ? "sohbette" : "hazır"))
       : ulasiliyor ? "TV kapalı (bekleme modunda)" : "TV kapalı ya da çevrimdışı";
   }
+  const sesSec = $("sesSec"), duyguEl = $("duygu"), sesDurum = $("sesDurum");
+  let sesGonderiliyor = null;
   function gorundu(p) {
+    if (p && p.ses && !sesGonderiliyor) {
+      if ([...sesSec.options].some((o) => o.value === p.ses)) sesSec.value = p.ses;
+      if (typeof p.duygu === "boolean") duyguEl.checked = p.duygu;
+      sesDurum.textContent = "TV'de şu an: " + p.ses + (p.duygu ? " · duygu uyumu açık" : "");
+    }
     sonGorulme = Date.now();
     if (p && typeof p.oturum === "boolean") sonOturum = p.oturum;
     if (p && typeof p.ekran === "boolean") ekran = p.ekran;
@@ -509,11 +542,31 @@
     izleIstemci = izleIstemci || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { realtime: { params: { eventsPerSecond: 5 } } });
     izleKanal = izleIstemci.channel("julide-" + kod, { config: { broadcast: { self: false, ack: false } } });
     ["hal", "durum", "nabiz"].forEach((e) => izleKanal.on("broadcast", { event: e }, ({ payload }) => gorundu(e === "durum" ? null : payload)));
+    izleKanal.on("broadcast", { event: "ses_onay" }, ({ payload }) => {
+      clearTimeout(sesGonderiliyor); sesGonderiliyor = null;
+      const p = payload || {};
+      sesDurum.textContent = "✓ TV'de ses: " + p.ses + (p.yeniden_baslatildi ? " — sohbet yeni sesle yeniden başlatıldı" : " — bir sonraki sohbette geçerli");
+      $("sesKaydet").disabled = false;
+    });
     izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
     clearInterval(yoklama);
     yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);
   }
   setInterval(isikYaz, 5000);
+  sesSec.value = oku("julide_ses") || "Sulafat";
+  duyguEl.checked = oku("julide_duygu") === "1";
+  $("sesKaydet").addEventListener("click", () => {
+    if (!izleKanal) { sesDurum.textContent = "Önce TV kodunu girin."; return; }
+    sakla("julide_ses", sesSec.value); sakla("julide_duygu", duyguEl.checked ? "1" : "0");
+    $("sesKaydet").disabled = true;
+    sesDurum.textContent = "TV'ye gönderiliyor…";
+    try { izleKanal.send({ type: "broadcast", event: "ses_ayari", payload: { ses: sesSec.value, duygu: duyguEl.checked } }); } catch (_) {}
+    clearTimeout(sesGonderiliyor);
+    sesGonderiliyor = setTimeout(() => {
+      sesGonderiliyor = null; $("sesKaydet").disabled = false;
+      sesDurum.textContent = "TV yanıt vermedi: TV açık mı (üstteki ışık yeşil mi)? TV'deki Jülide güncel olmalı.";
+    }, 8000);
+  });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { yokla(); isikYaz(); } });
   kodEl.addEventListener("change", () => { const k = (kodEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if (k.length >= 6) durumIzle(k); });
   baslatBtn.addEventListener("click", () => { const k = (kodEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if (k.length >= 6) durumIzle(k); });

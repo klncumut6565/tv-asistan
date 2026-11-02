@@ -41,6 +41,16 @@
     kanal.on("broadcast", { event: "hoscakal" }, () => { $("telefon").textContent = "Telefon ayrıldı"; });
     kanal.on("broadcast", { event: "ac" }, () => { if (hal === "bosta") baslat(); });
     kanal.on("broadcast", { event: "kapat" }, () => bitir());
+    kanal.on("broadcast", { event: "ses_ayari" }, ({ payload }) => {
+      const p = payload || {};
+      const ses = Gemini.sesDogrula(p.ses);
+      yaz("julide_ses_tercih", ses);
+      if (typeof p.duygu === "boolean") yaz("julide_duygu", p.duygu ? "1" : "0");
+      const acikti = hal !== "bosta";
+      kanal.send({ type: "broadcast", event: "ses_onay", payload: { ses, yeniden_baslatildi: acikti, duygu: oku("julide_duygu") === "1" } });
+      gunluk("Ses ayarı: " + ses);
+      if (acikti) { bitir(); setTimeout(() => { if (hal === "bosta") baslat(); }, 900); }
+    });
     kanal.on("broadcast", { event: "tv_kapat" }, () => { bitir(); LG.kapat().catch((e) => gunluk("TV kapatılamadı: " + e.message)); });
     kanal.subscribe((st) => {
       if (st === "SUBSCRIBED") { bagli = true; gunluk("Telefon kanalı hazır (" + kod + ")"); halBildir(); }
@@ -48,7 +58,8 @@
     });
   }
   function halBildir() {
-    if (kanal && bagli) kanal.send({ type: "broadcast", event: "hal", payload: { oturum: hal !== "bosta", konusuyor: Gemini.caliyor() } });
+    if (kanal && bagli) kanal.send({ type: "broadcast", event: "hal", payload: { oturum: hal !== "bosta", konusuyor: Gemini.caliyor(),
+      ses: Gemini.sesDogrula(oku("julide_ses_tercih") || "Kore"), duygu: oku("julide_duygu") === "1" } });
   }
   setInterval(() => { if (kanal && bagli) kanal.send({ type: "broadcast", event: "nabiz", payload: { t: Math.floor(Date.now() / 1000) } }); }, 20000);
   let sonKonusma = false;

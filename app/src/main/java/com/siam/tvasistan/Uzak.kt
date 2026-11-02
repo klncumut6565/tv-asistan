@@ -91,7 +91,11 @@ object Uzak {
         } catch (e: Exception) {
             Log.w("TvAsistan", "Uzak ayar alınamadı: ${e.message}")
         }
-        return a.uzakAyar?.let { cozumle(it) } ?: VARSAYILAN
+        val y = a.uzakAyar?.let { cozumle(it) } ?: VARSAYILAN
+        // Telefon sayfasından yapılan ses seçimi uzaktan ayardan önceliklidir (yalnız beyaz listedeki kadın sesleri)
+        val ses = a.sesTercihi.takeIf { t -> SESLER.any { it.equals(t, true) } }?.let { sesDogrula(it) } ?: y.ses
+        val duygu = when (a.duyguTercihi) { 0 -> false; 1 -> true; else -> y.duyguUyumu }
+        return y.copy(ses = ses, duyguUyumu = duygu)
     }
 
     private fun cozumle(metin: String): Yapilandirma? = try {

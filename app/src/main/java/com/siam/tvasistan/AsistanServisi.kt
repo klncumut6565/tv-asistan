@@ -260,7 +260,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
-        }, ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
+        }, olayGeldi = { olay, yuk -> if (olay == "ses_ayari") ana.post { sesAyariGeldi(yuk) } },
+            ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
     }
 
     /**
@@ -286,7 +287,27 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     /** Telefona sohbet ve konuşma durumunu bildirir (sayfa düğmeyi ve dinleme eşiğini buna göre ayarlar). */
     private fun halBildir() {
-        telefon?.halGonder(durum != Durum.BOSTA, oynatici?.caliyor() == true)
+        val ses = Uzak.sesDogrula(ayarlar.sesTercihi.ifBlank { uyari?.ses ?: "Kore" })
+        val duygu = when (ayarlar.duyguTercihi) { 0 -> false; 1 -> true; else -> uyari?.duyguUyumu ?: false }
+        telefon?.halGonder(durum != Durum.BOSTA, oynatici?.caliyor() == true, ses, duygu)
+    }
+
+    /** Telefon sayfasındaki "Jülide'nin sesi" ayarı: kaydedilir; sohbet açıksa yeni sesle yeniden başlatılır. */
+    private fun sesAyariGeldi(yuk: org.json.JSONObject) {
+        val istenen = yuk.optString("ses")
+        val ses = Uzak.sesDogrula(istenen)
+        ayarlar.sesTercihi = ses
+        if (yuk.has("duygu")) ayarlar.duyguTercihi = if (yuk.optBoolean("duygu")) 1 else 0
+        val acikti = durum != Durum.BOSTA
+        Log.i(ETIKET, "Ses ayarı telefondan: $ses (istenen: $istenen), sohbet açık=$acikti")
+        telefon?.olayGonder("ses_onay", org.json.JSONObject().put("ses", ses).put("yeniden_baslatildi", acikti)
+            .put("duygu", ayarlar.duyguTercihi == 1))
+        if (acikti) {
+            // Ses yalnız oturum kurulurken seçilebilir: sohbeti yeni sesle yeniden başlat
+            bitir()
+            ana.postDelayed({ if (durum == Durum.BOSTA) oturumBaslat() }, 900)
+        }
+        halBildir()
     }
 
     /** Telefondan PCM geldi (okhttp iş parçacığı). */

@@ -60,8 +60,8 @@
       const r = await fetch(AYAR_ADRESI, { cache: "no-cache" });
       const j = await r.json();
       const m = (j.modeller || []).filter((x) => x && /^models\/[\w.\-]+$/.test(x.ad)).map((x) => ({ ad: x.ad, etiket: String(x.etiket || x.ad).slice(0, 40), blocking: !!x.blocking }));
-      return { modeller: m.length ? m : VARSAYILAN_MODELLER, ses: SESLER.find((x) => x.toLowerCase() === String(j.ses || "").trim().toLowerCase()) || "Kore" };
-    } catch (_) { return { modeller: VARSAYILAN_MODELLER, ses: "Kore" }; }
+      return { modeller: m.length ? m : VARSAYILAN_MODELLER, ses: tercihliSes(j.ses) };
+    } catch (_) { return { modeller: VARSAYILAN_MODELLER, ses: tercihliSes("Kore") }; }
   }
 
   class Oturum {
@@ -162,5 +162,12 @@
     kapat() { this.kapatildi = true; try { this.ws && this.ws.close(1000, "bitti"); } catch (_) {} this.ws = null; sustur(); }
   }
 
-  window.Gemini = { Oturum, caliyor, sustur, sesiAc: baglam };
+  function sesDogrula(ad) { return SESLER.find((x) => x.toLowerCase() === String(ad || "").trim().toLowerCase()) || "Kore"; }
+  /** Telefon sayfasından seçilen ses (localStorage) uzaktan ayardan önceliklidir. */
+  function tercihliSes(uzak) {
+    let t = null; try { t = localStorage.getItem("julide_ses_tercih"); } catch (_) {}
+    return t && SESLER.some((x) => x.toLowerCase() === t.toLowerCase()) ? sesDogrula(t) : sesDogrula(uzak);
+  }
+
+  window.Gemini = { Oturum, caliyor, sustur, sesiAc: baglam, sesDogrula };
 })();
