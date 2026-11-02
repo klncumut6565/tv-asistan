@@ -78,12 +78,17 @@
   details.ayar summary::-webkit-details-marker { display: none; }
   details.ayar[open] summary { margin-bottom: 8px; }
   details.ayar .kart + .kart { margin-top: 12px; }
+  .tvdurum { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; color: var(--soluk); margin: -4px 0 4px; }
+  .isik { width: 12px; height: 12px; border-radius: 50%; background: #6b7280; flex: none; }
+  .isik.acik { background: #22c55e; box-shadow: 0 0 8px 2px rgba(34, 197, 94, .7); }
+  .isik.kapali { background: #ef4444; box-shadow: 0 0 8px 2px rgba(239, 68, 68, .6); }
 </style>
 </head>
 <body>
 <main>
   <h1>Jülide · Telefon Mikrofonu</h1>
   <p class="alt">Telefon mikrofon olur; TV'deki Jülide'yle tuşa basmadan konuşursunuz.</p>
+  <div class="tvdurum" title="Her yerden (mobil veri dahil) çalışır"><span id="isik" class="isik"></span><span id="isikMetin">TV durumu kontrol ediliyor…</span></div>
 
   <div class="kure-alan"><div id="kure" class="kure"></div></div>
   <div id="durum" class="durum">Hazır</div>
@@ -478,6 +483,34 @@
   });
   kodEl.addEventListener("keydown", (e) => { if (e.key === "Enter") baslat(); });
   if (adresKodu.length >= 6) durum("Kod alındı — Başlat'a basın", "iyi");
+
+  // ---- TV AÇIK MI? (yeşil/kırmızı ışık) — mikrofondan bağımsız, ayrı bağlantı; her ağdan çalışır (Supabase)
+  const isik = $("isik"), isikMetin = $("isikMetin");
+  let izleIstemci = null, izleKanal = null, izleKod = "", sonGorulme = 0, sonOturum = null, yoklama = null;
+  function isikYaz() {
+    if (!izleKod) { isik.className = "isik"; isikMetin.textContent = "TV kodu girilmedi"; return; }
+    const acik = Date.now() - sonGorulme < 45000;
+    isik.className = "isik " + (acik ? "acik" : "kapali");
+    isikMetin.textContent = acik ? ("TV açık · Jülide " + (sonOturum ? "sohbette" : "hazır")) : "TV kapalı ya da çevrimdışı";
+  }
+  function gorundu(p) { sonGorulme = Date.now(); if (p && typeof p.oturum === "boolean") sonOturum = p.oturum; isikYaz(); }
+  function yokla() { try { izleKanal && izleKanal.send({ type: "broadcast", event: "merhaba", payload: { izleme: true } }); } catch (_) {} }
+  function durumIzle(kod) {
+    if (!window.supabase || !kod || kod === izleKod) return;
+    try { izleKanal && izleIstemci && izleIstemci.removeChannel(izleKanal); } catch (_) {}
+    izleKod = kod; sonGorulme = 0; sonOturum = null; isikYaz();
+    izleIstemci = izleIstemci || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { realtime: { params: { eventsPerSecond: 5 } } });
+    izleKanal = izleIstemci.channel("julide-" + kod, { config: { broadcast: { self: false, ack: false } } });
+    ["hal", "durum", "nabiz"].forEach((e) => izleKanal.on("broadcast", { event: e }, ({ payload }) => gorundu(e === "hal" ? payload : null)));
+    izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
+    clearInterval(yoklama);
+    yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);
+  }
+  setInterval(isikYaz, 5000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { yokla(); isikYaz(); } });
+  kodEl.addEventListener("change", () => { const k = (kodEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if (k.length >= 6) durumIzle(k); });
+  baslatBtn.addEventListener("click", () => { const k = (kodEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if (k.length >= 6) durumIzle(k); });
+  if (kodEl.value.length >= 6) durumIzle(kodEl.value.trim().toUpperCase()); else isikYaz();
 })();
 </script>
 </body>

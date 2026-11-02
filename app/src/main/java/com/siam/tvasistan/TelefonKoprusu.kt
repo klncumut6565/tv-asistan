@@ -68,7 +68,9 @@ class TelefonKoprusu(
     private val nabiz = object : Runnable {
         override fun run() {
             gonder(JSONObject().put("topic", "phoenix").put("event", "heartbeat").put("payload", JSONObject()))
-            ana.postDelayed(this, 25_000)
+            // Telefon sayfasındaki "TV açık" (yeşil) ışığı için: her yerden görülebilen canlılık sinyali
+            olayGonder("nabiz", JSONObject().put("t", System.currentTimeMillis() / 1000))
+            ana.postDelayed(this, 20_000)
         }
     }
 
@@ -123,7 +125,7 @@ class TelefonKoprusu(
                     .put("access_token", ANON)
                 gonder(JSONObject().put("topic", konu).put("event", "phx_join").put("payload", ayar))
                 ana.removeCallbacks(nabiz)
-                ana.postDelayed(nabiz, 25_000)
+                ana.postDelayed(nabiz, 2_000)
                 Log.i(ETIKET, "Telefon köprüsü bağlandı ($konu)")
             }
 

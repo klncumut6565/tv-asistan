@@ -50,6 +50,7 @@
   function halBildir() {
     if (kanal && bagli) kanal.send({ type: "broadcast", event: "hal", payload: { oturum: hal !== "bosta", konusuyor: Gemini.caliyor() } });
   }
+  setInterval(() => { if (kanal && bagli) kanal.send({ type: "broadcast", event: "nabiz", payload: { t: Math.floor(Date.now() / 1000) } }); }, 20000);
   let sonKonusma = false;
   setInterval(() => { const k = Gemini.caliyor(); if (k !== sonKonusma) { sonKonusma = k; halBildir(); } }, 250);
 
