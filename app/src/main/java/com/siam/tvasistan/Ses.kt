@@ -304,35 +304,23 @@ class Mikrofon(
     }
 }
 
-/**
- * Asistan sesi: 24 kHz mono 16-bit PCM akışı.
- *
- * KOPUK KOPUK SES düzeltmesi (UYARLAMALI ÖN TAMPON): Gemini sesi parça parça, aşağı yukarı gerçek zamanlı
- * hızda gönderir; ağdaki her küçük gecikmede hoparlör tamponu boşalıp konuşma takılıyordu. Artık çalar,
- * her konuşmanın başında (ve her boşalmadan sonra) önce [onTamponMs] kadar sesi biriktirip sonra çalar.
- * Boşalma (underrun) olursa ön tampon 400 ms büyütülür (en çok ~1,6 sn); böylece takılma kendini düzeltir.
- * playbackHeadPosition KULLANILMAZ (bu TV'de güvenilir değil); boşalma AudioTrack.underrunCount ile anlaşılır.
- */
+/** Asistan sesi: 24 kHz mono 16-bit PCM akışı. */
 class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
-    private companion object {
-        /** Son yazılan sesin (yazma anına göre) bitişinden sonra çaların duraklatılması için beklenen süre. */
-        const val DURAKLAT_MS = 2000L
-        const val BAYT_MS = 48 // 24000 örnek/sn × 2 bayt
-        const val TAMPON_BAYT = 48 * 3000 // 3 sn: ön tampon (en çok 1,6 sn) + pay; çalar dururken yazma TIKANMAZ
-        const val ILK_ON_TAMPON = 500L
-        const val EN_COK_ON_TAMPON = 1600L
-        /** Süreç boyunca öğrenilen ön tampon (yeni Oynatici da aynı değerle başlar). */
-        @Volatile var ogrenilenOnTampon = ILK_ON_TAMPON
-    }
-
     private val kuyruk = LinkedBlockingQueue<ByteArray>()
     @Volatile private var acik = true
-    /** Yazılan sesin tahmini bitiş anı (elapsedRealtime ms). */
+    /** Çalınması beklenen sesin bitiş anı (elapsedRealtime ms) — hoparlörün GERÇEK konumuna göre. */
     @Volatile private var bitis = 0L
-    /** temizle() çağrıldı: oynatıcı iş parçacığı durumunu sıfırlasın. */
-    @Volatile private var sifirla = false
-    /** Ön tampon biriktiriliyor: ses henüz hoparlöre çıkmadı ama Jülide konuşuyor sayılır. */
-    @Volatile private var hazirlaniyor = false
+    /** Çalara yazılan toplam örnek (kare) sayısı; flush'ta sıfırlanır. */
+    @Volatile private var yazilanKare = 0L
+
+    /**
+     * Çalarda henüz çalınmamış ses (ms). Eski hesap yazma anına göreydi; oysa yazılan ses ~1 sn tamponda
+     * bekleyip sonra çalınır → cümle aralarında çalar erken duraklatılıp CÜMLE SONLARI KESİLİYORDU.
+     */
+    private fun kalanMs(): Long = try {
+        val calinan = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+        ((yazilanKare - calinan).coerceAtLeast(0L)) * 1000L / 24000L
+    } catch (_: Exception) { 0L }
 
     private val track: AudioTrack = AudioTrack.Builder()
         .setAudioAttributes(
@@ -351,76 +339,40 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
         .setBufferSizeInBytes(
             maxOf(
                 AudioTrack.getMinBufferSize(24000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT),
-                TAMPON_BAYT
+                48000
             )
         )
         .setTransferMode(AudioTrack.MODE_STREAM)
         .build()
 
-    /** Çalar dururken güvenle biriktirilebilecek en çok ses (ms): gerçek tampon − 400 ms pay. */
-    private val tamponMs: Long = try { track.bufferSizeInFrames / 24L } catch (_: Exception) { 1000L }
-    private val onTamponSiniri: Long = (tamponMs - 400L).coerceIn(200L, EN_COK_ON_TAMPON)
-
-    private fun underrun(): Int = try { track.underrunCount } catch (_: Exception) { 0 }
-
     private val is_ = Thread({
-        try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO) } catch (_: Exception) {}
         var oynuyor = false
-        var dolduruluyor = false   // ön tampon biriktiriliyor (çalar duruk)
-        var biriken = 0L           // ön tamponda biriken ses (ms)
-        var dolumBasi = 0L
-        var taban = 0              // play() anındaki underrunCount
-        fun baslat() {
-            try { track.play() } catch (_: Exception) {}
-            bitis = SystemClock.elapsedRealtime() + biriken
-            taban = underrun()
-            oynuyor = true; dolduruluyor = false; biriken = 0L; hazirlaniyor = false
-        }
         while (acik) {
-            if (sifirla) {
-                sifirla = false
-                try { track.pause() } catch (_: Exception) {}
-                oynuyor = false; dolduruluyor = false; biriken = 0L; hazirlaniyor = false
-            }
             val p = try { kuyruk.poll(100, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { null }
-            val simdi = SystemClock.elapsedRealtime()
             if (p == null) {
-                // Ön tampon dolarken akış durduysa (kısa cevap ya da yavaş ağ) bekletmeden çal
-                if (dolduruluyor && simdi - dolumBasi >= ogrenilenOnTampon.coerceAtMost(onTamponSiniri) + 300) baslat()
-                // Boştayken çalar duraklatılır: sistem "müzik çalıyor" sanmasın ve ses çıkışı gereksiz açık kalmasın.
-                // Duraklatma, tamponda çalınmamış ses kalmayacak kadar geç yapılır (yazma anı + 2 sn).
-                if (oynuyor && simdi > bitis + DURAKLAT_MS) {
+                // Boştayken çalar duraklatılır: sistem "müzik çalıyor" sanmasın (video algılaması
+                // yanlış tetiklenmesin) ve ses çıkışı gereksiz açık kalmasın.
+                // Yalnız tampondaki ses GERÇEKTEN bitince (ve 400 ms sessizlikten sonra) duraklat
+                if (oynuyor && kalanMs() <= 0L && SystemClock.elapsedRealtime() > bitis + 400) {
                     try { track.pause() } catch (_: Exception) {}
                     oynuyor = false
                 }
                 continue
             }
-            if (oynuyor && underrun() > taban) {
-                // Hoparlör tamponu konuşma ortasında boşaldı → takılma. Ön tamponu büyüt, yeniden biriktir.
-                ogrenilenOnTampon = (ogrenilenOnTampon + 400L).coerceAtMost(onTamponSiniri)
-                android.util.Log.i("TvAsistan", "Oynatıcı: tampon boşaldı, ön tampon ${ogrenilenOnTampon} ms")
-                try { track.pause() } catch (_: Exception) {}
-                oynuyor = false
+            if (!oynuyor) {
+                try { track.play() } catch (_: Exception) {}
+                oynuyor = true
             }
-            if (!oynuyor && !dolduruluyor) {
-                dolduruluyor = true; biriken = 0L; dolumBasi = simdi; hazirlaniyor = true
-            }
-            if (oynuyor) bitis = maxOf(bitis, simdi) + p.size / BAYT_MS
             // Küreyi konuşmayla senkron tutmak için parçayı ~40 ms'lik dilimlerle yaz ve seviyeyi bildir.
-            val bastaOynuyor = oynuyor
             var o = 0
-            while (o < p.size && acik && !sifirla) {
+            while (o < p.size && acik) {
                 val n = minOf(1920, p.size - o)
-                if (dolduruluyor && biriken + n / BAYT_MS > onTamponSiniri) baslat() // tampon taşmasın
                 seviye?.invoke(sesSeviyesi(pcmRms(p, o, n)))
-                track.write(p, o, n)
-                if (dolduruluyor) biriken += n / BAYT_MS
-                else if (!bastaOynuyor) bitis += n / BAYT_MS // parça ortasında çalmaya başlandı
+                val yazildi = track.write(p, o, n)
+                if (yazildi > 0) yazilanKare += yazildi / 2
                 o += n
+                bitis = SystemClock.elapsedRealtime() + kalanMs()
             }
-            if (sifirla) continue
-            if (dolduruluyor && (biriken >= ogrenilenOnTampon.coerceAtMost(onTamponSiniri) ||
-                    SystemClock.elapsedRealtime() - dolumBasi >= ogrenilenOnTampon.coerceAtMost(onTamponSiniri) + 300)) baslat()
         }
     }, "oynatici").apply { start() }
 
@@ -429,25 +381,18 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     }
 
     /** Asistan konuşuyor mu? (yankıyı modele geri göndermemek için) */
-    fun caliyor(): Boolean = hazirlaniyor || kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 300
-
-    /**
-     * YANKI KORUMASI için (oynatıcıyı ETKİLEMEZ): hoparlör, yazılan sesi ~1 sn tampondan sonra çalar. [caliyor]
-     * yazma anına göre erken "sustu" der; o arada TV mikrofonu Jülide'nin kendi sesini Gemini'ye gönderiyor,
-     * Gemini bunu kullanıcı konuşması sanıp sözü kesiyordu (CÜMLE KOPMASI). Bu yüzden mikrofon kapısı 1,5 sn
-     * daha kapalı tutulur.
-     */
-    fun yankiVar(): Boolean = hazirlaniyor || kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 1500
+    fun caliyor(): Boolean = kuyruk.isNotEmpty() || kalanMs() > 0L || SystemClock.elapsedRealtime() < bitis + 300
 
     /** Kesinti: kuyruktaki ve tampondaki sesi anında at. */
     fun temizle() {
         kuyruk.clear()
-        sifirla = true
         try {
             track.pause()
             track.flush()
+            track.play()
         } catch (_: Exception) {
         }
+        yazilanKare = 0L
         bitis = 0L
     }
 

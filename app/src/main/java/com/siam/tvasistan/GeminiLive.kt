@@ -231,7 +231,10 @@ class GeminiLive(private val d: Dinleyici) {
                 )
             )
             .put("contextWindowCompression", JSONObject().put("slidingWindow", JSONObject()))
-            // Duygu uyumu (enableAffectiveDialog) KAPALI: açıldığında konuşmada kopma görüldü; sorunsuz sürümde (ada1f8f) yoktu.
+            .apply {
+                // Duygu uyumu: yalnız açıkça açıldıysa ve model destekliyorsa (Gemini 3.1 Flash Live desteklemez)
+                if (duyguUyumu && !m.ad.contains("3.1-flash-live")) put("enableAffectiveDialog", true)
+            }
             .put("sessionResumption", JSONObject().apply { tutamac?.let { put("handle", it) } })
         return JSONObject().put("setup", setup)
     }
