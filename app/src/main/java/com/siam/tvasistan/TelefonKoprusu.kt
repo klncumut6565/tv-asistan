@@ -36,6 +36,8 @@ class TelefonKoprusu(
     kanalOn: String = "julide-",
     /** Diğer olaylar (ör. "anahtar"); okhttp iş parçacığında çağrılır. */
     private val olayGeldi: (String, JSONObject) -> Unit = { _, _ -> },
+    /** TV ekranı açık mı (bekleme modunda false). Telefon sayfasındaki yeşil/kırmızı ışık için. */
+    private val ekranAcik: () -> Boolean = { true },
 ) {
     companion object {
         private const val ETIKET = "TvAsistan"
@@ -69,7 +71,7 @@ class TelefonKoprusu(
         override fun run() {
             gonder(JSONObject().put("topic", "phoenix").put("event", "heartbeat").put("payload", JSONObject()))
             // Telefon sayfasındaki "TV açık" (yeşil) ışığı için: her yerden görülebilen canlılık sinyali
-            olayGonder("nabiz", JSONObject().put("t", System.currentTimeMillis() / 1000))
+            nabizGonder()
             ana.postDelayed(this, 20_000)
         }
     }
@@ -95,9 +97,14 @@ class TelefonKoprusu(
     }
 
     /** Telefona sohbetin açık olup olmadığını ve Jülide'nin konuşup konuşmadığını bildirir. */
+    /** Canlılık sinyali: TV'nin ekranı açık mı (bekleme modu = kapalı sayılır). */
+    fun nabizGonder() {
+        olayGonder("nabiz", JSONObject().put("t", System.currentTimeMillis() / 1000).put("ekran", ekranAcik()))
+    }
+
     fun halGonder(oturumAcik: Boolean, konusuyor: Boolean) {
         val yuk = JSONObject().put("type", "broadcast").put("event", "hal")
-            .put("payload", JSONObject().put("oturum", oturumAcik).put("konusuyor", konusuyor))
+            .put("payload", JSONObject().put("oturum", oturumAcik).put("konusuyor", konusuyor).put("ekran", ekranAcik()))
         gonder(JSONObject().put("topic", konu).put("event", "broadcast").put("payload", yuk))
     }
 

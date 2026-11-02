@@ -486,14 +486,21 @@
 
   // ---- TV AÇIK MI? (yeşil/kırmızı ışık) — mikrofondan bağımsız, ayrı bağlantı; her ağdan çalışır (Supabase)
   const isik = $("isik"), isikMetin = $("isikMetin");
-  let izleIstemci = null, izleKanal = null, izleKod = "", sonGorulme = 0, sonOturum = null, yoklama = null;
+  let izleIstemci = null, izleKanal = null, izleKod = "", sonGorulme = 0, sonOturum = null, yoklama = null, ekran = true;
   function isikYaz() {
     if (!izleKod) { isik.className = "isik"; isikMetin.textContent = "TV kodu girilmedi"; return; }
-    const acik = Date.now() - sonGorulme < 45000;
+    const ulasiliyor = Date.now() - sonGorulme < 45000;
+    const acik = ulasiliyor && ekran !== false;
     isik.className = "isik " + (acik ? "acik" : "kapali");
-    isikMetin.textContent = acik ? ("TV açık · Jülide " + (sonOturum ? "sohbette" : "hazır")) : "TV kapalı ya da çevrimdışı";
+    isikMetin.textContent = acik ? ("TV açık · Jülide " + (sonOturum ? "sohbette" : "hazır"))
+      : ulasiliyor ? "TV kapalı (bekleme modunda)" : "TV kapalı ya da çevrimdışı";
   }
-  function gorundu(p) { sonGorulme = Date.now(); if (p && typeof p.oturum === "boolean") sonOturum = p.oturum; isikYaz(); }
+  function gorundu(p) {
+    sonGorulme = Date.now();
+    if (p && typeof p.oturum === "boolean") sonOturum = p.oturum;
+    if (p && typeof p.ekran === "boolean") ekran = p.ekran;
+    isikYaz();
+  }
   function yokla() { try { izleKanal && izleKanal.send({ type: "broadcast", event: "merhaba", payload: { izleme: true } }); } catch (_) {} }
   function durumIzle(kod) {
     if (!window.supabase || !kod || kod === izleKod) return;
@@ -501,7 +508,7 @@
     izleKod = kod; sonGorulme = 0; sonOturum = null; isikYaz();
     izleIstemci = izleIstemci || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { realtime: { params: { eventsPerSecond: 5 } } });
     izleKanal = izleIstemci.channel("julide-" + kod, { config: { broadcast: { self: false, ack: false } } });
-    ["hal", "durum", "nabiz"].forEach((e) => izleKanal.on("broadcast", { event: e }, ({ payload }) => gorundu(e === "hal" ? payload : null)));
+    ["hal", "durum", "nabiz"].forEach((e) => izleKanal.on("broadcast", { event: e }, ({ payload }) => gorundu(e === "durum" ? null : payload)));
     izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
     clearInterval(yoklama);
     yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);

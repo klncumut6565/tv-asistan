@@ -133,6 +133,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         ornek = this
         ServisOnarim.kaydet(this)
         telefonuAyarla()
+        ekranDinle()
         Log.i(ETIKET, "Erişilebilirlik servisi bağlandı")
         guncellemeDongusu()
     }
@@ -204,7 +205,25 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     override fun onInterrupt() {}
 
+    /** TV beklemeye girince/çıkınca telefona hemen bildir (ışık 20 sn beklemeden kırmızı/yeşil olsun). */
+    private val ekranAlici = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context?, i: Intent?) {
+            Log.i(ETIKET, "Ekran: ${i?.action}")
+            telefon?.nabizGonder()
+            ana.postDelayed({ telefon?.nabizGonder() }, 1500)
+        }
+    }
+
+    private fun ekranDinle() {
+        try {
+            registerReceiver(ekranAlici, android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON)
+            })
+        } catch (e: Exception) { Log.w(ETIKET, "Ekran dinlenemedi: ${e.message}") }
+    }
+
     override fun onDestroy() {
+        try { unregisterReceiver(ekranAlici) } catch (_: Exception) {}
         if (::araclar.isInitialized) araclar.uyku.iptal()
         telefon?.durdur()
         telefon = null
@@ -234,7 +253,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
-        }).also { it.baslat() }
+        }, ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
     }
 
     /**
