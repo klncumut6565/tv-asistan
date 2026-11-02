@@ -15,7 +15,7 @@
       "etiket": "Gemini 2.5 Flash Native Audio"
     }
   ],
-  "ses": "Kore",
+  "ses": "Sulafat",
   "bosta_zaman_asimi_sn": 20,
   "vad_esik": 400,
   "surekli_sohbet": true,
@@ -35,5 +35,6 @@
     "jüli de",
     "jülde",
     "ülide"
-  ]
+  ],
+  "duygu_uyumu": false
 }

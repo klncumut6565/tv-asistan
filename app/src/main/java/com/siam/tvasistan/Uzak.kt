@@ -31,6 +31,8 @@ object Uzak {
         val uyandirma: Boolean,
         /** Uyandırma eşleşmesinde kabul edilen yazımlar (tanıyıcı "Jülide"yi farklı yazabilir). */
         val uyandirmaKelimeleri: List<String>,
+        /** Gemini "affective dialog": cevap tonunu kullanıcının ses tonuna uydurur. Varsayılan KAPALI. */
+        val duyguUyumu: Boolean = false,
     )
 
     private val http = OkHttpClient.Builder()
@@ -40,7 +42,19 @@ object Uzak {
 
     private val ADRES = "https://raw.githubusercontent.com/${BuildConfig.GUNCELLEME_REPO}/main/config/ayarlar.json"
     private val MODEL_DESENI = Regex("^models/gemini-[a-z0-9.\\-]{1,60}$")
-    private val SES_DESENI = Regex("^[A-Za-z]{3,20}$")
+    /**
+     * Gemini'nin resmî 30 hazır sesi (ai.google.dev/gemini-api/docs/speech-generation). Listede olmayan ad
+     * Gemini bağlantısını reddettirir; bu yüzden yalnız bunlar kabul edilir, gerisi "Kore"ye düşer.
+     */
+    val SESLER = setOf(
+        "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe",
+        "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia",
+        "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix",
+        "Sadachbia", "Sadaltager", "Sulafat",
+    )
+
+    /** Ses adını doğrular (büyük/küçük harf duyarsız); geçersizse Kore. */
+    fun sesDogrula(ad: String?): String = SESLER.firstOrNull { it.equals(ad?.trim(), ignoreCase = true) } ?: "Kore"
     private val KELIME_DESENI = Regex("^[\\p{L} ]{3,20}$")
     private val ABONELIK_DESENI = Regex("^[\\p{L}0-9 .+'-]{2,30}$")
 
@@ -97,7 +111,7 @@ object Uzak {
         }
         Yapilandirma(
             modeller = modeller.ifEmpty { VARSAYILAN.modeller },
-            ses = j.optString("ses").takeIf { SES_DESENI.matches(it) } ?: VARSAYILAN.ses,
+            ses = sesDogrula(j.optString("ses")),
             bostaSn = j.optInt("bosta_zaman_asimi_sn", VARSAYILAN.bostaSn).coerceIn(5, 120),
             vadEsik = j.optInt("vad_esik", VARSAYILAN.vadEsik).coerceIn(100, 3000),
             surekliSohbet = j.optBoolean("surekli_sohbet", VARSAYILAN.surekliSohbet),
@@ -110,6 +124,7 @@ object Uzak {
             uyandirmaKelimeleri = j.optJSONArray("uyandirma_kelimeleri")?.let { d ->
                 (0 until minOf(d.length(), 15)).map { d.optString(it).trim() }.filter { KELIME_DESENI.matches(it) }
             }?.takeIf { it.isNotEmpty() } ?: VARSAYILAN.uyandirmaKelimeleri,
+            duyguUyumu = j.optBoolean("duygu_uyumu", false),
         )
     } catch (e: Exception) {
         null

@@ -11,6 +11,10 @@
     { ad: "models/gemini-2.5-flash-native-audio-preview-12-2025", etiket: "Gemini 2.5 Flash Native Audio" },
   ];
   const kotaDolu = {}; // model → zaman
+  // Gemini'nin resmî hazır sesleri; listede olmayan ad bağlantıyı bozar → Kore
+  const SESLER = ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus",
+    "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux",
+    "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"];
 
   const kotaMi = (m) => /quota|resource_exhausted|resource exhausted|rate limit|exceeded/i.test(m || "");
 
@@ -58,7 +62,7 @@
       const r = await fetch(AYAR_ADRESI, { cache: "no-cache" });
       const j = await r.json();
       const m = (j.modeller || []).filter((x) => x && /^models\/[\w.\-]+$/.test(x.ad)).map((x) => ({ ad: x.ad, etiket: String(x.etiket || x.ad).slice(0, 40), blocking: !!x.blocking }));
-      return { modeller: m.length ? m : VARSAYILAN_MODELLER, ses: /^[A-Za-z]{2,20}$/.test(j.ses || "") ? j.ses : "Kore" };
+      return { modeller: m.length ? m : VARSAYILAN_MODELLER, ses: SESLER.find((x) => x.toLowerCase() === String(j.ses || "").trim().toLowerCase()) || "Kore" };
     } catch (_) { return { modeller: VARSAYILAN_MODELLER, ses: "Kore" }; }
   }
 

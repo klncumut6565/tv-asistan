@@ -53,6 +53,7 @@ class GeminiLive(private val d: Dinleyici) {
     }
 
     private var sesAdi = "Kore"
+    private var duyguUyumu = false
 
     private val http get() = ORTAK_HTTP
     private val aracYurutucu = Executors.newSingleThreadExecutor()
@@ -75,7 +76,8 @@ class GeminiLive(private val d: Dinleyici) {
 
     suspend fun baglan(anahtar: String, y: Uzak.Yapilandirma, talimat: String, araclar: JSONArray) {
         if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — Jülide uygulamasını açıp anahtarı kaydedin.")
-        sesAdi = y.ses
+        sesAdi = Uzak.sesDogrula(y.ses)
+        duyguUyumu = y.duyguUyumu
         val surumler = listOf("v1beta", "v1alpha")
         val simdi = System.currentTimeMillis()
         val sira = y.modeller.sortedWith(
@@ -229,6 +231,10 @@ class GeminiLive(private val d: Dinleyici) {
                 )
             )
             .put("contextWindowCompression", JSONObject().put("slidingWindow", JSONObject()))
+            .apply {
+                // Duygu uyumu: yalnız açıkça açıldıysa ve model destekliyorsa (Gemini 3.1 Flash Live desteklemez)
+                if (duyguUyumu && !m.ad.contains("3.1-flash-live")) put("enableAffectiveDialog", true)
+            }
             .put("sessionResumption", JSONObject().apply { tutamac?.let { put("handle", it) } })
         return JSONObject().put("setup", setup)
     }
