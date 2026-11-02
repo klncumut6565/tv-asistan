@@ -99,7 +99,7 @@ class TelefonKoprusu(
     /** Telefona sohbetin açık olup olmadığını ve Jülide'nin konuşup konuşmadığını bildirir. */
     /** Canlılık sinyali: TV'nin ekranı açık mı (bekleme modu = kapalı sayılır). */
     fun nabizGonder() {
-        olayGonder("nabiz", JSONObject().put("t", System.currentTimeMillis() / 1000).put("ekran", ekranAcik()))
+        olayGonder("nabiz", JSONObject().put("t", System.currentTimeMillis() / 1000).put("ekran", ekranAcik()).put("surum", BuildConfig.VERSION_NAME))
     }
 
     fun halGonder(oturumAcik: Boolean, konusuyor: Boolean, ses: String? = null, duygu: Boolean? = null) {

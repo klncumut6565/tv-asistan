@@ -141,6 +141,11 @@
       <button id="sesKaydet" class="ikincil">Kaydet ve TV'ye gönder</button>
       <p class="ipucu" id="sesDurum">Yalnız kadın sesleri. Sohbet açıksa Jülide yeni sesle yeniden başlar.</p>
     </section>
+    <section class="kart" id="guncelKart">
+      <div class="satir"><span>⬆ Jülide sürümü</span><span id="surumBilgi">—</span></div>
+      <button id="guncelleBtn" class="ikincil">TV'yi güncelle</button>
+      <p class="ipucu" id="guncelDurum">TV yeni sürümü indirir; sonra TV ekranındaki “Yükle”ye kumandayla basın.</p>
+    </section>
   </details>
 
   <p class="ipucu">Çalışırken ekran kendiliğinden kapanmaz. iPhone, kilit tuşuyla ekran kapatılınca ya da başka uygulamaya geçilince mikrofonu her web sayfası için keser (Apple sınırı); bu yüzden kilit tuşu yerine “Ekranı karart”ı kullanın. Sayfaya dönünce mikrofon kendiliğinden yeniden açılır.</p>
@@ -523,12 +528,44 @@
   }
   const sesSec = $("sesSec"), duyguEl = $("duygu"), sesDurum = $("sesDurum");
   let sesGonderiliyor = null;
+  // ---- GÜNCELLEME: TV'deki sürüm (hal/nabız) ile GitHub'daki son sürüm
+  const surumBilgi = $("surumBilgi"), guncelDurum = $("guncelDurum"), guncelleBtn = $("guncelleBtn");
+  let tvSurum = "", sonSurum = "", guncelBekle = null;
+  function surumYaz() {
+    const eski = tvSurum && sonSurum && (parseInt(sonSurum.split(".").pop(), 10) > parseInt(tvSurum.split(".").pop(), 10));
+    surumBilgi.textContent = "TV: " + (tvSurum || "?") + " · Son: " + (sonSurum || "?") + (eski ? " ⚠" : (tvSurum && sonSurum ? " ✓" : ""));
+  }
+  function sonSurumuAl() {
+    fetch("https://api.github.com/repos/klncumut6565/tv-asistan/releases/latest", { cache: "no-cache" })
+      .then((r) => r.json()).then((j) => { if (j && j.tag_name) { sonSurum = String(j.tag_name).replace(/^v/, ""); surumYaz(); } })
+      .catch(() => {});
+  }
+  sonSurumuAl();
+  guncelleBtn.addEventListener("click", () => {
+    if (!izleKanal) { guncelDurum.textContent = "Önce TV kodunu girin."; return; }
+    guncelleBtn.disabled = true;
+    guncelDurum.textContent = "TV'ye gönderiliyor…";
+    sonSurumuAl();
+    try { izleKanal.send({ type: "broadcast", event: "guncelle", payload: {} }); } catch (_) {}
+    clearTimeout(guncelBekle);
+    guncelBekle = setTimeout(() => {
+      guncelleBtn.disabled = false;
+      guncelDurum.textContent = "TV yanıt vermedi: TV açık mı (ışık yeşil mi)? Bu düğme için TV'deki Jülide en az 0.1.102 olmalı; değilse TV'den bir kez elle güncelleyin.";
+    }, 15000);
+  });
+  function guncellemeDurumu(p) {
+    p = p || {};
+    if (p.surum) { tvSurum = String(p.surum); surumYaz(); }
+    guncelDurum.textContent = (p.tamam ? "✓ " : "") + (p.m || "");
+    if (p.m && !/denetleniyor/i.test(p.m)) { clearTimeout(guncelBekle); guncelleBtn.disabled = false; }
+  }
   function gorundu(p) {
     if (p && p.ses && !sesGonderiliyor) {
       if ([...sesSec.options].some((o) => o.value === p.ses)) sesSec.value = p.ses;
       if (typeof p.duygu === "boolean") duyguEl.checked = p.duygu;
       sesDurum.textContent = "TV'de şu an: " + p.ses + (p.duygu ? " · duygu uyumu açık" : "");
     }
+    if (p && p.surum) { tvSurum = String(p.surum); surumYaz(); }
     sonGorulme = Date.now();
     if (p && typeof p.oturum === "boolean") sonOturum = p.oturum;
     if (p && typeof p.ekran === "boolean") ekran = p.ekran;
@@ -548,6 +585,7 @@
       sesDurum.textContent = "✓ TV'de ses: " + p.ses + (p.yeniden_baslatildi ? " — sohbet yeni sesle yeniden başlatıldı" : " — bir sonraki sohbette geçerli");
       $("sesKaydet").disabled = false;
     });
+    izleKanal.on("broadcast", { event: "guncelleme_durum" }, ({ payload }) => guncellemeDurumu(payload));
     izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
     clearInterval(yoklama);
     yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);
