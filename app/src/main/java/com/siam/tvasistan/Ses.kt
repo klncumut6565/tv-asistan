@@ -308,19 +308,8 @@ class Mikrofon(
 class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     private val kuyruk = LinkedBlockingQueue<ByteArray>()
     @Volatile private var acik = true
-    /** Çalınması beklenen sesin bitiş anı (elapsedRealtime ms) — hoparlörün GERÇEK konumuna göre. */
+    /** Yazılan sesin tahmini bitiş anı (elapsedRealtime ms). */
     @Volatile private var bitis = 0L
-    /** Çalara yazılan toplam örnek (kare) sayısı; flush'ta sıfırlanır. */
-    @Volatile private var yazilanKare = 0L
-
-    /**
-     * Çalarda henüz çalınmamış ses (ms). Eski hesap yazma anına göreydi; oysa yazılan ses ~1 sn tamponda
-     * bekleyip sonra çalınır → cümle aralarında çalar erken duraklatılıp CÜMLE SONLARI KESİLİYORDU.
-     */
-    private fun kalanMs(): Long = try {
-        val calinan = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
-        ((yazilanKare - calinan).coerceAtLeast(0L)) * 1000L / 24000L
-    } catch (_: Exception) { 0L }
 
     private val track: AudioTrack = AudioTrack.Builder()
         .setAudioAttributes(
@@ -352,8 +341,7 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
             if (p == null) {
                 // Boştayken çalar duraklatılır: sistem "müzik çalıyor" sanmasın (video algılaması
                 // yanlış tetiklenmesin) ve ses çıkışı gereksiz açık kalmasın.
-                // Yalnız tampondaki ses GERÇEKTEN bitince (ve 400 ms sessizlikten sonra) duraklat
-                if (oynuyor && kalanMs() <= 0L && SystemClock.elapsedRealtime() > bitis + 400) {
+                if (oynuyor && SystemClock.elapsedRealtime() > bitis + 400) {
                     try { track.pause() } catch (_: Exception) {}
                     oynuyor = false
                 }
@@ -363,15 +351,16 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
                 try { track.play() } catch (_: Exception) {}
                 oynuyor = true
             }
+            val simdi = SystemClock.elapsedRealtime()
+            val sureMs = p.size / 48L // 24000 örnek/sn × 2 bayt = 48 bayt/ms
+            bitis = maxOf(bitis, simdi) + sureMs
             // Küreyi konuşmayla senkron tutmak için parçayı ~40 ms'lik dilimlerle yaz ve seviyeyi bildir.
             var o = 0
             while (o < p.size && acik) {
                 val n = minOf(1920, p.size - o)
                 seviye?.invoke(sesSeviyesi(pcmRms(p, o, n)))
-                val yazildi = track.write(p, o, n)
-                if (yazildi > 0) yazilanKare += yazildi / 2
+                track.write(p, o, n)
                 o += n
-                bitis = SystemClock.elapsedRealtime() + kalanMs()
             }
         }
     }, "oynatici").apply { start() }
@@ -381,7 +370,7 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     }
 
     /** Asistan konuşuyor mu? (yankıyı modele geri göndermemek için) */
-    fun caliyor(): Boolean = kuyruk.isNotEmpty() || kalanMs() > 0L || SystemClock.elapsedRealtime() < bitis + 300
+    fun caliyor(): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 300
 
     /** Kesinti: kuyruktaki ve tampondaki sesi anında at. */
     fun temizle() {
@@ -392,7 +381,6 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
             track.play()
         } catch (_: Exception) {
         }
-        yazilanKare = 0L
         bitis = 0L
     }
 

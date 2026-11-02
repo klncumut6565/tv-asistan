@@ -187,34 +187,6 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         return aktifPaket == ana
     }
 
-    /** Telefon sayfasındaki "TV'yi güncelle" düğmesi: denetler, varsa indirip kurulum onayını açar; sonucu telefona bildirir. */
-    private fun telefondanGuncelle() {
-        fun bildir(m: String, tamam: Boolean = false) {
-            telefon?.olayGonder("guncelleme_durum", org.json.JSONObject().put("m", m).put("tamam", tamam).put("surum", BuildConfig.VERSION_NAME))
-        }
-        if (Guncelleme.kuruluyor) { bildir("Güncelleme zaten indiriliyor…"); return }
-        bildir("Güncelleme denetleniyor…")
-        kapsam.launch {
-            try {
-                val yeni = withContext(Dispatchers.IO) { Guncelleme.denetle() }
-                if (yeni == null) { bildir("Zaten en son sürüm (${BuildConfig.VERSION_NAME}).", true); return@launch }
-                if (!packageManager.canRequestPackageInstalls()) {
-                    bildir("TV'de izin gerekli: Ayarlar → Uygulamalar → Özel erişim → Bilinmeyen uygulamaları yükle → Jülide'yi açın.")
-                    return@launch
-                }
-                ekraniUyandir()
-                if (durum != Durum.BOSTA) bitir()
-                guncellemeyiKur(yeni)
-                bildir("${yeni.ad} indiriliyor. TV ekranında çıkan 'Yükle'ye kumandayla basın.", true)
-            } catch (e: Exception) {
-                val m = e.message.orEmpty()
-                bildir(if (m.contains("chain", true) || m.contains("certificate", true))
-                    "Denetlenemedi: TV'nin tarih/saati yanlış olabilir (Ayarlar → Tarih ve saat → Otomatik)."
-                else "Denetlenemedi: ${m.take(120)}")
-            }
-        }
-    }
-
     /** Sesli komut ("kendini güncelle") veya otomatik döngü tarafından çağrılır. */
     fun guncellemeyiKur(s: Guncelleme.Surum) {
         bekleyenSurum = null
@@ -288,13 +260,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
-        }, olayGeldi = { olay, yuk ->
-            when (olay) {
-                "ses_ayari" -> ana.post { sesAyariGeldi(yuk) }
-                "guncelle" -> telefondanGuncelle()
-            }
-        },
-            ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
+        }, ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
     }
 
     /**
@@ -320,27 +286,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     /** Telefona sohbet ve konuşma durumunu bildirir (sayfa düğmeyi ve dinleme eşiğini buna göre ayarlar). */
     private fun halBildir() {
-        val ses = Uzak.sesDogrula(ayarlar.sesTercihi.ifBlank { uyari?.ses ?: "Kore" })
-        val duygu = when (ayarlar.duyguTercihi) { 0 -> false; 1 -> true; else -> uyari?.duyguUyumu ?: false }
-        telefon?.halGonder(durum != Durum.BOSTA, oynatici?.caliyor() == true, ses, duygu)
-    }
-
-    /** Telefon sayfasındaki "Jülide'nin sesi" ayarı: kaydedilir; sohbet açıksa yeni sesle yeniden başlatılır. */
-    private fun sesAyariGeldi(yuk: org.json.JSONObject) {
-        val istenen = yuk.optString("ses")
-        val ses = Uzak.sesDogrula(istenen)
-        ayarlar.sesTercihi = ses
-        if (yuk.has("duygu")) ayarlar.duyguTercihi = if (yuk.optBoolean("duygu")) 1 else 0
-        val acikti = durum != Durum.BOSTA
-        Log.i(ETIKET, "Ses ayarı telefondan: $ses (istenen: $istenen), sohbet açık=$acikti")
-        telefon?.olayGonder("ses_onay", org.json.JSONObject().put("ses", ses).put("yeniden_baslatildi", acikti)
-            .put("duygu", ayarlar.duyguTercihi == 1))
-        if (acikti) {
-            // Ses yalnız oturum kurulurken seçilebilir: sohbeti yeni sesle yeniden başlat
-            bitir()
-            ana.postDelayed({ if (durum == Durum.BOSTA) oturumBaslat() }, 900)
-        }
-        halBildir()
+        telefon?.halGonder(durum != Durum.BOSTA, oynatici?.caliyor() == true)
     }
 
     /** Telefondan PCM geldi (okhttp iş parçacığı). */

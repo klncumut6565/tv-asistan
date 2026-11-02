@@ -6,14 +6,6 @@ import android.content.Context
 class Ayarlar(ctx: Context) {
     private val p = ctx.applicationContext.getSharedPreferences("tv_asistan", Context.MODE_PRIVATE)
 
-    init {
-        // Bir kerelik: konuşma kopması sonrası ses düzeni sorunsuz sürüme (ada1f8f) döner — ses Kore, duygu uyumu kapalı.
-        // Kullanıcı sonra telefondan başka ses seçebilir; bu sıfırlama bir daha çalışmaz.
-        if (!p.getBoolean("ses_sifirlama_v1", false)) {
-            p.edit().putString("ses_tercihi", "").putInt("duygu_tercihi", 0).putBoolean("ses_sifirlama_v1", true).apply()
-        }
-    }
-
     /** Kullanıcının kendi Gemini API anahtarı (aistudio.google.com). APK'da/repoda YOKTUR. */
     var geminiAnahtari: String
         get() {
@@ -86,14 +78,4 @@ class Ayarlar(ctx: Context) {
     var uyandirmaAktif: Boolean
         get() = p.getBoolean("uyandirma_aktif", false)
         set(v) = p.edit().putBoolean("uyandirma_aktif", v).apply()
-
-    /** Telefon sayfasından seçilen Jülide sesi (boş = uzaktan ayardaki ses). Uzak ayardan ÖNCELİKLİDİR. */
-    var sesTercihi: String
-        get() = p.getString("ses_tercihi", "") ?: ""
-        set(v) = p.edit().putString("ses_tercihi", v).apply()
-
-    /** Duygu uyumu tercihi: -1 = uzaktan ayar, 0 = kapalı, 1 = açık. */
-    var duyguTercihi: Int
-        get() = p.getInt("duygu_tercihi", -1)
-        set(v) = p.edit().putInt("duygu_tercihi", v).apply()
 }
