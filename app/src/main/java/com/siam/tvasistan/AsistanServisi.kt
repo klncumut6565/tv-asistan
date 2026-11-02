@@ -256,7 +256,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 "ac" -> ana.post { ekraniUyandir(); if (durum == Durum.BOSTA) oturumBaslat() }
                 // Telefondaki "TV'yi kapat" düğmesi (onay telefonda alınır)
                 "tv_kapat" -> ana.post {
-                    if (araclar.uyku.destekleniyor()) { araclar.uyku.iptal(); araclar.uyku.kapatmayaBasla(0) }
+                    araclar.uyku.iptal(); araclar.uyku.hemenKapat(araclar.adb)
                 }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }

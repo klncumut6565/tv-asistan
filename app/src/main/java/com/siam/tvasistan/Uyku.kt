@@ -43,6 +43,19 @@ class Uyku(private val s: AsistanServisi) {
      * TV'yi kapatır. Sohbet açıksa önce Jülide'nin vedası bitsin diye oturum kapatılır,
      * oturum kapandıktan (en çok ~10 sn) sonra TV uyutulur.
      */
+    /**
+     * Telefondaki "TV'yi kapat" düğmesi: onay telefonda alındı, veda beklenmez — sohbet hemen kapatılır,
+     * TV ~0,3 sn sonra uyutulur. Erişilebilirlik eylemi işe yaramazsa gerçek SLEEP tuşu (ADB) denenir.
+     */
+    fun hemenKapat(adb: Adb? = null) {
+        if (s.durum != AsistanServisi.Durum.BOSTA) s.bitir()
+        ana.postDelayed({
+            val oldu = destekleniyor() && s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+            Log.i(ETIKET, "TV hemen uyutma: ${if (oldu) "gönderildi" else "BAŞARISIZ, ADB SLEEP deneniyor"}")
+            if (!oldu && adb != null) Thread { try { adb.tuslar(listOf(223)) } catch (e: Exception) { Log.w(ETIKET, "ADB SLEEP: ${e.message}") } }.start()
+        }, 300)
+    }
+
     fun kapatmayaBasla(gecikmeMs: Long = VEDA_MS) {
         ana.postDelayed({
             if (s.durum != AsistanServisi.Durum.BOSTA) s.oturumuKapatIste()
