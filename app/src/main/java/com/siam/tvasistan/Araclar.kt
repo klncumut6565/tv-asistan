@@ -30,6 +30,9 @@ class Araclar(private val s: AsistanServisi) {
     /** "TV'yi kapat" ve uyku zamanlayıcısı. */
     val uyku = Uyku(s)
 
+    /** "Ekrana bak": küçültülmüş, sıkıştırılmış ekran görüntüsü. */
+    private val ekranGoruntusu = EkranGoruntusu(s)
+
     /** Tarayıcılar için sesle yönetilen imleç (fare oku ya da el işareti). */
     val imlec = Imlec(s)
 
@@ -120,6 +123,8 @@ class Araclar(private val s: AsistanServisi) {
             listOf(P("sorgu", "STRING", "Aranacak metin")), listOf("sorgu")))
         .put(fn("url_ac", "Bir web adresini tarayıcıda açar.",
             listOf(P("url", "STRING", "Tam adres, ör. https://www.siam.com.tr")), listOf("url")))
+        .put(fn("ekrana_bak", "Ekranın KÜÇÜK bir görüntüsünü sana gönderir; sen ekranı GÖRÜRSÜN. Yalnızca ekrani_oku boş/yetersiz döndüğünde kullan (Prime Video, TOD, Netflix gibi ekranı resim olarak çizen uygulamalar). Kota harcar: gereksiz yere ve arka arkaya çağırma; yön tuşlarıyla birkaç adım ilerledikten sonra tekrar bak.",
+            listOf(P("ne_ariyorum", "STRING", "Ekranda ne aradığın, ör. 'Yüzüklerin Efendisi kapağı', 'Oynat düğmesi'"))))
         .put(fn("ekrani_oku", "Şu an ekranda görünen yazıları/düğmeleri ve açık uygulamayı döndürür. Bir şeye tıklamadan önce kullan."))
         .put(fn("tikla", "Ekranda yazısı verilen öğeye tıklar (ör. 'Ara', 'Oynat', bir film adı).",
             listOf(
@@ -207,7 +212,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken film-dizi akilli_ara ile aboneliklerde aranır. Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
 - "YouTube'da X'i aç / oynat / çal / izle", "X şarkısını aç" (YouTube açıkken ya da YouTube denildiğinde) → youtube_oynat: videoyu DOĞRUDAN başlatır, sonuç sayfasına tıklamaya gerek yok. "İkincisini / başka birini aç" → aynı sorgu ile sira=2, 3... Yalnızca "YouTube'da ara, sonuçları göster" denirse youtube_ara. "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
 - Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
-- Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
+- Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal" → kanal_kaydet. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5).
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
@@ -284,6 +289,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "web_ara" -> webAra(a.optString("sorgu"))
             "url_ac" -> urlAc(a.optString("url"))
             "ekrani_oku" -> ekraniOku()
+            "ekrana_bak" -> ekranaBak(a.optString("ne_ariyorum"))
             "tikla" -> tikla(a.optString("metin"), a.optBoolean("onayli", false))
             "yaz" -> yaz(a.optString("metin"), a.optBoolean("gonder", false))
             "tus" -> tus(a.optString("tus"), a.optInt("tekrar", 1))
@@ -980,11 +986,27 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return null
     }
 
+    private fun ekranaBak(neArar: String): JSONObject {
+        return when (val r = ekranGoruntusu.al()) {
+            is EkranGoruntusu.Sonuc.Yeni -> {
+                if (!s.gorselGonder(r.jpeg)) return hata("Gemini oturumu yok; görüntü gönderilemedi.")
+                tamam("Ekran görüntüsü (${r.gen}×${r.yuk}) az önce sana gönderildi. O görüntüye bakarak cevap ver" +
+                    (if (neArar.isNotBlank()) "; '$neArar' nerede, hangi öğe ODAKTA (genelde beyaz çerçeveli/büyütülmüş)?" else ".") +
+                    " Sonra yön tuşlarıyla (tus) odağı hedefe taşı ve tamam'a bas. Görüntüde OLMAYAN bir şeyi uydurma.")
+            }
+            EkranGoruntusu.Sonuc.Ayni -> tamam("Ekran, son bakıştan beri DEĞİŞMEDİ (görüntü tekrar gönderilmedi, kota korunur). Önceki görüntüye göre devam et.")
+            EkranGoruntusu.Sonuc.Siyah -> tamam("Ekran SİYAH görünüyor: büyük olasılıkla kopya korumalı bir video oynuyor ya da ekran kapalı. Görüntü gönderilmedi.")
+            is EkranGoruntusu.Sonuc.Hata -> hata(r.mesaj)
+        }
+    }
+
     private fun ekraniOku(): JSONObject {
         val paket = s.aktifPaket
         val uygAdi = paket?.let { p -> Uygulamalar.liste(s, hepsi = true).firstOrNull { it.paket == p }?.ad } ?: paket ?: "bilinmiyor"
         val l = ogeler()
-        if (l.isEmpty()) return tamam("Açık uygulama: $uygAdi. Ekrandaki öğeler okunamadı (uygulama içeriğini gizliyor olabilir).")
+        if (l.size < 3) return tamam("Açık uygulama: $uygAdi. Ekrandaki yazılar OKUNAMADI (bu uygulama ekranı resim olarak çiziyor). " +
+            "Ekranı görmek için ekrana_bak çağır; sonra yön tuşları (tus) ve tamam ile ilerle." +
+            if (l.isNotEmpty()) " Okunabilen: ${l.joinToString(", ") { it.metin.take(40) }}" else "")
         val satirlar = l.distinctBy { it.metin }.take(80).map { o ->
             val etiketler = mutableListOf<String>()
             if (tiklanabilir(o.dugum) != null) etiketler += "tıklanabilir"

@@ -309,6 +309,13 @@ class GeminiLive(private val d: Dinleyici) {
         ws?.send(JSONObject().put("realtimeInput", JSONObject().put("audioStreamEnd", true)).toString())
     }
 
+    /** Görsel (JPEG) gönderir: Gemini bir sonraki cevabında bu görüntüyü "görür". */
+    fun gorselGonder(jpeg: ByteArray) {
+        ws?.send(JSONObject().put("realtimeInput", JSONObject().put("video", JSONObject()
+            .put("data", Base64.encodeToString(jpeg, Base64.NO_WRAP))
+            .put("mimeType", "image/jpeg"))).toString())
+    }
+
     fun metinGonder(t: String) {
         ws?.send(JSONObject().put("realtimeInput", JSONObject().put("text", t)).toString())
     }

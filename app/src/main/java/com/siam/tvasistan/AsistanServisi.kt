@@ -64,6 +64,13 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private var oturumNo = 0L
         private set
     private var live: GeminiLive? = null
+
+    /** Araçlar için: ekran görüntüsünü canlı Gemini oturumuna gönderir. */
+    fun gorselGonder(jpeg: ByteArray): Boolean {
+        val l = live ?: return false
+        l.gorselGonder(jpeg)
+        return true
+    }
     private var mikrofon: Mikrofon? = null
     @Volatile private var oynatici: Oynatici? = null
     private var odakIstegi: AudioFocusRequest? = null
