@@ -306,6 +306,10 @@ class Mikrofon(
 
 /** Asistan sesi: 24 kHz mono 16-bit PCM akışı. */
 class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
+    private companion object {
+        /** Son yazılan sesin (yazma anına göre) bitişinden sonra çaların duraklatılması için beklenen süre. */
+        const val DURAKLAT_MS = 2000L
+    }
     private val kuyruk = LinkedBlockingQueue<ByteArray>()
     @Volatile private var acik = true
     /** Yazılan sesin tahmini bitiş anı (elapsedRealtime ms). */
@@ -341,7 +345,11 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
             if (p == null) {
                 // Boştayken çalar duraklatılır: sistem "müzik çalıyor" sanmasın (video algılaması
                 // yanlış tetiklenmesin) ve ses çıkışı gereksiz açık kalmasın.
-                if (oynuyor && SystemClock.elapsedRealtime() > bitis + 400) {
+                // KOPUK KOPUK SES düzeltmesi: [bitis] yazma anına göre hesaplanır, oysa hoparlör ~1 sn'lik
+                // tampondan sonra çalar. Eskiden 400 ms beklenince Gemini'nin parçaları arasındaki kısa ağ
+                // boşluklarında çalar, tamponda çalınmamış ses VARKEN duraklıyor, sonraki parçayla devam
+                // ediyordu → konuşma ~2 sn'de bir takılıyordu. Tampon (1 sn) + pay = 2 sn beklenir.
+                if (oynuyor && SystemClock.elapsedRealtime() > bitis + DURAKLAT_MS) {
                     try { track.pause() } catch (_: Exception) {}
                     oynuyor = false
                 }
