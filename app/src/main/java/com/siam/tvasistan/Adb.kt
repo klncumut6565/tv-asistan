@@ -84,6 +84,20 @@ class Adb(private val ctx: Context) {
         komut(if (cift) "$t; sleep 0.12; $t" else t)
     }
 
+    /**
+     * Odaktaki yazı alanına metin yazar (input text). GÜVENLİK: metin önce ASCII'ye indirilir ve yalnız
+     * [a-z0-9] ile boşluk kalır (boşluk → %s); kabuk özel karakteri geçemez. Prime Video gibi yazı alanı
+     * erişilebilirlik ağacında görünmeyen uygulamalar için.
+     */
+    fun metinYaz(metin: String) {
+        val katla = mapOf('ç' to 'c', 'ğ' to 'g', 'ı' to 'i', 'ö' to 'o', 'ş' to 's', 'ü' to 'u', 'â' to 'a', 'î' to 'i', 'û' to 'u')
+        val temiz = metin.lowercase(java.util.Locale("tr")).map { katla[it] ?: it }
+            .filter { it in 'a'..'z' || it in '0'..'9' || it == ' ' }.joinToString("")
+            .trim().replace(Regex(" +"), " ").take(80)
+        require(temiz.isNotEmpty())
+        komut("input text " + temiz.replace(" ", "%s"))
+    }
+
     /** Bağlantıyı dener (ayar ekranındaki "etkinleştir" düğmesi). */
     fun dene() = komut("echo ok")
 

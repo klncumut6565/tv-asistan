@@ -503,6 +503,11 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         val siradaki = liste.dropWhile { it != hedefAdi }.drop(1)
         val ek = if (siradaki.isEmpty()) "" else " Bulunamazsa sıradaki: ${siradaki.joinToString(", ")}."
 
+        // 0) Prime Video: ekranı resim olarak çizer, "Ara" düğmesi erişilebilirlikte görünmez → özel yol
+        if (uyg.paket.contains("amazon", true) || Uygulamalar.normal(uyg.ad).contains("prime")) {
+            return primeAra(uyg.paket, uyg.ad, ad, ek)
+        }
+
         // 1) Uygulama arama niyetini destekliyorsa doğrudan
         val niyet = Intent(Intent.ACTION_SEARCH).setPackage(uyg.paket)
             .putExtra(SearchManager.QUERY, ad).putExtra("query", ad)
@@ -513,6 +518,53 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
 
         // 2) Uygulamayı aç → Ara öğesine tıkla → adı yaz
         return arayuzdeAra(uyg.paket, uyg.ad, ad, ek, "doğru başlığa tikla, sonra Oynat/İzle'ye tikla.")
+    }
+
+    /**
+     * Prime Video araması. Sırayla: (1) arama derin bağlantıları (yalnız uygulama gerçekten kabul ediyorsa),
+     * (2) uygulamayı aç → ADB ARA tuşu → ADB ile yaz → ENTER. Prime ekranı erişilebilirlikte okunamadığı için
+     * sonuç burada DOĞRULANAMAZ: Gemini ekrana_bak ile bakmadan "açtım/aradım" demez.
+     */
+    private fun primeAra(paket: String, gorunenAd: String, ad: String, ek: String): JSONObject {
+        val bak = " SONUÇ DOĞRULANMADI: kullanıcıya henüz 'aradım/açtım' DEME. Hemen ekrana_bak ile ekranda '$ad' sonuçları var mı bak; " +
+            "varsa doğru başlığa tus ile gidip tamam'a bas, sonra Oynat/İzle'yi seç. Yoksa kullanıcıya 'Prime'da arayamadım' de.$ek"
+        val q = enc(ad)
+        // 1) Derin bağlantılar
+        val baglantilar = listOf(
+            "https://app.primevideo.com/search?phrase=$q",
+            "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=$q",
+            "https://www.amazon.com/gp/video/search?phrase=$q",
+        )
+        for (u in baglantilar) {
+            val i = Intent(Intent.ACTION_VIEW, Uri.parse(u)).setPackage(paket)
+            if (s.packageManager.queryIntentActivities(i, 0).isNotEmpty() && baslat(i)) {
+                SystemClock.sleep(3500)
+                return tamam("$gorunenAd arama bağlantısı ile '$ad' için açıldı.$bak")
+            }
+        }
+        // 2) Uygulamayı aç → ARA tuşu → yaz
+        if (s.aktifPaket != paket) {
+            if (!Uygulamalar.ac(s, paket)) return hata("$gorunenAd açılamadı.")
+            var b = 0
+            while (s.aktifPaket != paket && b < 30) { SystemClock.sleep(200); b++ }
+            SystemClock.sleep(4000) // Prime ana sayfası geç yüklenir
+        }
+        try {
+            adb.tuslar(listOf(84)) // KEYCODE_SEARCH: Prime arama sayfasını açar
+            SystemClock.sleep(2500)
+            // Erişilebilir yazı alanı varsa onu kullan; yoksa ADB ile yaz
+            if (yaziAlani() == null || yaz(ad, gonder = true).has("hata")) {
+                adb.metinYaz(ad)
+                SystemClock.sleep(600)
+                adb.tuslar(listOf(66)) // ENTER
+            }
+            SystemClock.sleep(2500)
+            return tamam("$gorunenAd içinde ARA tuşuna basılıp '$ad' yazıldı.$bak")
+        } catch (e: Adb.Hata) {
+            return hata("$gorunenAd açık ama arama yazılamadı: ${e.message} ekrana_bak ile ekranı gör; sol tuşla menüyü açıp büyüteç (Ara) simgesine tus ile gidip tamam'a bas, sonra harfleri ekran klavyesinden seç.")
+        } catch (e: IllegalArgumentException) {
+            return hata("Aranacak ad yazılabilir harf içermiyor.")
+        }
     }
 
     /** Uygulamayı açar, "Ara" öğesine tıklar, metni yazar ve gönderir (arama niyeti olmayan uygulamalar için). */
