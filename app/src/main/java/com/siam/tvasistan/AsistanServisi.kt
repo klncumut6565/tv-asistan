@@ -348,7 +348,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         val simdi = SystemClock.elapsedRealtime()
         // YANKI KORUMASI (mobil veride gecikme): Jülide TV'den konuşurken telefon bunu henüz bilmiyorsa
         // (jk=false) gelen ses büyük olasılıkla Jülide'nin kendi sesidir: söz kesilmez, modele gönderilmez.
-        if (meta.has("jk") && !meta.optBoolean("jk") && oynatici?.caliyor() == true) return
+        if (meta.has("jk") && !meta.optBoolean("jk") && oynatici?.yankiVar() == true) return
         // Yeni konuşma: sayfa ilk parçayı b=1 ile işaretler; mobil ağdaki gecikmeli parçalar yeni konuşma sanılmaz.
         val yeniKonusma = if (meta.has("b")) meta.optInt("b") == 1 else simdi - sonTelefonSesi > 1_500
         sonTelefonSesi = simdi
@@ -494,10 +494,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                         tRmsToplam += r
                         if (r > tRmsMaks) tRmsMaks = r
                     }
-                    if (oy.caliyor()) {
+                    if (oy.yankiVar()) {
                         // Telefondan konuşuluyorsa Jülide'nin sözünü kes (bkz. telefonKonusmasiBasladi);
                         // TV/kumanda mikrofonunda yarı çift yönlü kural aynen geçerli.
-                        if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700) oy.temizle()
+                        if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700) { if (oy.caliyor()) oy.temizle() }
                         else { tKapali++; return@Mikrofon }
                     }
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
@@ -563,7 +563,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         kapsam.launch {
             while (durum == Durum.DINLIYOR) {
                 delay(500)
-                val caliyor = oynatici?.caliyor() == true
+                val caliyor = oynatici?.yankiVar() == true // telefon sayfası eşiği yüksek tutsun (Jülide'nin sesi sözü kesmesin)
                 val simdi = SystemClock.elapsedRealtime()
                 medyaAktif = medyaCaliyor()
                 // Tanılama: Jülide'nin konuşmaya başlaması/bitmesi ve 2 sn'de bir mikrofon özeti

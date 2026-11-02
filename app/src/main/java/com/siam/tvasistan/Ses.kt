@@ -372,6 +372,14 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     /** Asistan konuşuyor mu? (yankıyı modele geri göndermemek için) */
     fun caliyor(): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 300
 
+    /**
+     * YANKI KORUMASI için (oynatıcıyı ETKİLEMEZ): hoparlör, yazılan sesi ~1 sn tampondan sonra çalar. [caliyor]
+     * yazma anına göre erken "sustu" der; o arada TV mikrofonu Jülide'nin kendi sesini Gemini'ye gönderiyor,
+     * Gemini bunu kullanıcı konuşması sanıp sözü kesiyordu (CÜMLE KOPMASI). Bu yüzden mikrofon kapısı 1,5 sn
+     * daha kapalı tutulur.
+     */
+    fun yankiVar(): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 1500
+
     /** Kesinti: kuyruktaki ve tampondaki sesi anında at. */
     fun temizle() {
         kuyruk.clear()
