@@ -2,10 +2,6 @@
   "aciklama": "Uzaktan ayarlar. GÜVENLİK: yalnızca bu alanlar okunur ve doğrulanır; model talimatı (system prompt) uzaktan değiştirilemez. Değişiklik ETag ile en geç birkaç dakika içinde TV'ye ulaşır.",
   "modeller": [
     {
-      "ad": "models/gemini-3.1-flash-live-preview",
-      "etiket": "Gemini 3.1 Flash Live"
-    },
-    {
       "ad": "models/gemini-3.8-live",
       "etiket": "Gemini 3.8 Live",
       "blocking": true
