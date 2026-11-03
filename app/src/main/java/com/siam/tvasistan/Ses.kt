@@ -369,6 +369,9 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
         if (acik) kuyruk.offer(p)
     }
 
+    /** TANI: hoparlör tamponunun boşaldığı (takıldığı) toplam sayı. Her cevabın sonunda 1 kez boşalması normaldir. */
+    fun takilma(): Int = try { track.underrunCount } catch (_: Exception) { 0 }
+
     /** Asistan konuşuyor mu? (yankıyı modele geri göndermemek için) */
     fun caliyor(): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 300
 

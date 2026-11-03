@@ -1,5 +1,6 @@
 package com.siam.tvasistan
 
+import android.os.SystemClock
 import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
@@ -34,6 +35,41 @@ class GeminiLive(private val d: Dinleyici) {
         fun aracCagrisi(ad: String, args: JSONObject): JSONObject
         fun hata(mesaj: String)
         fun kapandi()
+        /** TANI: her cevabın sonunda ses akışı ölçümü (Gemini'den ses ne zaman, ne hızda geldi). */
+        fun tani(ozet: String) {}
+    }
+
+    // ---- TANI: uzun cevaplarda kopma ölçümü. Davranışı DEĞİŞTİRMEZ, yalnız ölçer.
+    private var turBas = -1L        // ilk ses parçasının geliş anı
+    private var turSesMs = 0L       // gelen toplam ses süresi
+    private var turParca = 0
+    private var gerekTampon = 0L    // hiç takılmadan çalmak için gereken en az ön tampon (ms)
+    private var bosluk = 0          // parçalar arası 300 ms'den uzun boşluk sayısı
+    private var enUzunBosluk = 0L
+    private var sonGelis = 0L
+    private var turKesinti = 0      // sunucudan gelen "interrupted" sayısı
+
+    private fun sesOlc(bayt: Int) {
+        val t = SystemClock.elapsedRealtime()
+        if (turBas < 0) { turBas = t; sonGelis = t }
+        // Sıfır tamponla çalınsaydı bu parçanın çalınması gereken an: turBas + şimdiye kadarki ses
+        gerekTampon = maxOf(gerekTampon, t - (turBas + turSesMs))
+        val ara = t - sonGelis
+        if (ara > 300) bosluk++
+        enUzunBosluk = maxOf(enUzunBosluk, ara)
+        turSesMs += bayt / 48L // 24 kHz × 2 bayt
+        sonGelis = t
+        turParca++
+    }
+
+    private fun turOzeti() {
+        if (turParca > 0) {
+            val sure = sonGelis - turBas
+            fun sn(ms: Long) = String.format(java.util.Locale("tr"), "%.1f", ms / 1000.0)
+            d.tani("Tanı · ${modelEtiketi ?: "?"} · ses ${sn(turSesMs)} sn, ${sn(sure)} sn'de geldi · " +
+                "gerekli tampon ${sn(gerekTampon)} sn · boşluk $bosluk (en uzun ${sn(enUzunBosluk)} sn) · kesinti $turKesinti · parça $turParca")
+        }
+        turBas = -1L; turSesMs = 0L; turParca = 0; gerekTampon = 0L; bosluk = 0; enUzunBosluk = 0L; turKesinti = 0
     }
 
 
@@ -264,18 +300,22 @@ class GeminiLive(private val d: Dinleyici) {
         }
 
         val sc = j.optJSONObject("serverContent") ?: return
-        if (sc.optBoolean("interrupted")) d.kesildi()
+        if (sc.optBoolean("interrupted")) { turKesinti++; turOzeti(); d.kesildi() }
 
         val parcalar = sc.optJSONObject("modelTurn")?.optJSONArray("parts")
         if (parcalar != null) {
             for (i in 0 until parcalar.length()) {
                 val veri = parcalar.optJSONObject(i)?.optJSONObject("inlineData")?.optString("data").orEmpty()
-                if (veri.isNotEmpty()) d.sesGeldi(Base64.decode(veri, Base64.DEFAULT))
+                if (veri.isNotEmpty()) {
+                    val pcm = Base64.decode(veri, Base64.DEFAULT)
+                    sesOlc(pcm.size)
+                    d.sesGeldi(pcm)
+                }
             }
         }
         sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotEmpty() }?.let { d.kullaniciMetni(it) }
         sc.optJSONObject("outputTranscription")?.optString("text")?.takeIf { it.isNotEmpty() }?.let { d.asistanMetni(it) }
-        if (sc.optBoolean("turnComplete")) d.turBitti()
+        if (sc.optBoolean("turnComplete")) { turOzeti(); d.turBitti() }
     }
 
     private fun aracCagrisi(tc: JSONObject) {

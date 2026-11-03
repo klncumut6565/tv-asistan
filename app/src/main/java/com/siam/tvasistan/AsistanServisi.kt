@@ -822,6 +822,20 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         oynatici?.temizle()
     }
 
+    private var sonTakilma = 0
+    private var takilmaOynatici: Oynatici? = null
+
+    override fun tani(ozet: String) {
+        val oy = oynatici
+        val toplam = oy?.takilma() ?: 0
+        if (oy !== takilmaOynatici) { takilmaOynatici = oy; sonTakilma = 0 }
+        val fark = (toplam - sonTakilma).coerceAtLeast(0)
+        sonTakilma = toplam
+        val m = "$ozet · hoparlör boşalması $fark"
+        Log.i(ETIKET, "TANI tur: $m")
+        telefon?.durumGonder(m)
+    }
+
     override fun turBitti() {
         ana.post {
             yeniTur = true
