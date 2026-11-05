@@ -373,7 +373,10 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     fun takilma(): Int = try { track.underrunCount } catch (_: Exception) { 0 }
 
     /** Asistan konuşuyor mu? (yankıyı modele geri göndermemek için) */
-    fun caliyor(): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + 300
+    fun caliyor(): Boolean = caliyor(300)
+
+    /** [ekMs]: yazılan sesin tahmini bitişinden sonra kaç ms daha "çalıyor" sayılsın (hoparlör tamponu payı). */
+    fun caliyor(ekMs: Long): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + ekMs
 
     /** Kesinti: kuyruktaki ve tampondaki sesi anında at. */
     fun temizle() {

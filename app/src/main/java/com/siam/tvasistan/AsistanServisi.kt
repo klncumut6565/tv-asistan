@@ -91,6 +91,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private var sessizCikis: SessizCikis? = null
     /** "Jülide" uyandırma dinleyicisi (yalnız sohbet açıkken; TV sesi varken beslenir). */
     @Volatile private var uyandirma: Uyandirma? = null
+    /** ŞAKA (tekrarlama) modu: sohbet kapanana ya da kullanıcı kapatana kadar açık. */
+    @Volatile var sakaModu = false
 
     // ---- Telefon mikrofonu (TelefonKoprusu) ----
     private var telefon: TelefonKoprusu? = null
@@ -294,7 +296,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         val simdi = SystemClock.elapsedRealtime()
         // YANKI KORUMASI (mobil veride gecikme): Jülide TV'den konuşurken telefon bunu henüz bilmiyorsa
         // (jk=false) gelen ses büyük olasılıkla Jülide'nin kendi sesidir: söz kesilmez, modele gönderilmez.
-        if (meta.has("jk") && !meta.optBoolean("jk") && oynatici?.caliyor() == true) return
+        if (meta.has("jk") && !meta.optBoolean("jk") && oynatici?.caliyor(if (sakaModu) 1500 else 300) == true) return
         // Yeni konuşma: sayfa ilk parçayı b=1 ile işaretler; mobil ağdaki gecikmeli parçalar yeni konuşma sanılmaz.
         val yeniKonusma = if (meta.has("b")) meta.optInt("b") == 1 else simdi - sonTelefonSesi > 1_500
         sonTelefonSesi = simdi
@@ -440,6 +442,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                         tRmsToplam += r
                         if (r > tRmsMaks) tRmsMaks = r
                     }
+                    // Şaka modunda Jülide'nin tekrarı mikrofona geri girip sonsuz tekrar döngüsü yapmasın:
+                    // hoparlör tamponu bitene kadar (+1,5 sn) TV mikrofonu kapalı. Normal modda davranış AYNI.
+                    if (sakaModu && !oy.caliyor() && oy.caliyor(1500)) { tKapali++; return@Mikrofon }
                     if (oy.caliyor()) {
                         // Telefondan konuşuluyorsa Jülide'nin sözünü kes (bkz. telefonKonusmasiBasladi);
                         // TV/kumanda mikrofonunda yarı çift yönlü kural aynen geçerli.
@@ -708,6 +713,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     fun bitir() {
+        sakaModu = false
         val oncekiDurum = durum
         synchronized(telefonTampon) { telefonTampon.clear() }
         if (oncekiDurum != Durum.BOSTA) telefon?.halGonder(false, false)

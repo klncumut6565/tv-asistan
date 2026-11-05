@@ -66,12 +66,14 @@ class Araclar(private val s: AsistanServisi) {
         .put(fn("uygulama_kapat", "Açık olan bir uygulamayı kapatır. Ad verilmezse şu an ekrandaki uygulamayı kapatır.",
             listOf(P("ad", "STRING", "Kapatılacak uygulamanın adı; boş bırakılırsa ekrandaki uygulama"))))
         .put(fn("uygulamalari_listele", "TV'de kurulu tüm uygulamaların adlarını döndürür."))
-        .put(fn("akilli_ara", "Kullanıcı bir film/dizi/şarkı/video/herhangi bir şeyi AÇ/İZLE/DİNLE/ARA dediğinde HER ZAMAN BUNU kullan. Platform söylenmemişse ŞU AN AÇIK uygulamada arar (YouTube açıksa YouTube'da, Prime/TOD açıksa orada, tarayıcı açıksa tarayıcıda). Platform söylenmişse ('tarayıcıdan', 'YouTube'da', 'Prime'da') oradan arar.",
+        .put(fn("akilli_ara", "Kullanıcı bir film/dizi/şarkı/video/herhangi bir şeyi AÇ/İZLE/DİNLE/ARA dediğinde HER ZAMAN BUNU kullan. Platform söylenmemişse ŞU AN AÇIK uygulamada arar (YouTube açıksa YouTube'da, Prime/TOD açıksa orada, tarayıcı açıksa tarayıcıda). Açık uygulama uygun değilse ve birden çok seçenek varsa HİÇBİR ŞEY AÇMAZ, 'soru_sor' döndürür: o zaman kullanıcıya hangi platformdan açacağını sor. Platform söylenmişse ('tarayıcıdan', 'YouTube'da', 'Prime'da', 'Spotify'dan') oradan arar.",
             listOf(
                 P("sorgu", "STRING", "Aranacak şey, ör. 'Cehennem Melekleri' ya da 'Yıldız Tilbe Delikanlım'"),
                 P("platform", "STRING", "YALNIZCA kullanıcı açıkça söylediyse: tarayıcı, YouTube, Prime Video, TOD... Söylemediyse BOŞ bırak."),
                 P("tur", "STRING", "film, dizi, muzik, video ya da diger", listOf("film", "dizi", "muzik", "video", "diger"))
             ), listOf("sorgu")))
+        .put(fn("saka_modu", "ŞAKA (TEKRARLAMA) MODU: açıkken Jülide kullanıcının söylediğini kelimesi kelimesine, hiçbir şey eklemeden tekrar eder. 'Söylediklerimi tekrarla', 'dediklerimi tekrar et', 'şaka modunu aç' → acik=true. 'Şaka modunu kapat', 'tekrarlamayı bırak', 'normal moda dön' → acik=false.",
+            listOf(P("acik", "BOOLEAN", "true: modu aç, false: kapat")), listOf("acik")))
         .put(fn("internette_arastir", "İNTERNET ARAŞTIRMASI (ücretsiz): genel ya da güncel BİLGİ sorularında kullan (bugünkü maçlar, skor, puan durumu, haber, kişi, olay, bilim, tarih, tarif, ürün, mevzuat...). Tarayıcı AÇMAZ. Birden çok kaynağı bulur, en güvenilirlerin sayfasını okur, kopyaları ayıklar ve kanıt düzeyiyle (güçlü/orta/yetersiz) kaynaklı bir kanıt paketi döndürür. Döviz için doviz_kuru, hava için hava_durumu daha nettir.",
             listOf(
                 P("sorgu", "STRING", "Kullanıcının sorusu doğal haliyle (ör. 'bugün hangi maçlar var', 'Galatasaray'ın bir sonraki maçı ne zaman'). Takip sorusunda önceki konuyu ekle."),
@@ -205,13 +207,19 @@ Senin adın JÜLİDE. Toshiba Android TV üzerinde çalışan Türkçe sesli asi
 DÜZGÜN TÜRKÇE: Standart, düzgün İstanbul Türkçesiyle konuş; kelimeleri doğru telaffuz et (ı, ğ, ş, ç, ö, ü seslerini net söyle), Türkçe vurgu ve ünlü uyumuna uy, yabancı aksan ya da çeviri kokan cümle kurma, argo ve devrik/bozuk cümle kullanma, dilbilgisi hatası yapma.
 KONUŞMA ÜSLUBU: Sıcak, samimi ama ölçülü bir Türk kadını gibi, doğal sohbet temposunda konuş. Kısa soruya kısa cevap ver (1-2 cümle), ayrıntı istenirse açıkla. Cümle sonlarını hep aynı tonda bitirme; soru sorarken doğal soru tonlaması kullan, önemli kelimeyi hafifçe vurgula. Virgüllerde kısa, cümle aralarında doğal duraklamalar yap; ama anlamsız uzun bekleme yapma. Gereksiz ünlem, yapay coşku ve "harika!", "tabii ki!" gibi kalıpları tekrarlama. Bir işi yaparken "Hemen bakıyorum", "Tamam, açıyorum" gibi kısa, insan gibi geçiş cümleleri kullan.
 Kullanıcı cümlesine "Jülide" diye başlayabilir (uyandırma kelimesi); bu sana hitaptır, komutun parçası değildir.
+${if (s.sakaModu) "!!! ŞAKA MODU ŞU AN AÇIK: aşağıdaki ŞAKA MODU kurallarına göre davran; karşılama yapma, kendini tanıtma. !!!\n" else ""}ŞAKA MODU (TEKRARLAMA) — BU KURAL AÇIKKEN DİĞER BÜTÜN KURALLARDAN ÖNCE GELİR:
+- Kullanıcı "söylediklerimi tekrarla", "dediklerimi tekrar et", "şaka modunu aç" derse → saka_modu(acik=true). Aynı cümlede komuttan sonra söz varsa (ör. "Jülide söylediklerimi tekrarla ben bu evin ruhuyum huuu") araç sonucundan sonra YALNIZCA o sözü tekrar et ("ben bu evin ruhuyum huuu").
+- Mod AÇIKKEN kullanıcının her sözünü KELİMESİ KELİMESİNE, aynı sırayla tekrar et: ekleme, çıkarma, düzeltme, çeviri, yorum YOK. Başına/sonuna "Tamam", "Ben Jülide", "Size nasıl yardımcı olabilirim", "Tekrar ediyorum" gibi HİÇBİR ŞEY ekleme. Karşılama yapma, kendini tanıtma.
+- Cümle başındaki "Hey Jülide" / "Jülide" hitabını tekrar ETME; yalnız ondan sonrasını söyle. Sesin kendisi Jülide'nin sesi; sözün havasına uygun tonla söyle (ürkütücü sözleri yavaş ve gizemli, uzatılmış sesleri "huuuu" gibi uzatarak).
+- Mod açıkken söz soru ya da komut gibi olsa bile CEVAPLAMA ve araç çağırma; yalnız tekrar et. Tek istisna: "şaka modunu kapat", "tekrarlamayı bırak", "normal moda dön" → saka_modu(acik=false), sonra yalnızca "Tamam, normal moda döndüm." de. "Sohbeti kapat" → oturumu_kapat (şaka modu da biter).
+- Kendi az önce söylediğin sözün yankısını duyarsan (aynı cümle tekrar geliyorsa) tekrar ETME, sessiz kal.
 Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulamak:
 - "X'i aç" → uygulama_ac. Bulunamazsa benzer adları söyle.
 - "X'i kapat", "bunu kapat", "uygulamadan çık" → uygulama_kapat (ad belirtilmemişse boş bırak).
-- BAĞLAM (ÇOK ÖNEMLİ): Hangi uygulamada olduğunu bil. Her araç sonucunda "simdi_acik_uygulama" alanı var; buna bak. "X'i aç / izle / dinle / bul / ara" (film, dizi, şarkı, video, ne olursa) → akilli_ara. Kullanıcı platform SÖYLEMEDİYSE platform'u BOŞ bırak: akilli_ara ŞU AN AÇIK uygulamada arar (ör. YouTube'da şarkı açıkken "Cehennem Melekleri filmini aç" → YouTube'da arar). Kullanıcı platform SÖYLEDİYSE ("tarayıcıdan aç", "Prime'da aç", "YouTube'dan") platform'a onu yaz. Kendi kafana göre platform değiştirme.
+- BAĞLAM (ÇOK ÖNEMLİ): Hangi uygulamada olduğunu bil. Her araç sonucunda "simdi_acik_uygulama" alanı var; buna bak. "X'i aç / izle / dinle / bul / ara" (film, dizi, şarkı, video, ne olursa) → akilli_ara. Kullanıcı platform SÖYLEMEDİYSE platform'u BOŞ bırak: akilli_ara ŞU AN AÇIK uygulamada arar (ör. YouTube'da şarkı açıkken "Cehennem Melekleri filmini aç" → YouTube'da arar). PLATFORM SORUSU: akilli_ara "soru_sor" döndürürse (ana ekran, canlı TV gibi bağlam yokken birden çok uygun uygulama var) HİÇBİR ŞEY AÇILMAMIŞTIR; kullanıcıya kısaca sor: şarkıda "YouTube'dan mı açayım, Spotify'dan mı?", filmde ör. "YouTube'dan mı açayım, tarayıcıdan mı?". Cevabı alınca akilli_ara'yı aynı sorgu ve platform=seçilen ile çağır. Kendi başına platform seçme; kullanıcı "fark etmez" derse ilk seçeneği kullan. Kullanıcı platform SÖYLEDİYSE ("tarayıcıdan aç", "Prime'da aç", "YouTube'dan") platform'a onu yaz. Kendi kafana göre platform değiştirme.
 - TARAYICIDA FİLM: Kullanıcı tarayıcıdan film izlemek isterse: akilli_ara(platform=tarayıcı) → sonuç linkine tikla (yazıyla) ya da numaralari_goster → numaraya_tikla. Film sayfası açılınca video_oynat (ortadaki ▶), sonra video_tam_ekran. Reklam sekmesi/yeni sayfa açılırsa tus: geri ile dön ve tekrar dene. "Sayfayı büyüt/küçült", "yazılar küçük" → sayfa_boyutu. Kullanıcı "imleci göster", "sağa götür", "biraz aşağı", "şuna tıkla" derse → imlec (goster/tasi/git/oge/tikla). İmleç modu otomatik: linkler algılanıyorsa el işareti, algılanmıyorsa fare oku; kullanıcı açıkça "fare" ya da "el" isterse mod ile ver. İmleç taşındıktan sonra altındaki öğeyi kısaca söyle; tıklamadan önce emin değilsen sor.
-- MÜZİK: Kullanıcının SPOTIFY üyeliği var. "Spotify'dan X aç / çal" → spotify_ara (ya da akilli_ara platform=Spotify). Spotify açıkken ya da ana ekrandayken şarkı istenirse Spotify kullanılır; YouTube açıkken platform söylenmezse YouTube'da aranır. Sonuçlar gelince ekrani_oku ile bak: kullanıcı belirli şarkıyı söylediyse ONU, "herhangi biri / fark etmez / bir şarkısını aç" dediyse İLK ŞARKIYI seç (tikla). Kullanıcı "neler var" derse ilk birkaç şarkıyı oku ve hangisini istediğini sor; numara veya ad söyleyince ona tikla.
-- FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken film-dizi akilli_ara ile aboneliklerde aranır. Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
+- MÜZİK: Kullanıcının SPOTIFY üyeliği var. "Spotify'dan X aç / çal" → spotify_ara (ya da akilli_ara platform=Spotify). Spotify açıkken şarkı istenirse Spotify'da, YouTube açıkken YouTube'da aranır; ana ekrandayken akilli_ara soru_sor döndürür → "YouTube'dan mı, Spotify'dan mı?" diye sor. Sonuçlar gelince ekrani_oku ile bak: kullanıcı belirli şarkıyı söylediyse ONU, "herhangi biri / fark etmez / bir şarkısını aç" dediyse İLK ŞARKIYI seç (tikla). Kullanıcı "neler var" derse ilk birkaç şarkıyı oku ve hangisini istediğini sor; numara veya ad söyleyince ona tikla.
+- FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken akilli_ara soru_sor döndürür → kullanıcıya platformu sor (YouTube, tarayıcı, abonelikler; içeriğe en uygun 2-3 tanesi). Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
 - "YouTube'da X'i aç / oynat / çal / izle", "X şarkısını aç" (YouTube açıkken ya da YouTube denildiğinde) → youtube_oynat: videoyu DOĞRUDAN başlatır, sonuç sayfasına tıklamaya gerek yok. "İkincisini / başka birini aç" → aynı sorgu ile sira=2, 3... Yalnızca "YouTube'da ara, sonuçları göster" denirse youtube_ara. "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
 - Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
@@ -303,6 +311,13 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "numaraya_tikla" -> numarayaTikla(a.optInt("numara", -1), a.optBoolean("onayli", false))
             "ses" -> ses(a.optString("islem"), if (a.has("seviye")) a.optInt("seviye") else null)
             "medya" -> medya(a.optString("islem"))
+            "saka_modu" -> {
+                val ac = a.optBoolean("acik", false)
+                s.sakaModu = ac
+                if (ac) tamam("ŞAKA MODU AÇIK. Şimdi kullanıcının bu komuttan SONRA söylediği sözleri (varsa) kelimesi kelimesine tekrar et; " +
+                    "başına/sonuna HİÇBİR ŞEY ekleme ('tamam', 'Ben Jülide', 'size nasıl yardımcı olurum' YOK). Komuttan sonra söz yoksa HİÇ konuşma, sessizce bekle.")
+                else tamam("Şaka modu kapandı. Yalnızca 'Tamam, normal moda döndüm.' de.")
+            }
             "oturumu_kapat" -> {
                 s.oturumuKapatIste()
                 tamam("Oturum kapanacak.")
@@ -873,6 +888,17 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
         // 2) Platform yoksa: ŞU AN AÇIK uygulama
         val (b, ad) = baglamBul(s.aktifPaket)
+        // 2b) Açık uygulama uygun değilse ve birden çok seçenek varsa: AÇMA, kullanıcıya sor
+        if (b == Baglam.DIGER) {
+            val secenekler = platformSecenekleri(tur)
+            if (secenekler.size > 1) {
+                return JSONObject()
+                    .put("soru_sor", "HİÇBİR ŞEY AÇILMADI. Platform belirsiz: kullanıcıya YALNIZCA kısa bir soru sor, ör. '${secenekler[0]}'dan mı açayım, ${secenekler[1]}'dan mı?' " +
+                        "Seçeneklerden içeriğe en uygun 2-3 tanesini söyle (ör. eski/ücretsiz yerli film → YouTube ve tarayıcı; yeni film/dizi → abonelikler). " +
+                        "Cevap gelince akilli_ara'yı AYNI sorgu ve platform=seçilen ile tekrar çağır. Kullanıcı 'fark etmez/sen seç' derse platform=${secenekler[0]}.")
+                    .put("secenekler", JSONArray(secenekler))
+            }
+        }
         val sonuc = when (b) {
             Baglam.YOUTUBE -> youtubeAra(sorgu)
             Baglam.SPOTIFY -> spotifyAra(sorgu, false)
@@ -888,6 +914,29 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
         val not = if (b == Baglam.DIGER) "Açık uygulamada arama yok; türe göre seçildi." else "Şu an $ad açık olduğu için orada arandı."
         return sonuc.put("baglam", not + " Bulunamazsa kullanıcıya kısaca söyle ve başka platform önermeden önce sor.")
+    }
+
+    /** İçerik türüne göre TV'de kurulu ve Jülide'de AKTİF olan platformlar (akilli_ara platform adlarıyla). */
+    private fun platformSecenekleri(tur: String): List<String> {
+        val l = mutableListOf<String>()
+        val youtube = try { Uygulamalar.bul(s, "YouTube").any { it.paket.contains("youtube", true) && !it.paket.contains("music", true) } } catch (_: Exception) { false }
+        val tarayici = try { Uygulamalar.aktifTarayici(s)?.let { p -> Uygulamalar.liste(s).firstOrNull { it.paket == p }?.ad ?: "tarayıcı" } } catch (_: Exception) { null }
+        when (tur) {
+            "muzik" -> {
+                if (youtube) l += "YouTube"
+                if (spotifyPaketi() != null) l += "Spotify"
+            }
+            "film", "dizi" -> {
+                if (youtube) l += "YouTube"
+                tarayici?.let { l += it }
+                abonelikler.forEach { a -> if (try { Uygulamalar.bul(s, a).isNotEmpty() } catch (_: Exception) { false }) l += a }
+            }
+            "video" -> {
+                if (youtube) l += "YouTube"
+                tarayici?.let { l += it }
+            }
+        }
+        return l
     }
 
     private fun icerikAra(q: String): JSONObject {
