@@ -65,6 +65,14 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         private set
     private var live: GeminiLive? = null
 
+    /** Basit komutlar (kanal, ses, HDMI, medya) için LLM'siz hızlı yol. */
+    private val hizli by lazy {
+        HizliYol(
+            calistir = { ad, args -> araclar.calistir(ad, args) },
+            bildir = { m -> ana.post { panel.durum(m) } },
+        )
+    }
+
     /** Araçlar için: ekran görüntüsünü canlı Gemini oturumuna gönderir. */
     fun gorselGonder(jpeg: ByteArray): Boolean {
         val l = live ?: return false
@@ -714,6 +722,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     fun bitir() {
         sakaModu = false
+        hizli.kapat()
         val oncekiDurum = durum
         synchronized(telefonTampon) { telefonTampon.clear() }
         if (oncekiDurum != Durum.BOSTA) telefon?.halGonder(false, false)
@@ -862,8 +871,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 kullaniciMetin.clear()
                 asistanMetin.clear()
                 yeniTur = false
+                hizli.yeniTur()
             }
             kullaniciMetin.append(t)
+            if (durum == Durum.DINLIYOR && !bekleyenKapat && !sakaModu) hizli.metin(kullaniciMetin.toString())
             panel.metin(kullaniciMetin.toString(), asistanMetin.toString())
             // "Sohbeti kapat" modelin aracı çağırmasına bırakılmaz: duyulduğu an kapanış başlar
             // (veda cümlesi bitince küre söner).
@@ -883,6 +894,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     override fun aracCagrisi(ad: String, args: JSONObject): JSONObject {
         Log.i(ETIKET, "TANI olay: araç $ad")
         sonEtkinlik = SystemClock.elapsedRealtime()
+        hizli.modelCagrisi(ad)?.let {
+            sonEtkinlik = SystemClock.elapsedRealtime()
+            return it
+        }
         panel.durum("İşlem: ${ad.replace('_', ' ')}")
         val sonuc = araclar.calistir(ad, args)
         sonEtkinlik = SystemClock.elapsedRealtime()
