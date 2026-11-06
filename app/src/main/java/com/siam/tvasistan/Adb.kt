@@ -56,6 +56,9 @@ class Adb(private val ctx: Context) {
 
         /** "7" → KEYCODE_7 (14). */
         fun rakamTusu(c: Char): Int = 7 + (c - '0')
+
+        /** Jülide'nin kendi gönderdiği tuşların zamanı: kumanda tuşu yakalayıcısı bunları kullanıcı tuşu sanmasın. */
+        @Volatile var sonTusGonderimi = 0L
     }
 
     class Hata(mesaj: String) : Exception(mesaj)
@@ -71,7 +74,32 @@ class Adb(private val ctx: Context) {
      */
     fun tuslar(kodlar: List<Int>) {
         require(kodlar.isNotEmpty() && kodlar.size <= 12 && kodlar.all { it in 1..400 })
-        komut("input keyevent " + kodlar.joinToString(" "))
+        sonTusGonderimi = android.os.SystemClock.elapsedRealtime()
+        try {
+            komut("input keyevent " + kodlar.joinToString(" "))
+        } finally {
+            sonTusGonderimi = android.os.SystemClock.elapsedRealtime()
+        }
+    }
+
+    /**
+     * Sayfayı kaydırır (fare tekerleği gibi): gerçek parmak kaydırma hareketi (input swipe).
+     * Dokunmatik ekranı olmayan TV'de de tarayıcılar bunu sayfa kaydırması olarak alır.
+     */
+    fun kaydir(x1: Int, y1: Int, x2: Int, y2: Int, sureMs: Int = 250) {
+        require(listOf(x1, y1, x2, y2).all { it in 0..8000 } && sureMs in 50..2000)
+        komut("input swipe $x1 $y1 $x2 $y2 $sureMs")
+    }
+
+    /**
+     * [paket]'i Android'in VARSAYILAN TARAYICISI yapar (rol: android.app.role.BROWSER) ve sonucu döndürür.
+     * GÜVENLİK: paket adı yalnız [A-Za-z0-9._] olabilir.
+     */
+    fun varsayilanTarayiciYap(paket: String): Boolean {
+        require(Regex("^[A-Za-z0-9._]{3,200}$").matches(paket))
+        komut("cmd role add-role-holder android.app.role.BROWSER $paket 0")
+        val sahip = komut("cmd role get-role-holders android.app.role.BROWSER")
+        return sahip.contains(paket)
     }
 
     /**

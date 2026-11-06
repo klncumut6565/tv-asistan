@@ -345,6 +345,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     // ------------------------------------------------------------ kumanda tuşu
 
+    private val GOOGLE_TUSLARI = setOf(
+        KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_CENTER,
+        KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+    )
+    @Volatile private var googleTutulan = -1
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (!::ayarlar.isInitialized) return false
         val kod = event.keyCode
@@ -359,6 +365,21 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
             }
             return true
+        }
+
+        // Google sonuç sayfası: aşağı/yukarı sonuçlar arasında gezinir, orta tuş seçili sonucu açar
+        if (kod in GOOGLE_TUSLARI && ::araclar.isInitialized) {
+            val orta = kod != KeyEvent.KEYCODE_DPAD_DOWN && kod != KeyEvent.KEYCODE_DPAD_UP
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount > 0 && orta) return googleTutulan == kod
+                val al = try { araclar.googleTusu(kod) } catch (e: Exception) { Log.w(ETIKET, "Google tuşu: ${e.message}"); false }
+                if (al) { googleTutulan = kod; return true }
+                if (event.repeatCount == 0) googleTutulan = -1
+            } else if (event.action == KeyEvent.ACTION_UP && googleTutulan == kod) {
+                googleTutulan = -1
+                return true
+            }
+            return false
         }
 
         val tetik = ayarlar.tetikTusu

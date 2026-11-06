@@ -75,6 +75,16 @@ class Ayarlar(ctx: Context) {
         } catch (_: Exception) { emptyMap() }
         set(v) = p.edit().putString("kanal_haritasi", org.json.JSONObject(v).toString()).apply()
 
+    /** Google sonuç sayfasında kumandanın aşağı/yukarı tuşları sonuçlar arasında gezinsin, orta tuş açsın. */
+    var googleTusGezinme: Boolean
+        get() = p.getBoolean("google_tus_gezinme", true)
+        set(v) = p.edit().putBoolean("google_tus_gezinme", v).apply()
+
+    /** Android'in varsayılan tarayıcısı yapılan paket (yeniden denememek için). */
+    var varsayilanTarayici: String?
+        get() = p.getString("varsayilan_tarayici", null)
+        set(v) = p.edit().putString("varsayilan_tarayici", v).apply()
+
     var uyandirmaAktif: Boolean
         get() = p.getBoolean("uyandirma_aktif", false)
         set(v) = p.edit().putBoolean("uyandirma_aktif", v).apply()
