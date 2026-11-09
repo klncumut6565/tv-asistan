@@ -18,7 +18,7 @@ class AracKorumasi(private val sinir: Int = 2) {
         val MUAF = setOf(
             "tus", "kaydir", "imlec", "ekrani_oku", "ekrana_bak", "numaralari_goster", "arama_sonucu",
             "saat_tarih", "cihaz_durumu", "uygulamalari_listele", "kaynaklari_listele", "kanal_listesi",
-            "oturumu_kapat", "tv_kapat", // kullanıcının durdurma/kapatma kontrolü her zaman erişilebilir
+            "hatirladiklarim", "oturumu_kapat", "tv_kapat", // kullanıcının durdurma/kapatma kontrolü her zaman erişilebilir
         )
 
         /** Anahtarları sıralı, iç içe nesneleri de kapsayan kararlı argüman metni. */

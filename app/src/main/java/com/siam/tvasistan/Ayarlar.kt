@@ -75,6 +75,11 @@ class Ayarlar(ctx: Context) {
         } catch (_: Exception) { emptyMap() }
         set(v) = p.edit().putString("kanal_haritasi", org.json.JSONObject(v).toString()).apply()
 
+    /** Jülide'nin kalıcı belleği (kullanıcının açıkça kaydettirdiği bilgiler, JSON). Bkz. Bellek. */
+    var bellekJson: String
+        get() = p.getString("bellek", "[]") ?: "[]"
+        set(v) = p.edit().putString("bellek", v).apply()
+
     /** Google sonuç sayfasında kumandanın aşağı/yukarı tuşları sonuçlar arasında gezinsin, orta tuş açsın. */
     var googleTusGezinme: Boolean
         get() = p.getBoolean("google_tus_gezinme", true)

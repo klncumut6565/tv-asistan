@@ -448,6 +448,14 @@ class MainActivity : Activity() {
             s.ekle(ui.dugme("Öğrenilen kanalları sil") { a.kanalHaritasi = emptyMap(); toast("Silindi."); kategoriEkrani(Kategori.TV) })
         }
 
+        val bellek = Bellek(a.bellekJson).liste
+        s.ekle(ui.bolum("Jülide'nin belleği"))
+        s.ekle(ui.aciklama(if (bellek.isEmpty()) "Henüz kayıt yok. \"Jülide, bunu hatırla: …\" diyerek bilgi kaydettirebilirsiniz."
+            else "Kayıtlı ${bellek.size} bilgi: " + bellek.take(10).joinToString(" · ") { it.metin }))
+        if (bellek.isNotEmpty()) {
+            s.ekle(ui.dugme("Jülide'nin belleğini sil") { a.bellekJson = "[]"; toast("Bellek silindi."); kategoriEkrani(Kategori.TV) })
+        }
+
         s.ekle(ui.bolum("Bilgisayardan (ADB)"))
         s.ekle(ui.aciklama("Menüler yoksa ya da izin verilemiyorsa bir kez çalıştırın:"))
         s.ekle(ui.yazi(
