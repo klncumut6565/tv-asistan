@@ -858,6 +858,11 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         oynatici?.temizle()
     }
 
+    /** Aynı aracın aynı argümanla tur içinde döngüye girmesini engeller. */
+    private val aracKorumasi = AracKorumasi()
+
+    /** TANI: tur kimliği (logda kopmaları aynı tura bağlamak için). */
+    private var taniTurNo = 0L
     private var sonTakilma = 0
     private var takilmaOynatici: Oynatici? = null
 
@@ -867,14 +872,17 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         if (oy !== takilmaOynatici) { takilmaOynatici = oy; sonTakilma = 0 }
         val fark = (toplam - sonTakilma).coerceAtLeast(0)
         sonTakilma = toplam
-        val m = "$ozet · hoparlör boşalması $fark"
-        Log.i(ETIKET, "TANI tur: $m")
+        val cal = oy?.taniOzeti() ?: "çalar yok"
+        val m = "$ozet · hoparlör boşalması $fark · $cal"
+        taniTurNo++
+        Log.i(ETIKET, "TANI tur #$taniTurNo: $m")
         telefon?.durumGonder(m)
     }
 
     override fun turBitti() {
         ana.post {
             yeniTur = true
+            aracKorumasi.sifirla()
             medyaSessizUyarisi = false
             // Cevaptan sonra 8 sn takip penceresi: video/canlı yayın açılmış olsa bile kullanıcı
             // hemen ikinci komutu verebilsin (TV sesi varken konuşma eşiği yükseltilir).
@@ -915,6 +923,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     override fun aracCagrisi(ad: String, args: JSONObject): JSONObject {
         Log.i(ETIKET, "TANI olay: araç $ad")
         sonEtkinlik = SystemClock.elapsedRealtime()
+        aracKorumasi.denetle(ad, args)?.let {
+            Log.w(ETIKET, "TANI araç tekrarı engellendi: $ad ${AracKorumasi.normal(args)}")
+            return it
+        }
         hizli.modelCagrisi(ad)?.let {
             sonEtkinlik = SystemClock.elapsedRealtime()
             return it

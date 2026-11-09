@@ -1,6 +1,7 @@
 package com.siam.tvasistan
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -310,6 +311,19 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     @Volatile private var acik = true
     /** Yazılan sesin tahmini bitiş anı (elapsedRealtime ms). */
     @Volatile private var bitis = 0L
+    /** Çalara yazılan toplam ses karesi (tanı için; çalma kafasıyla karşılaştırılır). */
+    @Volatile private var yazilanKare = 0L
+
+    // TANI (yalnız ölçüm; çalma davranışını DEĞİŞTİRMEZ). Her tur özetinde okunup sıfırlanır.
+    private val olcKilit = Any()
+    private var olcYazmaHatasi = 0      // write() < 0
+    private var olcSifirYazma = 0       // write() == 0
+    private var olcKisaYazma = 0        // 0 < write() < istenen
+    private var olcSonHata = 0
+    private var olcBostaDuraklatma = 0  // kuyruk boşalınca yapılan pause (bitis + 400 ms)
+    private var olcErkenDuraklatma = 0  // pause anında yazılan ses henüz bitmemiş görünüyordu
+    private var olcKesinti = 0          // temizle() (söz kesme / sunucu "interrupted")
+    private var olcKuyrukMaks = 0
 
     private val track: AudioTrack = AudioTrack.Builder()
         .setAudioAttributes(
@@ -342,6 +356,10 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
                 // Boştayken çalar duraklatılır: sistem "müzik çalıyor" sanmasın (video algılaması
                 // yanlış tetiklenmesin) ve ses çıkışı gereksiz açık kalmasın.
                 if (oynuyor && SystemClock.elapsedRealtime() > bitis + 400) {
+                    // TANI: tahmini bitiş geçtiği hâlde çalar hâlâ tamponda ses tutuyorsa pause sesi KESER
+                    val bekleyen = try { yazilanKare - track.playbackHeadPosition.toLong() } catch (_: Exception) { 0L }
+                    synchronized(olcKilit) { olcBostaDuraklatma++; if (bekleyen > 2400) olcErkenDuraklatma++ }
+                    if (bekleyen > 2400) Log.w("TvAsistanSes", "pause: tamponda ~${bekleyen / 24} ms çalınmamış ses vardı")
                     try { track.pause() } catch (_: Exception) {}
                     oynuyor = false
                 }
@@ -351,6 +369,8 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
                 try { track.play() } catch (_: Exception) {}
                 oynuyor = true
             }
+            val kb = kuyruk.size + 1
+            synchronized(olcKilit) { if (kb > olcKuyrukMaks) olcKuyrukMaks = kb }
             val simdi = SystemClock.elapsedRealtime()
             val sureMs = p.size / 48L // 24000 örnek/sn × 2 bayt = 48 bayt/ms
             bitis = maxOf(bitis, simdi) + sureMs
@@ -359,7 +379,16 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
             while (o < p.size && acik) {
                 val n = minOf(1920, p.size - o)
                 seviye?.invoke(sesSeviyesi(pcmRms(p, o, n)))
-                track.write(p, o, n)
+                val yazilan = track.write(p, o, n)
+                // TANI: dönüş değeri yalnız SAYILIR; ilerleme eskisi gibi (o += n) — davranış değişmez
+                if (yazilan > 0) yazilanKare += yazilan / 2
+                if (yazilan != n) synchronized(olcKilit) {
+                    when {
+                        yazilan < 0 -> { olcYazmaHatasi++; olcSonHata = yazilan }
+                        yazilan == 0 -> olcSifirYazma++
+                        else -> olcKisaYazma++
+                    }
+                }
                 o += n
             }
         }
@@ -367,6 +396,20 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
 
     fun ekle(p: ByteArray) {
         if (acik) kuyruk.offer(p)
+    }
+
+    /** TANI: son okumadan bu yana çalar olayları (okununca sıfırlanır). Ses davranışını etkilemez. */
+    fun taniOzeti(): String = synchronized(olcKilit) {
+        val parcalar = mutableListOf<String>()
+        if (olcYazmaHatasi > 0) parcalar += "yazma hatası $olcYazmaHatasi (kod $olcSonHata)"
+        if (olcSifirYazma > 0) parcalar += "sıfır yazma $olcSifirYazma"
+        if (olcKisaYazma > 0) parcalar += "kısa yazma $olcKisaYazma"
+        parcalar += "duraklatma $olcBostaDuraklatma" + if (olcErkenDuraklatma > 0) " (ERKEN $olcErkenDuraklatma)" else ""
+        if (olcKesinti > 0) parcalar += "temizleme $olcKesinti"
+        parcalar += "kuyruk en çok $olcKuyrukMaks"
+        olcYazmaHatasi = 0; olcSifirYazma = 0; olcKisaYazma = 0; olcSonHata = 0
+        olcBostaDuraklatma = 0; olcErkenDuraklatma = 0; olcKesinti = 0; olcKuyrukMaks = 0
+        parcalar.joinToString(", ")
     }
 
     /** TANI: hoparlör tamponunun boşaldığı (takıldığı) toplam sayı. Her cevabın sonunda 1 kez boşalması normaldir. */
@@ -381,6 +424,7 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     /** Kesinti: kuyruktaki ve tampondaki sesi anında at. */
     fun temizle() {
         kuyruk.clear()
+        synchronized(olcKilit) { olcKesinti++ }
         try {
             track.pause()
             track.flush()
@@ -388,6 +432,7 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
         } catch (_: Exception) {
         }
         bitis = 0L
+        yazilanKare = try { track.playbackHeadPosition.toLong() } catch (_: Exception) { 0L }
     }
 
     fun kapat() {
