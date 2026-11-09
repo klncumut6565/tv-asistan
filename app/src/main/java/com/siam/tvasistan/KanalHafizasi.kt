@@ -22,7 +22,8 @@ object KanalHafizasi {
 
     /** Kanal adının karşılaştırma anahtarı. */
     fun anahtar(ad: String): String {
-        var n = Uygulamalar.normal(ad)
+        // "Show TV'yi", "TRT 1'e" → ek atılır
+        var n = Uygulamalar.normal(ad.replace(Regex("['’`][A-Za-zÇĞİÖŞÜçğıöşü]+"), ""))
         for (ek in listOf(" kanalini", " kanalina", " kanalinda", " kanali", " kanal")) n = n.removeSuffix(ek)
         val kelimeler = n.split(" ").filter { it.isNotEmpty() }.map { RAKAM[it] ?: it }.toMutableList()
         if (kelimeler.size > 1 && kelimeler.last() == "tv") kelimeler.removeAt(kelimeler.lastIndex)
@@ -66,11 +67,11 @@ object KanalHafizasi {
         return null
     }
 
-    private val YASAK_ADLAR = setOf("ne", "hangi", "kac", "su", "bu", "o", "simdi", "acik", "kanal", "ilk", "son", "sonraki", "onceki")
+    private val YASAK_ADLAR = setOf("ne", "hangi", "kac", "su", "bu", "o", "simdi", "acik", "ilk", "son", "sonraki", "onceki")
 
     private fun gecerliAd(ad: String): Boolean {
         val k = ad.split(" ")
-        return ad.length >= 2 && k.none { it in YASAK_ADLAR } && ad.toIntOrNull() == null
+        return ad.length >= 2 && ad != "kanal" && k.none { it in YASAK_ADLAR } && ad.toIntOrNull() == null
     }
 
     /** Kayıtlı haritada adın numarasını bulur (eski kayıtlar farklı biçimde saklanmış olabilir). */
