@@ -12,6 +12,11 @@ import java.util.concurrent.TimeUnit
  * Trafik: ETag ile koşullu istek; dosya değişmediyse sunucu ~300 bayt "304" döner.
  */
 object Uzak {
+    /** Gemini sessizlik süresi: varsayılan 800 ms (eski davranış), güvenli aralık 500–2000 ms. */
+    const val SESSIZLIK_VARSAYILAN = 800
+
+    fun sessizlikDogrula(ms: Int): Int = if (ms in 500..2000) ms else SESSIZLIK_VARSAYILAN
+
     data class Model(val ad: String, val etiket: String, val blocking: Boolean)
     data class Yapilandirma(
         val modeller: List<Model>,
@@ -33,6 +38,8 @@ object Uzak {
         val uyandirmaKelimeleri: List<String>,
         /** Gemini "affective dialog": cevap tonunu kullanıcının ses tonuna uydurur. Varsayılan KAPALI. */
         val duyguUyumu: Boolean = false,
+        /** Gemini'nin konuşma bitti saymak için beklediği sessizlik (ms). Uzun = cümle bölünmez, cevap biraz gecikir. */
+        val sessizlikMs: Int = SESSIZLIK_VARSAYILAN,
     )
 
     private val http = OkHttpClient.Builder()
@@ -123,6 +130,7 @@ object Uzak {
                 (0 until minOf(d.length(), 15)).map { d.optString(it).trim() }.filter { KELIME_DESENI.matches(it) }
             }?.takeIf { it.isNotEmpty() } ?: VARSAYILAN.uyandirmaKelimeleri,
             duyguUyumu = j.optBoolean("duygu_uyumu", false),
+            sessizlikMs = sessizlikDogrula(j.optInt("sessizlik_ms", SESSIZLIK_VARSAYILAN)),
         )
     } catch (e: Exception) {
         null

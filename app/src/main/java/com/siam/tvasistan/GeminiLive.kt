@@ -90,6 +90,7 @@ class GeminiLive(private val d: Dinleyici) {
 
     private var sesAdi = "Kore"
     private var duyguUyumu = false
+    private var sessizlikMs = Uzak.SESSIZLIK_VARSAYILAN
 
     private val http get() = ORTAK_HTTP
     private val aracYurutucu = Executors.newSingleThreadExecutor()
@@ -114,6 +115,7 @@ class GeminiLive(private val d: Dinleyici) {
         if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — Jülide uygulamasını açıp anahtarı kaydedin.")
         sesAdi = Uzak.sesDogrula(y.ses)
         duyguUyumu = y.duyguUyumu
+        sessizlikMs = Uzak.sessizlikDogrula(y.sessizlikMs)
         val surumler = listOf("v1beta", "v1alpha")
         val simdi = System.currentTimeMillis()
         val sira = y.modeller.sortedWith(
@@ -263,7 +265,7 @@ class GeminiLive(private val d: Dinleyici) {
                     "automaticActivityDetection", JSONObject()
                         .put("startOfSpeechSensitivity", "START_SENSITIVITY_LOW")
                         .put("prefixPaddingMs", 200)
-                        .put("silenceDurationMs", 800)
+                        .put("silenceDurationMs", sessizlikMs)
                 )
             )
             .put("contextWindowCompression", JSONObject().put("slidingWindow", JSONObject()))
