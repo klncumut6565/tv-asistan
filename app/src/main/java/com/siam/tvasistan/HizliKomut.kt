@@ -69,6 +69,14 @@ object HizliKomut {
     private val HDMI = Regex("^hdmi ?(1|2|3|4|bir|iki|uc|dort)( ?(e|ye|a|ya|ine|ina))? ((girisine|girise|kaynagina) )?($GEC|$AC)$")
     private val SAYI = mapOf("bir" to "1", "iki" to "2", "uc" to "3", "dort" to "4")
 
+    /** Ad, bilinen bir kanal adı mı ("trt 1", "TV8", "Kanal 7")? */
+    fun bilinenKanalMi(ad: String): Boolean {
+        val a = KanalHafizasi.anahtar(ad)
+        return a.isNotEmpty() && KANALLAR.keys.any { KanalHafizasi.anahtar(it) == a }
+    }
+
+    private val KANAL_LISTESI = Regex("^(kayitli |ogrendigin )?kanal(lar|lari|larin)?( listesi| listesini| listeni| listeyi)? (goster|gosterir|gostersene|ac|listele|getir)$")
+
     /** Sözün normalleştirilmiş, hitap ve nezaket ekleri atılmış hali. Testlerde de kullanılır. */
     fun sadelestir(metin: String): String {
         var n = Uygulamalar.normal(metin)
@@ -79,8 +87,13 @@ object HizliKomut {
 
     /** Söz basit bir komutsa araç çağrısı, değilse null (→ karar Gemini'ye kalır). */
     fun coz(metin: String): Komut? {
+        // "4. kanalda Show TV var", "TRT 1 birinci kanalda" → kanalı numarasıyla hafızaya al
+        KanalHafizasi.kayitCumlesi(metin)?.let { (ad, no) ->
+            return Komut("kanal_kaydet", JSONObject().put("kanal", ad).put("numara", no))
+        }
         val n = sadelestir(metin)
         if (n.isEmpty() || n.length > 40) return null
+        if (KANAL_LISTESI.matches(n)) return Komut("kanal_listesi", JSONObject().put("islem", "goster"))
 
         HDMI.find(n)?.let { m ->
             val no = m.groupValues[1].let { SAYI[it] ?: it }

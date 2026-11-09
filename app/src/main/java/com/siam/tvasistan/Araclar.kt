@@ -40,6 +40,9 @@ class Araclar(private val s: AsistanServisi) {
     val adb = Adb(s)
     private val ayar = Ayarlar(s)
 
+    /** "Kanal listesini göster": öğrenilen kanallar ekranda. */
+    private val kanalListesiPenceresi = KanalListesiPenceresi(s)
+
     /** Tarayıcıdaki Google sonuç sayfasını okur (sonuç başlıkları, adresler, seçili sonuç). */
     val google = GoogleGezgini(s)
     private val tusIsci = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "google-tus").apply { isDaemon = true } }
@@ -159,7 +162,9 @@ class Araclar(private val s: AsistanServisi) {
             ), listOf("islem")))
         .put(fn("kanal_ac", "Canlı yayında bir TV kanalını açar (ör. ATV, Show TV, TRT 1, Kanal D) ya da kanal numarasına geçer ('7').",
             listOf(P("kanal", "STRING", "Kanal adı veya numarası, kullanıcının söylediği gibi")), listOf("kanal")))
-        .put(fn("kanal_kaydet", "Bir kanal adının kanal numarasını hatırlar (ör. ATV = 4). Kullanıcı 'ATV 4. kanalda' ya da sorduğunda numarayı söylerse kullan. sil=true ile kaydı siler.",
+        .put(fn("kanal_listesi", "Kanal listesini EKRANDA gösterir. goster: Jülide'nin öğrendiği (kaydedilen) kanalları numaralarıyla ekrana yazar ve listeyi döndürür; gizle: listeyi kapatır; tv: TV'nin kendi kanal listesini açar (canlı yayın + Tamam).",
+            listOf(P("islem", "STRING", "goster (varsayılan), gizle ya da tv", listOf("goster", "gizle", "tv"))), listOf("islem")))
+        .put(fn("kanal_kaydet", "Bir kanal adının kanal numarasını KALICI olarak hatırlar (ör. ATV = 4). 'Birinci kanalda TRT 1 var', '4. kanalda Show TV var', 'ATV 4. kanalda' gibi sözlerde HEMEN kullan; sonra 'Show TV'yi aç' denince o numara açılır. sil=true ile kaydı siler.",
             listOf(
                 P("kanal", "STRING", "Kanal adı"),
                 P("numara", "INTEGER", "Kanal numarası"),
@@ -232,7 +237,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - "YouTube'da X'i aç / oynat / çal / izle", "X şarkısını aç" (YouTube açıkken ya da YouTube denildiğinde) → youtube_oynat: videoyu DOĞRUDAN başlatır, sonuç sayfasına tıklamaya gerek yok. "İkincisini / başka birini aç" → aynı sorgu ile sira=2, 3... Yalnızca "YouTube'da ara, sonuçları göster" denirse youtube_ara. "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
 - Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
-- TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal" → kanal_kaydet. "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
+- TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal", "birinci kanalda TRT 1 var", "4. kanalda Show TV var" → kanal_kaydet (kayıt KALICIDIR; o kanal sonra hep o numarayla açılır, kullanıcıya "Tamam, Show TV 4. kanal olarak kaydedildi" de). "Kanal listesini göster", "kayıtlı kanallar" → kanal_listesi(goster): liste ekranda görünür, sen yalnızca kaç kanal olduğunu ve ilk birkaçını kısaca söyle. "Listeyi kapat" → kanal_listesi(gizle). "TV'nin kanal listesini aç" → kanal_listesi(tv). "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5). Tarayıcıda bu fare tekerleği gibi sayfayı kaydırır.
 - GOOGLE SONUÇLARI (tarayıcıda Google araması açıkken): "ikinci sonucu aç", "üçüncüye gir", "ilk sonucu aç" → arama_sonucu(islem=ac, sira=N). "Sonuçlar neler / oku" → arama_sonucu(listele), ilk 3-5 başlığı ve sitesini kısaca söyle. "Sonraki/önceki sonuç", "bir aşağı" → arama_sonucu(sonraki/onceki) (seçili sonuç el işaretiyle gösterilir); "bunu aç", "tamam aç" → arama_sonucu(sec). Bu sayfada tikla ya da numaralari_goster KULLANMA; arama_sonucu hata verirse onlara geç. Sıra numarası reklamları saymaz. Kullanıcı kumandanın aşağı/yukarı tuşlarıyla da sonuçlar arasında gezebilir, orta tuş seçili sonucu açar.
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
@@ -319,6 +324,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "numaralari_goster" -> numaralariGoster()
             "kanal_ac" -> kanalAc(a.optString("kanal"))
             "kanal_degistir" -> kanalDegistir(a.optString("yon"), a.optInt("adet", 1))
+            "kanal_listesi" -> kanalListesi(a.optString("islem", "goster"))
             "kanal_kaydet" -> kanalKaydet(a.optString("kanal"), a.optInt("numara", -1), a.optBoolean("sil", false))
             "numaraya_tikla" -> numarayaTikla(a.optInt("numara", -1), a.optBoolean("onayli", false))
             "ses" -> ses(a.optString("islem"), if (a.has("seviye")) a.optInt("seviye") else null)
@@ -1554,14 +1560,26 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     private fun ekrandaKanal(h: String): Oge? =
         ogeler().filter { kanalEslesir(it.metin, h) }.minByOrNull { it.metin.length }
 
+    private fun numarayaGec(numara: String, ad: String?): JSONObject {
+        canliTvHazirla()?.let { return hata(it) }
+        return try {
+            adb.tuslar(numara.map { Adb.rakamTusu(it) })
+            tamam("$numara. kanal açılıyor${if (ad != null) " ($ad)" else ""}.")
+        } catch (e: Adb.Hata) {
+            hata(e.message ?: "Kanal açılamadı.")
+        }
+    }
+
     private fun kanalAc(sorgu: String): JSONObject {
         if (sorgu.isBlank()) return hata("Kanal adı boş.")
+        // 0) Kullanıcının öğrettiği numara HER ŞEYDEN önce gelir ("4. kanalda Show TV var")
+        KanalHafizasi.bul(ayar.kanalHaritasi, sorgu)?.let { return numarayaGec(it, sorgu) }
         // 1) TV sağlayıcısından doğrudan
         val liste = Kanallar.liste(s)
         if (liste.isNotEmpty()) {
-            val k = Kanallar.bul(liste, sorgu)
-                ?: return hata("'$sorgu' kanal listesinde yok. Bazı kanallar: " + liste.take(30).joinToString(", ") { "${it.numara} ${it.ad}".trim() })
-            return if (Kanallar.ac(s, k)) tamam("${k.numara} ${k.ad} açıldı.".trim()) else hata("${k.ad} açılamadı.")
+            Kanallar.bul(liste, sorgu)?.let { k ->
+                return if (Kanallar.ac(s, k)) tamam("${k.numara} ${k.ad} açıldı.".trim()) else hata("${k.ad} açılamadı.")
+            }
         }
         // 2) Kanal numarası (söylenen ya da kanal_kaydet ile öğrenilen) → rakam tuşları
         val h = Uygulamalar.normal(sorgu).removeSuffix(" kanali").removeSuffix(" kanal").trim()
@@ -1638,25 +1656,56 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             for (d in degerler) top = if (d == 100) (if (top == 0) 100 else top * 100) else top + d!!
             if (top in 1..9999) return top.toString()
         }
-        val harita = ayar.kanalHaritasi
-        harita[h]?.let { return it }
-        val hb = h.replace(" ", "")
-        return harita.entries.firstOrNull { it.key.replace(" ", "") == hb }?.value
+        return KanalHafizasi.bul(ayar.kanalHaritasi, h)
     }
 
     private fun kanalKaydet(kanal: String, numara: Int, sil: Boolean): JSONObject {
-        val h = Uygulamalar.normal(kanal).removeSuffix(" kanali").removeSuffix(" kanal").trim()
-        if (h.isEmpty()) return hata("Kanal adı boş.")
+        val h = Uygulamalar.normal(kanal).removeSuffix(" kanalini").removeSuffix(" kanali").removeSuffix(" kanal").trim()
+        val anahtar = KanalHafizasi.anahtar(h)
+        if (anahtar.isEmpty()) return hata("Kanal adı boş.")
         val harita = ayar.kanalHaritasi.toMutableMap()
+        // Aynı kanalın farklı söylenişlerini ("show", "show tv") tek kayıtta topla
+        harita.keys.filter { KanalHafizasi.anahtar(it) == anahtar }.forEach { harita.remove(it) }
         if (sil) {
-            harita.remove(h)
             ayar.kanalHaritasi = harita
+            kanalListesiPenceresi.yenile(harita)
             return tamam("$kanal kaydı silindi.")
         }
         if (numara !in 1..9999) return hata("Geçerli bir kanal numarası gerekli.")
         harita[h] = numara.toString()
         ayar.kanalHaritasi = harita
+        kanalListesiPenceresi.yenile(harita)
         return tamam("Kaydedildi: $kanal = $numara. kanal. Kayıtlı kanallar: " + harita.entries.sortedBy { it.value.toIntOrNull() ?: 0 }.joinToString(", ") { "${it.value} ${it.key}" })
+    }
+
+    private fun kanalListesi(islem: String): JSONObject {
+        when (islem) {
+            "gizle" -> { kanalListesiPenceresi.gizle(); return tamam("Kanal listesi kapatıldı.") }
+            "tv" -> {
+                canliTvHazirla()?.let { return hata(it) }
+                val once = ekranImzasi()
+                tekBas("tamam")
+                return dogrula(once, s.aktifPaket, "TV'nin kanal listesini açma")
+            }
+        }
+        val harita = ayar.kanalHaritasi
+        val tv = try { Kanallar.liste(s) } catch (_: Exception) { emptyList() }
+        val satirlar = if (harita.isNotEmpty()) {
+            harita.entries.sortedWith(compareBy({ it.value.toIntOrNull() ?: 99999 }, { it.key }))
+                .map { "${it.value}. ${KanalListesiPenceresi.guzelAd(it.key)}" }
+        } else {
+            tv.take(40).map { "${it.numara}. ${it.ad}".trim() }
+        }
+        val baslik = if (harita.isNotEmpty()) "Kayıtlı kanallar (${harita.size})" else if (tv.isNotEmpty()) "TV kanalları" else "Kayıtlı kanal yok"
+        val gosterildi = kanalListesiPenceresi.goster(
+            baslik,
+            satirlar.ifEmpty { listOf("Henüz kanal öğretilmedi.", "Örnek: \"Birinci kanalda TRT 1 var\"", "\"4. kanalda Show TV var\"") },
+        )
+        val j = JSONObject()
+            .put("not", if (gosterildi) "Liste ekranda gösteriliyor (40 sn). Hepsini okuma; kaç kanal olduğunu ve ilk birkaçını kısaca söyle." else "Liste ekrana ÇİZİLEMEDİ; 'gösterdim' DEME, listeyi kısaca sesli söyle.")
+            .put("kanallar", JSONArray(satirlar))
+        if (satirlar.isEmpty()) j.put("ipucu", "Henüz kayıt yok. Kullanıcıya 'Hangi kanal kaçıncıda? Örneğin birinci kanalda TRT 1 var diyebilirsiniz' de.")
+        return j
     }
 
     private fun kanalDegistir(yon: String, adet: Int): JSONObject {
