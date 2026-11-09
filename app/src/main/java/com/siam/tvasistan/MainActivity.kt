@@ -368,6 +368,16 @@ class MainActivity : Activity() {
             a.uyandirmaAktif = acikMi
             toast(if (acikMi) "Uyandırma kelimesi AÇIK — bir sonraki sohbette geçerli." else "Uyandırma kelimesi KAPALI.")
         })
+        s.ekle(ui.onay("Kalabalık modu (yalnız \"Jülide\" denince ya da tuşla dinle)", a.kalabalikModu) { acikMi ->
+            a.kalabalikModu = acikMi
+            toast(if (acikMi) "Kalabalık modu AÇIK — odadaki konuşmalar Jülide'ye gitmez. Bir sonraki sohbette geçerli."
+                  else "Kalabalık modu KAPALI.")
+        })
+        s.ekle(ui.aciklama(
+            "Kalabalık modunda Jülide yalnız kumanda tuşuna basınca ya da \"Jülide\" dendikten sonra dinler; " +
+                "cevaptan sonra 8 sn ek soru beklenir. Telefon mikrofonunda da geçerlidir. " +
+                "\"Jülide\" kelimesi için uyandırma modeli indirilmiş olmalıdır."
+        ))
         durumSatiri(s) { if (Uyandirma.modelHazirMi(this)) "Uyandırma modeli hazır" to Durum.IYI else "Model: ${Uyandirma.durum}".trim() to Durum.UYARI }
         s.ekle(ui.dugme("Uyandırma modelini indir (~37 MB, bir kez)") {
             Thread { Uyandirma.modeliHazirla(this) }.start()

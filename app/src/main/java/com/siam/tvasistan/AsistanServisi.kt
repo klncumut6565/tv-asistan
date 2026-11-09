@@ -90,6 +90,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     @Volatile private var bostaZamanAsimiMs = 20_000L
     /** true: oturum yalnız "sohbeti kapat" (veya tetik tuşuna uzun basış) ile kapanır. */
     @Volatile private var surekliSohbet = true
+    /** Kalabalık modu: pencere dışında ses Gemini'ye gitmez (oturum başında ayardan okunur). */
+    @Volatile private var kalabalik = false
     /** Video/müzik çalarken mikrofon yalnız bu ana kadar açık (tetik tuşuyla açılır). */
     @Volatile private var konusmaPenceresiBitis = 0L
     @Volatile private var medyaSessizUyarisi = false
@@ -334,6 +336,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         when (durum) {
             Durum.BOSTA, Durum.BAGLANIYOR -> {}
             Durum.DINLIYOR -> {
+                // Kalabalık modunda telefondaki her konuşma pencere açmaz: önce "Jülide" ya da tuş gerekir
+                if (!DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) return
                 oynatici?.let { if (it.caliyor()) it.temizle() }
                 konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
                 if (medyaAktif) konusOdagiAl()
@@ -449,6 +453,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 uyari = y
                 bostaZamanAsimiMs = y.bostaSn * 1000L
                 surekliSohbet = y.surekliSohbet
+                kalabalik = ayarlar.kalabalikModu
                 konusurkenDuraklat = y.konusurkenDuraklat
                 araclar.abonelikler = y.abonelikler
                 val talimat = withContext(Dispatchers.IO) { araclar.sistemTalimati() }
@@ -477,13 +482,14 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     if (oy.caliyor()) {
                         // Telefondan konuşuluyorsa Jülide'nin sözünü kes (bkz. telefonKonusmasiBasladi);
                         // TV/kumanda mikrofonunda yarı çift yönlü kural aynen geçerli.
-                        if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700) oy.temizle()
+                        if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700 &&
+                            DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) oy.temizle()
                         else { tKapali++; return@Mikrofon }
                     }
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
                     val simdi = SystemClock.elapsedRealtime()
-                    if (surekliSohbet && simdi > konusmaPenceresiBitis && medyaAktif && konusOdagi == null) {
-                        // TV sesi var: ses Gemini'ye GİTMEZ, yalnız yerel "Jülide" dinleyicisine gider
+                    if (DinlemeKapisi.yol(surekliSohbet, simdi, konusmaPenceresiBitis, medyaAktif, konusOdagi != null, kalabalik) == DinlemeKapisi.Yol.YEREL) {
+                        // TV sesi var ya da kalabalık modu: ses Gemini'ye GİTMEZ, yalnız yerel "Jülide" dinleyicisine gider
                         kapi.kes()
                         panel.mikrofonSeviyesi(0f)
                         uyandirma?.besle(pcm)
@@ -519,7 +525,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 mikrofon = m
                 // Uzak ayar izin verse bile kullanıcı ayar ekranından açmadıkça uyandırma kelimesi çalışmaz.
-                if (y.uyandirma && surekliSohbet && ayarlar.uyandirmaAktif) {
+                if (y.uyandirma && surekliSohbet && (ayarlar.uyandirmaAktif || kalabalik)) {
                     uyandirma = Uyandirma(this@AsistanServisi, y.uyandirmaKelimeleri) { ana.post { uyandirmaDuyuldu() } }
                         .also { it.baslat() }
                 }
@@ -602,11 +608,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     }
                 }
                 if (surekliSohbet && !caliyor && !yenidenBaglaniyor && !mikrofonUyarisi) {
-                    val sessiz = simdi > konusmaPenceresiBitis && medyaAktif
+                    val sessiz = simdi > konusmaPenceresiBitis && (medyaAktif || kalabalik)
                     if (sessiz && !medyaSessizUyarisi) {
                         medyaSessizUyarisi = true
+                        val bas = if (kalabalik && !medyaAktif) "Kalabalık modu" else "Video açık"
                         panel.durum(if (uyandirma != null && Uyandirma.modelHazirMi(this@AsistanServisi))
-                            "Video açık — \"Jülide\" de ya da tuşa bas" else "Video açık — konuşmak için tuşa bas")
+                            "$bas — \"Jülide\" de ya da tuşa bas" else "$bas — konuşmak için tuşa bas")
                     } else if (!sessiz && medyaSessizUyarisi) {
                         medyaSessizUyarisi = false
                         panel.durum("Jülide dinliyor…")

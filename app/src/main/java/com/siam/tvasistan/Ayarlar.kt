@@ -85,6 +85,11 @@ class Ayarlar(ctx: Context) {
         get() = p.getString("varsayilan_tarayici", null)
         set(v) = p.edit().putString("varsayilan_tarayici", v).apply()
 
+    /** Kalabalık modu: Jülide yalnız kumanda tuşundan ya da "Jülide" dendikten sonra dinler. */
+    var kalabalikModu: Boolean
+        get() = p.getBoolean("kalabalik_modu", false)
+        set(v) = p.edit().putBoolean("kalabalik_modu", v).apply()
+
     var uyandirmaAktif: Boolean
         get() = p.getBoolean("uyandirma_aktif", false)
         set(v) = p.edit().putBoolean("uyandirma_aktif", v).apply()
