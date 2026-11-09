@@ -389,6 +389,12 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
                         else -> olcKisaYazma++
                     }
                 }
+                // Hata kodu (ör. ERROR_DEAD_OBJECT): bu parçanın kalanını bozuk çalara yazmaya çalışma.
+                // Kısa yazma (söz kesme/duraklatma anında olur) bilerek eskisi gibi atlanır: kesilen cümle devam etmesin.
+                if (yazilan < 0) {
+                    Log.w("TvAsistanSes", "AudioTrack.write hata=$yazilan; parçanın kalanı atlandı")
+                    break
+                }
                 o += n
             }
         }
@@ -404,7 +410,8 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
         if (olcYazmaHatasi > 0) parcalar += "yazma hatası $olcYazmaHatasi (kod $olcSonHata)"
         if (olcSifirYazma > 0) parcalar += "sıfır yazma $olcSifirYazma"
         if (olcKisaYazma > 0) parcalar += "kısa yazma $olcKisaYazma"
-        parcalar += "duraklatma $olcBostaDuraklatma" + if (olcErkenDuraklatma > 0) " (ERKEN $olcErkenDuraklatma)" else ""
+        // "erken?" playbackHeadPosition'a dayanır; bu TV'de güvenilir olmayabilir (1416cd0) → yalnız ipucu
+        parcalar += "duraklatma $olcBostaDuraklatma" + if (olcErkenDuraklatma > 0) " (erken? $olcErkenDuraklatma, tahmini)" else ""
         if (olcKesinti > 0) parcalar += "temizleme $olcKesinti"
         parcalar += "kuyruk en çok $olcKuyrukMaks"
         olcYazmaHatasi = 0; olcSifirYazma = 0; olcKisaYazma = 0; olcSonHata = 0

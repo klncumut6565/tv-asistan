@@ -77,8 +77,19 @@ class Ayarlar(ctx: Context) {
 
     /** Jülide'nin kalıcı belleği (kullanıcının açıkça kaydettirdiği bilgiler, JSON). Bkz. Bellek. */
     var bellekJson: String
-        get() = p.getString("bellek", "[]") ?: "[]"
-        set(v) = p.edit().putString("bellek", v).apply()
+        get() {
+            p.getString("bellek_sifreli", null)?.let { s -> Kasa.coz(s)?.let { return it } }
+            val eski = p.getString("bellek", "[]") ?: "[]"
+            if (eski != "[]") bellekJson = eski // düz metinden şifreliye taşı
+            return eski
+        }
+        set(v) {
+            val sifreli = Kasa.sifrele(v)
+            val e = p.edit()
+            if (sifreli != null) e.putString("bellek_sifreli", sifreli).remove("bellek")
+            else e.remove("bellek_sifreli").putString("bellek", v) // Keystore çalışmıyorsa son çare
+            e.apply()
+        }
 
     /** Google sonuç sayfasında kumandanın aşağı/yukarı tuşları sonuçlar arasında gezinsin, orta tuş açsın. */
     var googleTusGezinme: Boolean

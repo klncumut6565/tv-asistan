@@ -96,6 +96,11 @@ class KaynakTest {
         assertEquals(KanitDuzeyi.YETERSIZ, Kaynak.kanitDuzeyi(emptyList()))
     }
 
+    @Test fun wikipedia_tek_basina_guclu_degil() {
+        assertEquals(KaynakTuru.GUVENILIR_IKINCIL, Kaynak.siniflandir("https://tr.wikipedia.org/wiki/Kemal_Sunal"))
+        assertEquals(KanitDuzeyi.ORTA, Kaynak.kanitDuzeyi(listOf(okunmus("https://tr.wikipedia.org/wiki/Kemal_Sunal", uzunMetin))))
+    }
+
     @Test fun birincil_kaynak_tek_basina_guclu() {
         assertEquals(KanitDuzeyi.GUCLU, Kaynak.kanitDuzeyi(listOf(okunmus("https://www.resmigazete.gov.tr/x", uzunMetin))))
     }

@@ -749,6 +749,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     fun bitir() {
+        taniBekleyen?.let { taniYaz(it) }
         sakaModu = false
         hizli.kapat()
         val oncekiDurum = durum
@@ -873,16 +874,46 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private var sonTakilma = 0
     private var takilmaOynatici: Oynatici? = null
 
+    /**
+     * TANI: Gemini "tur bitti" dediğinde Jülide hâlâ konuşuyor olabilir. Çalar ölçümleri (boşalma, duraklatma,
+     * yazma hataları) ancak o turun sesi BİTİNCE okunur; böylece bir turun kopması sonraki tura karışmaz.
+     */
     override fun tani(ozet: String) {
+        ana.post {
+            taniBekleyen?.let { taniYaz(it) } // önceki tur hâlâ bekliyorsa (yeni cevap başladı) önce onu kapat
+            taniTurNo++
+            taniBekleyen = taniTurNo to ozet
+            taniBaslangic = SystemClock.elapsedRealtime()
+            taniKontrol()
+        }
+    }
+
+    private var taniBekleyen: Pair<Long, String>? = null
+    private var taniBaslangic = 0L
+    private val taniDenetle = Runnable { taniKontrol() }
+
+    private fun taniKontrol() {
+        val b = taniBekleyen ?: return
+        val oy = oynatici
+        if (oy != null && oy.caliyor(600) && SystemClock.elapsedRealtime() - taniBaslangic < 90_000) {
+            ana.removeCallbacks(taniDenetle)
+            ana.postDelayed(taniDenetle, 300)
+            return
+        }
+        taniYaz(b)
+    }
+
+    private fun taniYaz(b: Pair<Long, String>) {
+        taniBekleyen = null
+        ana.removeCallbacks(taniDenetle)
         val oy = oynatici
         val toplam = oy?.takilma() ?: 0
         if (oy !== takilmaOynatici) { takilmaOynatici = oy; sonTakilma = 0 }
         val fark = (toplam - sonTakilma).coerceAtLeast(0)
         sonTakilma = toplam
         val cal = oy?.taniOzeti() ?: "çalar yok"
-        val m = "$ozet · hoparlör boşalması $fark · $cal"
-        taniTurNo++
-        Log.i(ETIKET, "TANI tur #$taniTurNo: $m")
+        val m = "${b.second} · hoparlör boşalması $fark · $cal"
+        Log.i(ETIKET, "TANI tur #${b.first}: $m")
         telefon?.durumGonder(m)
     }
 

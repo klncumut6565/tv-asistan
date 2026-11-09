@@ -49,7 +49,7 @@ object Kaynak {
         "superlig.com.tr", "trendyolsuperlig.com.tr"
     )
     private val YETKILI_SONEKLER = listOf(".gov.tr", ".edu.tr", ".gov", ".edu", ".int", ".bel.tr", ".tsk.tr", ".pol.tr", ".k12.tr")
-    private val YETKILI_ALANLAR = listOf("europa.eu", "un.org", "oecd.org", "worldbank.org", "imf.org", "saglik.gov.tr", "wikipedia.org")
+    private val YETKILI_ALANLAR = listOf("europa.eu", "un.org", "oecd.org", "worldbank.org", "imf.org", "saglik.gov.tr")
     private val IKINCIL_ALANLAR = listOf(
         "aa.com.tr", "trthaber.com", "trtspor.com.tr", "ntv.com.tr", "ntvspor.net", "hurriyet.com.tr", "milliyet.com.tr",
         "sabah.com.tr", "sozcu.com.tr", "haberturk.com", "cnnturk.com", "bbc.com", "bbc.co.uk", "reuters.com", "apnews.com",
@@ -58,7 +58,9 @@ object Kaynak {
         "bloomberght.com", "dunya.com", "ekonomim.com", "investing.com", "donanimhaber.com", "webtekno.com", "shiftdelete.net",
         "chip.com.tr", "theverge.com", "arstechnica.com", "nature.com", "sciencedirect.com", "nytimes.com", "theguardian.com",
         "t24.com.tr", "cumhuriyet.com.tr", "karar.com", "yenisafak.com", "star.com.tr", "posta.com.tr", "haberler.com",
-        "iha.com.tr", "dha.com.tr", "ensonhaber.com", "mynet.com"
+        "iha.com.tr", "dha.com.tr", "ensonhaber.com", "mynet.com",
+        // Wikipedia herkesin düzenleyebildiği bir derleme: tek başına GÜÇLÜ kanıt sayılmaz (ikinci bağımsız kaynak gerekir)
+        "wikipedia.org"
     )
     private val SOSYAL_ALANLAR = listOf(
         "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "youtube.com", "reddit.com", "eksisozluk.com",
