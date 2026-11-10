@@ -78,6 +78,11 @@ class Ayarlar(ctx: Context) {
         get() = p.getBoolean("kutu_etkin", false)
         set(v) = p.edit().putBoolean("kutu_etkin", v).apply()
 
+    /** Kutu girişi açıkken ön planda görünen paket (HDMI görüntüleyici); kutunun hâlâ ekranda olduğunu anlamak için. */
+    var kutuPaketi: String
+        get() = p.getString("kutu_paketi", "") ?: ""
+        set(v) = p.edit().putString("kutu_paketi", v).apply()
+
     /** TV+ kutusundaki kanal numaraları (TV'nin anten kanallarından AYRI). */
     var kutuKanalHaritasi: Map<String, String>
         get() = try {
