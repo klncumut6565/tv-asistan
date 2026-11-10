@@ -520,11 +520,18 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 val l = GeminiLive(this@AsistanServisi)
                 live = l
                 withContext(Dispatchers.IO) { l.baglan(ayarlar.geminiAnahtari, y, talimat, araclar.bildirimler()) }
-                if (l.varsayilanSesleBaglandi) {
-                    // Telefondan seçilen ses/duygu ayarı Gemini'de reddedildi: kullanıcıyı bilgilendir
-                    Log.w(ETIKET, "Seçilen ses (${y.ses}, duygu=${y.duyguUyumu}) reddedildi; Kore sesiyle bağlanıldı")
-                    telefon?.olayGonder("ses_onay", org.json.JSONObject().put("ses", "Kore").put("yeniden_baslatildi", false)
-                        .put("duygu", false).put("uyari", "${y.ses} sesi bu modelde kullanılamadı; Kore ile bağlanıldı"))
+                when (l.geriDonus) {
+                    "duygu" -> {
+                        // Duygu uyumu bu modelde reddedildi; seçilen ses KORUNDU
+                        Log.w(ETIKET, "Duygu uyumu reddedildi (${l.modelEtiketi}); ${y.ses} sesiyle, duygu uyumu kapalı bağlanıldı")
+                        telefon?.olayGonder("ses_onay", org.json.JSONObject().put("ses", y.ses).put("yeniden_baslatildi", false)
+                            .put("duygu", false).put("uyari", "Duygu uyumu bu modelde desteklenmiyor; ${y.ses} sesi duygu uyumu olmadan kullanılıyor"))
+                    }
+                    "ses" -> {
+                        Log.w(ETIKET, "Seçilen ses (${y.ses}, duygu=${y.duyguUyumu}) reddedildi; Kore sesiyle bağlanıldı")
+                        telefon?.olayGonder("ses_onay", org.json.JSONObject().put("ses", "Kore").put("yeniden_baslatildi", false)
+                            .put("duygu", false).put("uyari", "${y.ses} sesi bu modelde kullanılamadı; Kore ile bağlanıldı"))
+                    }
                 }
                 if (durum != Durum.BAGLANIYOR || oturumNo != benimNo) {
                     l.kapat()

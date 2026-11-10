@@ -111,7 +111,8 @@ object Uygulamalar {
         val sonuc = LinkedHashMap<String, Uyg>()
         val kurulu = tumu(ctx).associateBy { it.paket }
         for (p in webAcabilenler(ctx)) {
-            if (p == ctx.packageName || "youtube" in p.lowercase(TR)) continue
+            // "Activity Stub" (com.android.tv.frameworkpackagestubs): sistemin "uygulama yok" yer tutucusu, tarayıcı DEĞİL
+            if (p == ctx.packageName || "youtube" in p.lowercase(TR) || "stub" in p.lowercase(TR)) continue
             val ad = kurulu[p]?.ad ?: try { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() } catch (_: Exception) { p }
             sonuc[p] = Uyg(ad, p)
         }

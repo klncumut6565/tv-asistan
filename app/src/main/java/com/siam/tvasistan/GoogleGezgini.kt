@@ -187,6 +187,8 @@ class GoogleGezgini(private val s: AccessibilityService) {
         }
         val liste = sonuc.values.sortedBy { it.ust }
         val serp = googleIzi && liste.isNotEmpty()
+        if (sinirMs == 0L) android.util.Log.i("TvAsistan",
+            "Google sayfası: iz=$googleIzi düğüm=${minOf(sayac, 4001)} başlık=${adaylar.size} bağlantı=${baglantilar.size} sonuç=${liste.size}")
 
         val eski = sonuclar.getOrNull(secili)?.baslik
         sonuclar = if (serp) liste else emptyList()
