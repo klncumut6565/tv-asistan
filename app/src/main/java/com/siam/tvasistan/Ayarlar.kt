@@ -68,6 +68,24 @@ class Ayarlar(ctx: Context) {
      * Kullanıcı ayar ekranındaki onay kutusundan açar.
      */
     /** Kullanıcının söylediği kanal adı → kanal numarası eşlemesi (ör. "atv" → "4"). JSON nesnesi. */
+    /** TV+ kutusunun bağlı olduğu giriş ("HDMI 2"); boş = kutu yok. */
+    var kutuGirisi: String
+        get() = p.getString("kutu_girisi", "") ?: ""
+        set(v) = p.edit().putString("kutu_girisi", v).apply()
+
+    /** Ekranda TV+ kutusu mu var (Jülide kutu girişine geçince açılır, TV yayınına dönünce kapanır). */
+    var kutuEtkin: Boolean
+        get() = p.getBoolean("kutu_etkin", false)
+        set(v) = p.edit().putBoolean("kutu_etkin", v).apply()
+
+    /** TV+ kutusundaki kanal numaraları (TV'nin anten kanallarından AYRI). */
+    var kutuKanalHaritasi: Map<String, String>
+        get() = try {
+            val j = org.json.JSONObject(p.getString("kutu_kanal_haritasi", "{}") ?: "{}")
+            j.keys().asSequence().associateWith { j.getString(it) }
+        } catch (_: Exception) { emptyMap() }
+        set(v) = p.edit().putString("kutu_kanal_haritasi", org.json.JSONObject(v).toString()).apply()
+
     var kanalHaritasi: Map<String, String>
         get() = try {
             val j = org.json.JSONObject(p.getString("kanal_haritasi", "{}") ?: "{}")

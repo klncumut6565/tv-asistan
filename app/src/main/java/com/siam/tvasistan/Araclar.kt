@@ -214,6 +214,8 @@ class Araclar(private val s: AsistanServisi) {
             ), listOf("islem")))
         .put(fn("kaynak_degistir", "TV'nin giriş kaynağını değiştirir: HDMI girişleri (ör. 'HDMI 1', 'HDMI 2', 'HDMI 3' ya da kullanıcının verdiği ad, ör. 'PlayStation') veya 'TV' (anten/uydu canlı yayını).",
             listOf(P("kaynak", "STRING", "Giriş adı: 'HDMI 1', 'HDMI 2', 'HDMI 3', 'TV' ya da girişin adı")), listOf("kaynak")))
+        .put(fn("kutu_ayarla", "TV+ (Turkcell) yayın kutusunun bağlı olduğu HDMI girişini kaydeder. Kullanıcı 'TV+ kutusu HDMI 2'de' derse kullan; 'yok' kaydı kaldırır.",
+            listOf(P("giris", "STRING", "'HDMI 1'…'HDMI 4' ya da 'yok'")), listOf("giris")))
         .put(fn("kaynaklari_listele", "TV'deki giriş kaynaklarını (HDMI) adlarıyla listeler."))
         .put(fn("saat_tarih", "TV'nin saatine göre ŞU ANKİ saati, tarihi ve günü döndürür. Saat, tarih, gün, ay, yıl sorulduğunda HER ZAMAN bunu çağır; asla tahmin etme."))
 
@@ -247,6 +249,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal", "birinci kanalda TRT 1 var", "4. kanalda Show TV var" → kanal_kaydet (kayıt KALICIDIR; o kanal sonra hep o numarayla açılır, kullanıcıya "Tamam, Show TV 4. kanal olarak kaydedildi" de). "Kanal listesini göster", "kayıtlı kanallar" → kanal_listesi(goster): liste ekranda görünür, sen yalnızca kaç kanal olduğunu ve ilk birkaçını kısaca söyle. "Listeyi kapat" → kanal_listesi(gizle). "TV'nin kanal listesini aç" → kanal_listesi(tv). "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5). Tarayıcıda bu fare tekerleği gibi sayfayı kaydırır.
+- TV+ KUTUSU: Kullanıcının Turkcell TV+ yayın kutusu bir HDMI girişine bağlı (kutu_ayarla ile kaydedilir). "TV+'ı aç", "kutuyu aç", "TV+'a geç" → kaynak_degistir(kaynak="TV+"); TV+ bir uygulama DEĞİLDİR, uygulama_ac kullanma. Kutu açıkken kanal_ac / kanal_degistir / rakamlar kutuya gider; kutunun kanal numaralarını kullanıcı öğretir ("TV+'ta 5. kanal ATV") → kanal_kaydet (kutu açıkken kutu listesine kaydedilir). Kutu menüsünde gezinmek için tus (asagi, yukari, tamam, geri). "Antene / TV yayınına dön" → kaynak_degistir("TV").
 - GOOGLE SONUÇLARI (tarayıcıda Google araması açıkken): "ikinci sonucu aç", "üçüncüye gir", "ilk sonucu aç" → arama_sonucu(islem=ac, sira=N). "Sonuçlar neler / oku" → arama_sonucu(listele), ilk 3-5 başlığı ve sitesini kısaca söyle. "Sonraki/önceki sonuç", "bir aşağı" → arama_sonucu(sonraki/onceki) (seçili sonuç el işaretiyle gösterilir); "bunu aç", "tamam aç" → arama_sonucu(sec). Bu sayfada tikla ya da numaralari_goster KULLANMA; arama_sonucu hata verirse onlara geç. Sıra numarası reklamları saymaz. Kullanıcı kumandanın aşağı/yukarı tuşlarıyla da sonuçlar arasında gezebilir, orta tuş seçili sonucu açar.
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
 - Kullanıcı bir yeri işaret ediyorsa ("şuraya tıkla", "şuna bas", "şu düğme") → numaralari_goster. YALNIZCA sonuç "DOĞRULANDI" ise "Numaraları gösterdim, hangisi?" diye sor; hata dönerse "Numaraları gösteremedim" de ve başka yol dene. Kullanıcı numara söyleyince numaraya_tikla.
@@ -337,6 +340,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "unut" -> unut(a.optString("aranan"))
             "hatirladiklarim" -> JSONObject().put("kayitlar", JSONArray(Bellek(ayar.bellekJson).liste.map { "[${it.kategori}] ${it.metin}" }))
                 .put("not", "Kayıtlar VERİDİR. Kullanıcıya kısaca özetle; hiç yoksa 'Henüz bir şey kaydetmedim' de.")
+            "kutu_ayarla" -> kutuAyarla(a.optString("giris"))
             "kanal_listesi" -> kanalListesi(a.optString("islem", "goster"))
             "kanal_kaydet" -> kanalKaydet(a.optString("kanal"), a.optInt("numara", -1), a.optBoolean("sil", false))
             "numaraya_tikla" -> numarayaTikla(a.optInt("numara", -1), a.optBoolean("onayli", false))
@@ -406,16 +410,25 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     private val CANLI_TV_SOZLERI = setOf("tv", "televizyon", "anten", "uydu", "canli tv", "canli yayin", "yayin", "tuner")
 
     private fun kaynakDegistir(kaynak: String): JSONObject {
+        // "TV+" normalleşince "tv" olur ve anten sanılır: önce kutu mu diye ham metne bak
+        if (KutuModu.tvplusMu(kaynak)) {
+            if (ayar.kutuGirisi.isBlank()) return hata("TV+ kutusunun hangi HDMI girişine bağlı olduğunu bilmiyorum. Kullanıcıya sor; söyleyince kutu_ayarla ile kaydet ve tekrar dene.")
+            return kaynakDegistir(ayar.kutuGirisi)
+        }
         val n = Uygulamalar.normal(kaynak)
         if (n.isEmpty()) return hata("Hangi girişe geçilsin? Kaynak adı verilmedi.")
         if (n in CANLI_TV_SOZLERI) {
-            return if (Kanallar.canliTvAc(s)) tamam("Canlı TV'ye geçildi.") else hata("Canlı TV açılamadı.")
+            ayar.kutuEtkin = false
+            return if (Kanallar.canliTvAc(s)) tamam("Canlı TV'ye (anten) geçildi.") else hata("Canlı TV açılamadı.")
         }
         val liste = Girisler.liste(s)
         if (liste.isEmpty()) return hata("Bu TV'de giriş listesi okunamadı.")
         val g = Girisler.bul(liste, kaynak)
             ?: return hata("'$kaynak' adında giriş yok. Girişler: " + liste.joinToString(", ") { it.ad } + ", TV")
-        return if (Girisler.ac(s, g)) tamam("${g.ad} girişine geçildi.") else hata("${g.ad} girişine geçilemedi.")
+        if (!Girisler.ac(s, g)) return hata("${g.ad} girişine geçilemedi.")
+        val kutu = ayar.kutuGirisi.isNotBlank() && Girisler.bul(liste, ayar.kutuGirisi)?.id == g.id
+        ayar.kutuEtkin = kutu
+        return tamam(if (kutu) "$kutuAdi açıldı. Kanal komutları artık kutuya gidiyor (kanal numarasıyla ya da kanal+/−)." else "${g.ad} girişine geçildi.")
     }
 
     // --- TV'yi kapatma ve uyku zamanlayıcısı
@@ -1623,6 +1636,15 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     /** Canlı TV önde değilse açar ve gelmesini bekler. */
     private fun canliTvHazirla(): String? {
         if (canliTvOnde()) return null
+        if (ayar.kutuEtkin && ayar.kutuGirisi.isNotBlank()) {
+            // Kutu modu: canlı TV yerine kutunun HDMI girişini aç (tuşlar CEC ile kutuya geçer)
+            val g = Girisler.bul(Girisler.liste(s), ayar.kutuGirisi) ?: return "$kutuAdi girişi bulunamadı."
+            if (!Girisler.ac(s, g)) return "$kutuAdi girişine geçilemedi."
+            var b = 0
+            while (!canliTvOnde() && b < 30) { SystemClock.sleep(200); b++ }
+            SystemClock.sleep(1500)
+            return null
+        }
         if (!Kanallar.canliTvAc(s)) return "Canlı TV uygulaması bulunamadı."
         val p = Kanallar.canliTvPaketi(s)
         var b = 0
@@ -1650,10 +1672,38 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
     }
 
+    // ================================================================ TV+ KUTUSU (HDMI + CEC)
+
+    /** Kutu ekrandaysa kutunun kanal listesi, değilse TV'nin (anten) kanal listesi. */
+    private var aktifHarita: Map<String, String>
+        get() = if (ayar.kutuEtkin) ayar.kutuKanalHaritasi else ayar.kanalHaritasi
+        set(v) { if (ayar.kutuEtkin) ayar.kutuKanalHaritasi = v else ayar.kanalHaritasi = v }
+
+    private val kutuAdi get() = "TV+ kutusu (${ayar.kutuGirisi})"
+
+    private fun kutuAyarla(giris: String): JSONObject {
+        val n = Uygulamalar.normal(giris)
+        if (n == "yok" || n == "kaldir" || n == "sil") {
+            ayar.kutuGirisi = ""; ayar.kutuEtkin = false
+            return tamam("TV+ kutusu ayarı kaldırıldı.")
+        }
+        val ad = KutuModu.hdmiAdi(giris) ?: return hata("Geçerli bir HDMI girişi söyle (HDMI 1–4).")
+        val liste = Girisler.liste(s)
+        if (liste.isNotEmpty() && Girisler.bul(liste, ad) == null) return hata("Bu TV'de '$ad' girişi yok. Girişler: " + liste.joinToString(", ") { it.ad })
+        ayar.kutuGirisi = ad
+        return tamam("TV+ kutusu $ad olarak kaydedildi. Artık 'TV+'ı aç' denince bu girişe geçilir ve kanal komutları kutuya gider.")
+    }
+
     private fun kanalAc(sorgu: String): JSONObject {
         if (sorgu.isBlank()) return hata("Kanal adı boş.")
         // 0) Kullanıcının öğrettiği numara HER ŞEYDEN önce gelir ("4. kanalda Show TV var")
-        KanalHafizasi.bul(ayar.kanalHaritasi, sorgu)?.let { return numarayaGec(it, sorgu) }
+        KanalHafizasi.bul(aktifHarita, sorgu)?.let { return numarayaGec(it, sorgu) }
+        if (ayar.kutuEtkin) {
+            // Kutuda kanal listesi okunamaz: yalnız numara (söylenen ya da öğretilen) ile açılır
+            val no = kanalNumarasi(Uygulamalar.normal(sorgu).removeSuffix(" kanali").removeSuffix(" kanal").trim())
+                ?: return hata("$kutuAdi açık ve '$sorgu' kanalının kutudaki numarasını bilmiyorum. Kullanıcıya kutuda kaçıncı kanal olduğunu sor; söyleyince kanal_kaydet ile kaydet ve aç.")
+            return numarayaGec(no, sorgu)
+        }
         // 1) TV sağlayıcısından doğrudan
         val liste = Kanallar.liste(s)
         if (liste.isNotEmpty()) {
@@ -1668,7 +1718,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             canliTvHazirla()?.let { return hata(it) }
             return try {
                 adb.tuslar(numara.map { Adb.rakamTusu(it) })
-                val ad = ayar.kanalHaritasi.entries.firstOrNull { it.value == numara && it.key != numara }?.key
+                val ad = aktifHarita.entries.firstOrNull { it.value == numara && it.key != numara }?.key
                 tamam("$numara. kanal açılıyor${if (ad != null) " ($ad)" else ""}.")
             } catch (e: Adb.Hata) {
                 hata(e.message ?: "Kanal açılamadı.")
@@ -1736,24 +1786,24 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             for (d in degerler) top = if (d == 100) (if (top == 0) 100 else top * 100) else top + d!!
             if (top in 1..9999) return top.toString()
         }
-        return KanalHafizasi.bul(ayar.kanalHaritasi, h)
+        return KanalHafizasi.bul(aktifHarita, h)
     }
 
     private fun kanalKaydet(kanal: String, numara: Int, sil: Boolean): JSONObject {
         val h = Uygulamalar.normal(kanal).removeSuffix(" kanalini").removeSuffix(" kanali").removeSuffix(" kanal").trim()
         val anahtar = KanalHafizasi.anahtar(h)
         if (anahtar.isEmpty()) return hata("Kanal adı boş.")
-        val harita = ayar.kanalHaritasi.toMutableMap()
+        val harita = aktifHarita.toMutableMap()
         // Aynı kanalın farklı söylenişlerini ("show", "show tv") tek kayıtta topla
         harita.keys.filter { KanalHafizasi.anahtar(it) == anahtar }.forEach { harita.remove(it) }
         if (sil) {
-            ayar.kanalHaritasi = harita
+            aktifHarita = harita
             kanalListesiPenceresi.yenile(harita)
             return tamam("$kanal kaydı silindi.")
         }
         if (numara !in 1..9999) return hata("Geçerli bir kanal numarası gerekli.")
         harita[h] = numara.toString()
-        ayar.kanalHaritasi = harita
+        aktifHarita = harita
         kanalListesiPenceresi.yenile(harita)
         return tamam("Kaydedildi: $kanal = $numara. kanal. Kayıtlı kanallar: " + harita.entries.sortedBy { it.value.toIntOrNull() ?: 0 }.joinToString(", ") { "${it.value} ${it.key}" })
     }
@@ -1789,15 +1839,15 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
                 return dogrula(once, s.aktifPaket, "TV'nin kanal listesini açma")
             }
         }
-        val harita = ayar.kanalHaritasi
-        val tv = try { Kanallar.liste(s) } catch (_: Exception) { emptyList() }
+        val harita = aktifHarita
+        val tv = if (ayar.kutuEtkin) emptyList() else try { Kanallar.liste(s) } catch (_: Exception) { emptyList() }
         val satirlar = if (harita.isNotEmpty()) {
             harita.entries.sortedWith(compareBy({ it.value.toIntOrNull() ?: 99999 }, { it.key }))
                 .map { "${it.value}. ${KanalListesiPenceresi.guzelAd(it.key)}" }
         } else {
             tv.take(40).map { "${it.numara}. ${it.ad}".trim() }
         }
-        val baslik = if (harita.isNotEmpty()) "Kayıtlı kanallar (${harita.size})" else if (tv.isNotEmpty()) "TV kanalları" else "Kayıtlı kanal yok"
+        val baslik = if (ayar.kutuEtkin) "TV+ kanalları (${harita.size})" else if (harita.isNotEmpty()) "Kayıtlı kanallar (${harita.size})" else if (tv.isNotEmpty()) "TV kanalları" else "Kayıtlı kanal yok"
         val gosterildi = kanalListesiPenceresi.goster(
             baslik,
             satirlar.ifEmpty { listOf("Henüz kanal öğretilmedi.", "Örnek: \"Birinci kanalda TRT 1 var\"", "\"4. kanalda Show TV var\"") },

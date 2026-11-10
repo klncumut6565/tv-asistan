@@ -495,6 +495,25 @@ class MainActivity : Activity() {
                 runOnUiThread { toast(sonuc) }
             }.start()
         })
+        s.ekle(ui.bolum("TV+ kutusu"))
+        s.ekle(ui.aciklama("Turkcell TV+ kutusu hangi HDMI girişine bağlı? Seçince \"TV+'ı aç\" denince o girişe geçilir; " +
+            "kanal komutları kumanda tuşu olarak kutuya iletilir (HDMI CEC açık olmalı)."))
+        durumSatiri(s) { if (a.kutuGirisi.isBlank()) "TV+ kutusu: ayarlanmadı" to Durum.UYARI else "TV+ kutusu: ${a.kutuGirisi}" to Durum.IYI }
+        val kutuSatir = ui.yatay()
+        listOf("Yok", "HDMI 1", "HDMI 2", "HDMI 3", "HDMI 4").forEach { g ->
+            kutuSatir.addView(ui.dugme(g) {
+                a.kutuGirisi = if (g == "Yok") "" else g
+                if (g == "Yok") a.kutuEtkin = false
+                toast(if (g == "Yok") "TV+ kutusu kaldırıldı." else "TV+ kutusu $g olarak kaydedildi.")
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = ui.dp(8) })
+        }
+        s.addView(kutuSatir, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val kutuHarita = a.kutuKanalHaritasi
+        if (kutuHarita.isNotEmpty()) {
+            s.ekle(ui.aciklama("TV+ kanalları: " + kutuHarita.entries.sortedBy { it.value.toIntOrNull() ?: 0 }.joinToString(", ") { "${it.value} ${it.key}" }))
+            s.ekle(ui.dugme("TV+ kanallarını sil") { a.kutuKanalHaritasi = emptyMap(); toast("Silindi."); kategoriEkrani(Kategori.TV) })
+        }
+
         val harita = a.kanalHaritasi
         if (harita.isNotEmpty()) {
             s.ekle(ui.aciklama("Öğrenilen kanallar: " + harita.entries.sortedBy { it.value.toIntOrNull() ?: 0 }.joinToString(", ") { "${it.value} ${it.key}" }))
