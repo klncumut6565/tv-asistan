@@ -45,7 +45,8 @@ class SozlesmeTest {
         val bas = araclar.indexOf("    fun calistir(")
         assertTrue(bas >= 0)
         val sonra = araclar.substring(bas + 10)
-        val son = Regex("""\n {4}(private )?fun """).find(sonra)?.range?.first ?: sonra.length
+        // calistir iki parçalı (kısa sarmalayıcı + asıl dağıtım): ikisini de kapsa, sonraki BAŞKA fonksiyonda dur
+        val son = Regex("""\n {4}(private )?fun (?!calistir)""").find(sonra)?.range?.first ?: sonra.length
         val dagitim = bul("""^\s+"([a-z_]+)"(?:, "[a-z_]+")* ->""", sonra.substring(0, son), setOf(RegexOption.MULTILINE))
 
         assertTrue("Araç listesi okunamadı (${tanimli.size})", tanimli.size >= 40)
