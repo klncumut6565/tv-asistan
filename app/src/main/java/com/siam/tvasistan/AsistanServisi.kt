@@ -193,6 +193,35 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         }
     }
 
+    /** Telefon sayfasındaki "TV'yi güncelle" düğmesi: denetler, varsa indirip kurulum onayını açar; sonucu telefona bildirir. */
+    private fun telefondanGuncelle() {
+        fun bildir(m: String, tamam: Boolean = false) {
+            Log.i(ETIKET, "Telefondan güncelleme: $m")
+            telefon?.olayGonder("guncelleme_durum", org.json.JSONObject().put("m", m).put("tamam", tamam).put("surum", BuildConfig.VERSION_NAME))
+        }
+        if (Guncelleme.kuruluyor) { bildir("Güncelleme zaten indiriliyor…"); return }
+        bildir("Güncelleme denetleniyor…")
+        kapsam.launch {
+            try {
+                val yeni = withContext(Dispatchers.IO) { Guncelleme.denetle() }
+                if (yeni == null) { bildir("Zaten en son sürüm (${BuildConfig.VERSION_NAME}).", true); return@launch }
+                if (!packageManager.canRequestPackageInstalls()) {
+                    bildir("TV'de izin gerekli: Ayarlar → Uygulamalar → Özel erişim → Bilinmeyen uygulamaları yükle → Jülide'yi açın.")
+                    return@launch
+                }
+                ekraniUyandir()
+                if (durum != Durum.BOSTA) bitir()
+                guncellemeyiKur(yeni)
+                bildir("${yeni.ad} indiriliyor. TV ekranında çıkan 'Yükle'ye kumandayla basın.", true)
+            } catch (e: Exception) {
+                val m = e.message.orEmpty()
+                bildir(if (m.contains("chain", true) || m.contains("certificate", true))
+                    "Denetlenemedi: TV'nin tarih/saati yanlış olabilir (Ayarlar → Tarih ve saat → Otomatik)."
+                else "Denetlenemedi: ${m.take(120)}")
+            }
+        }
+    }
+
     private fun anaEkrandaMi(): Boolean {
         val ana = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
             ?.activityInfo?.packageName ?: return false
@@ -272,6 +301,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 "kapat" -> ana.post { if (durum != Durum.BOSTA) bitir() }
             }
+        }, olayGeldi = { olay, _ ->
+            // Telefon sayfasındaki "TV'yi güncelle" düğmesi
+            if (olay == "guncelle") ana.post { telefondanGuncelle() }
         }, ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
     }
 
