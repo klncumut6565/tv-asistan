@@ -341,12 +341,16 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
 
     /** Telefon sayfasındaki "Jülide'nin sesi" ayarı: kaydedilir; sohbet açıksa yeni sesle yeniden başlatılır. */
     private fun sesAyariGeldi(yuk: org.json.JSONObject) {
-        val istenen = yuk.optString("ses")
+        sesiUygula(yuk.optString("ses"), if (yuk.has("duygu")) yuk.optBoolean("duygu") else null, "telefon")
+    }
+
+    /** Ses seçimi (telefondan ya da TV ayarlarından): kaydedilir; sohbet açıksa yeni sesle yeniden başlatılır. Ana iş parçacığında çağrılmalı. */
+    fun sesiUygula(istenen: String, duygu: Boolean?, kaynak: String) {
         val ses = Uzak.sesDogrula(istenen)
         ayarlar.sesTercihi = ses
-        if (yuk.has("duygu")) ayarlar.duyguTercihi = if (yuk.optBoolean("duygu")) 1 else 0
+        if (duygu != null) ayarlar.duyguTercihi = if (duygu) 1 else 0
         val acikti = durum != Durum.BOSTA
-        Log.i(ETIKET, "Ses ayarı telefondan: $ses (istenen: $istenen), sohbet açık=$acikti")
+        Log.i(ETIKET, "Ses ayarı ($kaynak): $ses (istenen: $istenen), sohbet açık=$acikti")
         telefon?.olayGonder("ses_onay", org.json.JSONObject().put("ses", ses).put("yeniden_baslatildi", acikti)
             .put("duygu", ayarlar.duyguTercihi == 1))
         if (acikti) {

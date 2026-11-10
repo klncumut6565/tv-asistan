@@ -98,6 +98,7 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        ornekOynatici?.let { o -> ornekOynatici = null; try { o.kapat() } catch (_: Exception) {} }
         ana.removeCallbacks(yenileyici)
         kurulumuDurdur()
         super.onPause()
@@ -318,6 +319,56 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- 🎙 Ses ve mikrofon
 
+    @Volatile private var ornekOynatici: Oynatici? = null
+    private var sonDinlenen: String? = null
+
+    /** "Jülide'nin sesi": her sesin kısa örneğini dinle, beğendiğini seç. */
+    private fun sesSecimi(s: LinearLayout) {
+        s.ekle(ui.bolum("Jülide'nin sesi"))
+        s.ekle(ui.aciklama(
+            "Bir sese basınca kısa bir örnek çalar (ilk dinlemede internetten hazırlanır, sonra anında). " +
+                "Beğendiğiniz sesi alttaki düğmeyle seçin. Örnek, Jülide'nin konuşmasından biraz farklı duyulabilir."
+        ))
+        durumSatiri(s) { "Şu anki ses: ${Uzak.sesDogrula(a.sesTercihi.ifBlank { "Kore" })}" to Durum.IYI }
+        val kullan = ui.dugme("Önce bir ses dinleyin", vurgulu = true) {
+            val ses = sonDinlenen ?: run { toast("Önce bir sesi dinleyin."); return@dugme }
+            val sv = AsistanServisi.ornek
+            if (sv != null) sv.sesiUygula(ses, null, "TV ayarları") else a.sesTercihi = ses
+            toast("Jülide'nin sesi: $ses. Sohbet açıksa yeni sesle yeniden başlar.")
+        }
+        val sesler = Uzak.SESLER.sortedBy { if (it == "Kore") "" else it }
+        sesler.chunked(4).forEach { grup ->
+            val satir = ui.yatay()
+            grup.forEach { ses ->
+                val d = ui.dugme("▶ $ses · ${SesOrnegi.TARIF[ses] ?: ""}") { ornekCal(ses, kullan) }
+                satir.addView(d, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = ui.dp(8) })
+            }
+            repeat(4 - grup.size) { satir.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f)) }
+            s.addView(satir, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = ui.dp(8) })
+        }
+        s.ekle(kullan)
+    }
+
+    private fun ornekCal(ses: String, kullan: TextView) {
+        sonDinlenen = ses
+        kullan.text = "✓ \"$ses\" sesini kullan"
+        ornekOynatici?.kapat()
+        ornekOynatici = null
+        toast("$ses hazırlanıyor…")
+        Thread {
+            try {
+                val pcm = SesOrnegi.getir(this, a.geminiAnahtari, ses)
+                val oy = Oynatici()
+                ornekOynatici = oy
+                oy.ekle(pcm)
+                Thread.sleep(pcm.size / 48L + 700) // 24 kHz × 2 bayt = 48 bayt/ms
+                if (ornekOynatici === oy) { oy.kapat(); ornekOynatici = null }
+            } catch (e: Exception) {
+                runOnUiThread { toast(e.message ?: "Örnek ses çalınamadı.") }
+            }
+        }.start()
+    }
+
     private fun sesVeMikrofon(s: LinearLayout) {
         durumSatiri(s) { if (izinVar(Manifest.permission.RECORD_AUDIO)) "Mikrofon izni var" to Durum.IYI else "Mikrofon izni yok" to Durum.HATA }
         s.ekle(ui.dugme("Mikrofon izni ver") { izinleriIste() })
@@ -358,6 +409,8 @@ class MainActivity : Activity() {
             val sv = AsistanServisi.ornek
             if (sv == null) toast("Önce erişilebilirlik servisini açın.") else sv.oturumBaslat()
         })
+
+        sesSecimi(s)
 
         s.ekle(ui.bolum("\"Jülide\" uyandırma kelimesi"))
         s.ekle(ui.aciklama(
