@@ -255,7 +255,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal", "birinci kanalda TRT 1 var", "4. kanalda Show TV var" → kanal_kaydet (kayıt KALICIDIR; o kanal sonra hep o numarayla açılır, kullanıcıya "Tamam, Show TV 4. kanal olarak kaydedildi" de). "Kanal listesini göster", "kayıtlı kanallar" → kanal_listesi(goster): liste ekranda görünür, sen yalnızca kaç kanal olduğunu ve ilk birkaçını kısaca söyle. "Listeyi kapat" → kanal_listesi(gizle). "TV'nin kanal listesini aç" → kanal_listesi(tv). "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5). Tarayıcıda bu fare tekerleği gibi sayfayı kaydırır.
-- TV+ KUTUSU: Kullanıcının Turkcell TV+ yayın kutusu bir HDMI girişine bağlı (kutu_ayarla ile kaydedilir). "TV+'ı aç", "kutuyu aç", "TV+'a geç" → kaynak_degistir(kaynak="TV+"); TV+ bir uygulama DEĞİLDİR, uygulama_ac kullanma. Kutu açıkken kanal_ac / kanal_degistir / rakamlar kutuya gider; kutunun kanal numaralarını kullanıcı öğretir ("TV+'ta 5. kanal ATV") → kanal_kaydet (kutu açıkken kutu listesine kaydedilir). Kutu menüsünde gezinmek için tus (asagi, yukari, tamam, geri). "Antene / TV yayınına dön" → kaynak_degistir("TV"). KUTU EKRANINI GÖREMEZSİN (TV HDMI görüntüsünü vermiyor): kutudayken ekrana_bak/ekrani_oku KULLANMA. "Kutuda X'i aç" → kutu_kisayol(calistir, ad=X); kısayol yoksa kullanıcıya bir kez öğretmesini öner: kutu_kisayol(kayit_baslat), kullanıcının tarifiyle tus bas, "kaydet" deyince kutu_kisayol(kaydet, ad=X). Kullanıcı diziyi doğrudan söylerse ("sol 5, yukarı 3, sağ 1, tamam") kaydet'e tuslar ile ver. Kısayollar sağlam olsun diye diziye bir BAŞLANGIÇ adımı eklemeyi öner (ör. önce geri birkaç kez ya da yukarı/sol ile köşeye git).
+- TV+ KUTUSU: Kullanıcının Turkcell TV+ yayın kutusu bir HDMI girişine bağlı (kutu_ayarla ile kaydedilir). "TV+'ı aç", "kutuyu aç", "TV+'a geç" → kaynak_degistir(kaynak="TV+"); TV+ bir uygulama DEĞİLDİR, uygulama_ac kullanma. Kutu açıkken kanal_ac / kanal_degistir / rakamlar kutuya gider; kutunun kanal numaralarını kullanıcı öğretir ("TV+'ta 5. kanal ATV") → kanal_kaydet (kutu açıkken kutu listesine kaydedilir). Kutu menüsünde gezinmek için tus (asagi, yukari, tamam, geri). "Antene / TV yayınına dön" → kaynak_degistir("TV"). Kutu açıkken kaynak_degistir'i TEKRAR çağırma (her giriş değişimi sesi keser); kanal/kısayol araçları gerekirse girişi kendisi açar. KUTU EKRANINI GÖREMEZSİN (TV HDMI görüntüsünü vermiyor): kutudayken ekrana_bak/ekrani_oku KULLANMA. "Kutuda X'i aç" → kutu_kisayol(calistir, ad=X); kısayol yoksa kullanıcıya bir kez öğretmesini öner: kutu_kisayol(kayit_baslat), kullanıcının tarifiyle tus bas, "kaydet" deyince kutu_kisayol(kaydet, ad=X). Kullanıcı diziyi doğrudan söylerse ("sol 5, yukarı 3, sağ 1, tamam") kaydet'e tuslar ile ver. Kısayollar sağlam olsun diye diziye bir BAŞLANGIÇ adımı eklemeyi öner (ör. önce geri birkaç kez ya da yukarı/sol ile köşeye git).
 - GOOGLE SONUÇLARI (tarayıcıda Google araması açıkken): "ikinci sonucu aç", "üçüncüye gir", "ilk sonucu aç" → arama_sonucu(islem=ac, sira=N). "Sonuçlar neler / oku" → arama_sonucu(listele), ilk 3-5 başlığı ve sitesini kısaca söyle. "Sonraki/önceki sonuç", "bir aşağı" → arama_sonucu(sonraki/onceki) (seçili sonuç el işaretiyle gösterilir); "bunu aç", "tamam aç" → arama_sonucu(sec). Bu sayfada tikla ya da numaralari_goster KULLANMA; arama_sonucu hata verirse onlara geç. Sıra numarası reklamları saymaz. Kullanıcı kumandanın aşağı/yukarı tuşlarıyla da sonuçlar arasında gezebilir, orta tuş seçili sonucu açar.
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
 - Kullanıcı bir yeri işaret ediyorsa ("şuraya tıkla", "şuna bas", "şu düğme") → numaralari_goster. YALNIZCA sonuç "DOĞRULANDI" ise "Numaraları gösterdim, hangisi?" diye sor; hata dönerse "Numaraları gösteremedim" de ve başka yol dene. Kullanıcı numara söyleyince numaraya_tikla.
@@ -422,6 +422,9 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             if (ayar.kutuGirisi.isBlank()) return hata("TV+ kutusunun hangi HDMI girişine bağlı olduğunu bilmiyorum. Kullanıcıya sor; söyleyince kutu_ayarla ile kaydet ve tekrar dene.")
             return kaynakDegistir(ayar.kutuGirisi)
         }
+        if (kutuEkrandaMi() && KutuModu.hdmiAdi(kaynak) == ayar.kutuGirisi) {
+            return tamam("$kutuAdi ZATEN açık; giriş yeniden değiştirilmedi. Tekrar kaynak_degistir çağırma.")
+        }
         val n = Uygulamalar.normal(kaynak)
         if (n.isEmpty()) return hata("Hangi girişe geçilsin? Kaynak adı verilmedi.")
         if (n in CANLI_TV_SOZLERI) {
@@ -435,6 +438,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         if (!Girisler.ac(s, g)) return hata("${g.ad} girişine geçilemedi.")
         val kutu = ayar.kutuGirisi.isNotBlank() && Girisler.bul(liste, ayar.kutuGirisi)?.id == g.id
         ayar.kutuEtkin = kutu
+        if (kutu) kutuGecisiniKaydet() else { kutuEkranPaketi = null; kutuGecisZamani = 0L }
         return tamam(if (kutu) "$kutuAdi açıldı. Kanal komutları artık kutuya gidiyor (kanal numarasıyla ya da kanal+/−)." else "${g.ad} girişine geçildi.")
     }
 
@@ -1646,12 +1650,13 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     private fun canliTvHazirla(): String? {
         if (canliTvOnde()) return null
         if (ayar.kutuEtkin && ayar.kutuGirisi.isNotBlank()) {
+            // Kutu zaten ekrandaysa girişi YENİDEN değiştirme: her geçiş sesi keser
+            if (kutuEkrandaMi()) return null
             // Kutu modu: canlı TV yerine kutunun HDMI girişini aç (tuşlar CEC ile kutuya geçer)
             val g = Girisler.bul(Girisler.liste(s), ayar.kutuGirisi) ?: return "$kutuAdi girişi bulunamadı."
+            Log.i("TvAsistan", "TANI kutu: girişe geçiliyor (önde: ${s.aktifPaket})")
             if (!Girisler.ac(s, g)) return "$kutuAdi girişine geçilemedi."
-            var b = 0
-            while (!canliTvOnde() && b < 30) { SystemClock.sleep(200); b++ }
-            SystemClock.sleep(1500)
+            kutuGecisiniKaydet()
             return null
         }
         if (!Kanallar.canliTvAc(s)) return "Canlı TV uygulaması bulunamadı."
@@ -1689,6 +1694,23 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         set(v) { if (ayar.kutuEtkin) ayar.kutuKanalHaritasi = v else ayar.kanalHaritasi = v }
 
     private val kutuAdi get() = "TV+ kutusu (${ayar.kutuGirisi})"
+
+    /**
+     * Kutu girişine geçildikten sonra öndeki uygulama (bu TV'de HDMI görüntüsünü gösteren uygulama, canlı TV
+     * uygulamasından farklı olabilir). Ön plan bu kaldıkça kutu ekranda sayılır ve giriş tekrar değiştirilmez.
+     */
+    @Volatile private var kutuEkranPaketi: String? = null
+    @Volatile private var kutuGecisZamani = 0L
+
+    private fun kutuGecisiniKaydet() {
+        SystemClock.sleep(1500)
+        kutuEkranPaketi = s.aktifPaket
+        kutuGecisZamani = SystemClock.elapsedRealtime()
+        Log.i("TvAsistan", "TANI kutu: girişte, önde=$kutuEkranPaketi")
+    }
+
+    private fun kutuEkrandaMi(): Boolean =
+        ayar.kutuEtkin && kutuGecisZamani > 0 && s.aktifPaket == kutuEkranPaketi
 
     /** Öğretme kaydı: kayıt açıkken kutuya gönderilen yön/tamam/geri tuşları burada birikir. */
     private val kutuKaydi = mutableListOf<String>()
