@@ -1706,11 +1706,19 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         SystemClock.sleep(1500)
         kutuEkranPaketi = s.aktifPaket
         kutuGecisZamani = SystemClock.elapsedRealtime()
+        // Jülide yeniden başlasa da hatırlansın (yoksa ilk komutta giriş bir kez daha seçilip ses kopar)
+        s.aktifPaket?.takeIf { it != s.packageName }?.let { ayar.kutuPaketi = it }
         Log.i("TvAsistan", "TANI kutu: girişte, önde=$kutuEkranPaketi")
     }
 
-    private fun kutuEkrandaMi(): Boolean =
-        ayar.kutuEtkin && kutuGecisZamani > 0 && s.aktifPaket == kutuEkranPaketi
+    private fun kutuEkrandaMi(): Boolean {
+        if (!ayar.kutuEtkin) return false
+        val p = s.aktifPaket
+        // Ön plan bilinmiyorsa (Jülide'nin kendi paneli, sistem arayüzü) girişe DOKUNMA: yeniden seçmek sayfayı yeniler
+        if (p == null || p == s.packageName || p.startsWith("com.android.systemui")) return true
+        val kayitli = kutuEkranPaketi ?: ayar.kutuPaketi.ifBlank { null }
+        return (kayitli != null && p == kayitli) || canliTvOnde()
+    }
 
     /** Öğretme kaydı: kayıt açıkken kutuya gönderilen yön/tamam/geri tuşları burada birikir. */
     private val kutuKaydi = mutableListOf<String>()
