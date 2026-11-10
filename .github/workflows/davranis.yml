@@ -9,6 +9,10 @@ on:
         description: "Gemini metin modeli"
         required: false
         default: "gemini-2.5-flash"
+      vakalar:
+        description: "Yalnız bu vakalar (virgülle id, ör. hava,sohbet). Boş = hepsi"
+        required: false
+        default: ""
 
 jobs:
   davranis:
@@ -25,15 +29,16 @@ jobs:
         env:
           GEMINI_TEST_ANAHTARI: ${{ secrets.GEMINI_TEST_ANAHTARI }}
           GEMINI_TEST_MODELI: ${{ inputs.model }}
+          GEMINI_TEST_VAKALAR: ${{ inputs.vakalar }}
         run: |
           if [ -z "$GEMINI_TEST_ANAHTARI" ]; then
             echo "::error::GEMINI_TEST_ANAHTARI secret'ı yok. Repo → Settings → Secrets and variables → Actions → New repository secret."
             exit 1
           fi
           chmod +x gradlew
-          ./gradlew --no-daemon :app:testDebugUnitTest --tests "com.siam.tvasistan.DavranisTesti" -i 2>&1 | grep -E "GEÇTİ|KALDI|FAILED|BUILD" || true
-          test -f app/build/reports/davranis-testi.md && grep -q "✅\|❌" app/build/reports/davranis-testi.md
-          ! grep -q "❌" app/build/reports/davranis-testi.md
+          ./gradlew --no-daemon :app:testDebugUnitTest --tests "com.siam.tvasistan.DavranisTesti" -i 2>&1 | grep -E "GEÇTİ|KALDI|ÇALIŞMADI|FAILED|BUILD" || true
+          test -f app/build/reports/davranis-testi.md
+          ! grep -q "❌\|⏸️" app/build/reports/davranis-testi.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:

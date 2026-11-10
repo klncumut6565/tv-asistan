@@ -23,7 +23,8 @@ import java.net.URL
  */
 class DavranisTesti {
 
-    private data class Sonuc(val id: String, val tur: String, val soz: String, val gecti: Boolean, val beklenen: String, val gelen: String, val neden: String)
+    /** calisti=false: istek kota/sunucu hatasıyla cevapsız kaldı → "ÇALIŞMADI" (kaldı SAYILMAZ, geçti de sayılmaz). */
+    private data class Sonuc(val id: String, val tur: String, val soz: String, val gecti: Boolean, val beklenen: String, val gelen: String, val neden: String, val calisti: Boolean = true)
 
     private fun normal(s: String) = Uygulamalar.normal(s)
 
@@ -58,11 +59,14 @@ class DavranisTesti {
         )
         val araclar = AracTanimi.bildirimler()
         val set = JSONObject(javaClass.classLoader!!.getResource("davranis_seti.json")!!.readText()).getJSONArray("vakalar")
+        // İsteğe bağlı: yalnız belirli vakalar (ör. "hava,sohbet") — kota azken kalanları yeniden denemek için
+        val secili = System.getenv("GEMINI_TEST_VAKALAR").orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         val sonuclar = mutableListOf<Sonuc>()
         for (i in 0 until set.length()) {
             val v = set.getJSONObject(i)
             val id = v.getString("id"); val soz = v.getString("soz"); val tur = v.optString("tur", "normal")
+            if (secili.isNotEmpty() && id !in secili) continue
             val kabul = (0 until (v.optJSONArray("arac")?.length() ?: 0)).map { v.getJSONArray("arac").getString(it) }.toSet()
             val yasak = (0 until (v.optJSONArray("yasak")?.length() ?: 0)).map { v.getJSONArray("yasak").getString(it) }.toSet()
             val arguman = v.optJSONObject("arguman") ?: JSONObject()
@@ -73,7 +77,9 @@ class DavranisTesti {
                 .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", soz)))))
                 .put("generationConfig", JSONObject().put("temperature", 0))
             val cevap = try { istek(anahtar, model, govde) } catch (e: Exception) {
-                sonuclar += Sonuc(id, tur, soz, false, kabul.joinToString("/"), "HATA", e.message.orEmpty().take(120)); continue
+                val m = e.message.orEmpty().take(160)
+                println("ÇALIŞMADI $id: '$soz' → $m")
+                sonuclar += Sonuc(id, tur, soz, false, kabul.joinToString("/"), "—", m, calisti = false); continue
             }
             val parcalar = cevap.optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
             val cagri = (0 until parcalar.length()).mapNotNull { parcalar.optJSONObject(it)?.optJSONObject("functionCall") }.firstOrNull()
@@ -96,23 +102,27 @@ class DavranisTesti {
             }
             sonuclar += Sonuc(id, tur, soz, neden.isEmpty(), if (kabul.isEmpty()) "araç yok" else kabul.joinToString("/"), gelen.take(140), neden)
             println((if (neden.isEmpty()) "GEÇTİ " else "KALDI ") + "$id: '$soz' → $gelen ${if (neden.isEmpty()) "" else "← $neden"}")
-            Thread.sleep(4_500) // ücretsiz kota: dakikada ~13 istek
+            Thread.sleep(6_500) // ücretsiz kota: dakikada ~9 istek
         }
 
         val gecen = sonuclar.count { it.gecti }
+        val calismayan = sonuclar.count { !it.calisti }
+        val kalan = sonuclar.count { it.calisti && !it.gecti }
         val rapor = buildString {
-            appendLine("## Jülide davranış testi — $gecen / ${sonuclar.size} geçti")
+            appendLine("## Jülide davranış testi — $gecen geçti · $kalan kaldı · $calismayan çalışmadı (toplam ${sonuclar.size})")
             appendLine()
             appendLine("Model: `$model` (metin). TV'deki Gemini Live sesli modeliyle birebir aynı değildir; talimat + araç seçimini yaklaşık ölçer.")
             appendLine()
             appendLine("| Sonuç | Tür | Cümle | Beklenen | Gelen | Neden |")
             appendLine("|---|---|---|---|---|---|")
-            for (s in sonuclar) appendLine("| ${if (s.gecti) "✅" else "❌"} | ${s.tur} | ${s.soz} | ${s.beklenen} | `${s.gelen.replace("|", "/")}` | ${s.neden} |")
+            if (calismayan > 0) appendLine("\n⚠️ 'Çalışmadı' = Gemini cevap vermedi (çoğunlukla günlük/dakikalık kota). Bunlar sonuç DEĞİLDİR; vakalar alanına id yazıp yeniden çalıştırın.\n")
+            for (s in sonuclar) appendLine("| ${if (!s.calisti) "⏸️" else if (s.gecti) "✅" else "❌"} | ${s.tur} | ${s.soz} | ${s.beklenen} | `${s.gelen.replace("|", "/")}` | ${s.neden} |")
         }
         File("build/reports").mkdirs()
         File("build/reports/davranis-testi.md").writeText(rapor)
         System.getenv("GITHUB_STEP_SUMMARY")?.let { File(it).appendText(rapor) }
         println(rapor)
-        assertTrue("Davranış testi: ${sonuclar.size - gecen} vaka kaldı (rapor: build/reports/davranis-testi.md)", gecen == sonuclar.size)
+        assertTrue("Davranış testi: $kalan vaka KALDI (rapor: build/reports/davranis-testi.md)", kalan == 0)
+        assertTrue("Davranış testi: $calismayan vaka ÇALIŞMADI (kota?) — sonuç eksik", calismayan == 0)
     }
 }
