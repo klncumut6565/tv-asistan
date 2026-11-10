@@ -36,7 +36,10 @@ class SozlesmeTest {
     private val araclar by lazy { kaynak("Araclar.kt") }
 
     /** Gemini'ye tanımlanan araçlar. */
-    private val tanimli by lazy { bul("""fn\("([a-z_]+)"""", blok(araclar, "fun bildirimler", "fun sistemTalimati")) }
+    private val tanimli by lazy {
+        val l = AracTanimi.bildirimler()
+        (0 until l.length()).map { l.getJSONObject(it).getString("name") }.toSet()
+    }
 
     private fun farkYok(neyi: String, eksik: Set<String>) =
         assertTrue("$neyi: ${eksik.sorted()}", eksik.isEmpty())

@@ -1,0 +1,30 @@
+{
+  "aciklama": "Jülide davranış test seti. Her cümle Gemini'ye gerçek talimat ve araç tanımlarıyla METİN olarak verilir; ilk araç çağrısı beklenenle karşılaştırılır. arac: kabul edilen araç(lar), 'YOK' = araç çağrılmamalı. arguman: anahtar → küçük harfli içerik parçası (birden çoksa | ile). yasak: kesinlikle çağrılmaması gereken araçlar. tur: normal / sinir (sınır durumu) / karsi (benzer ama tetiklememesi gereken).",
+  "vakalar": [
+    {"id": "tvplus-ac", "tur": "normal", "soz": "TV+'ı aç", "arac": ["kaynak_degistir"], "arguman": {"kaynak": "tv"}, "yasak": ["uygulama_ac"]},
+    {"id": "hdmi2", "tur": "normal", "soz": "HDMI 2'ye geç", "arac": ["kaynak_degistir"], "arguman": {"kaynak": "2"}},
+    {"id": "kutu-ayarla", "tur": "normal", "soz": "TV+ kutusu HDMI 2'de bağlı", "arac": ["kutu_ayarla"], "arguman": {"giris": "2"}},
+    {"id": "kutu-youtube", "tur": "normal", "soz": "Kutuda YouTube'u aç", "arac": ["kutu_kisayol"], "arguman": {"islem": "calistir", "ad": "youtube"}},
+    {"id": "atv", "tur": "normal", "soz": "ATV'yi aç", "arac": ["kanal_ac"], "arguman": {"kanal": "atv"}},
+    {"id": "sonraki-kanal", "tur": "normal", "soz": "Sonraki kanala geç", "arac": ["kanal_degistir"], "arguman": {"yon": "sonraki"}},
+    {"id": "kanal-kaydet", "tur": "normal", "soz": "Dördüncü kanalda Show TV var", "arac": ["kanal_kaydet"], "arguman": {"kanal": "show", "numara": "4"}},
+    {"id": "kanal-soru", "tur": "karsi", "soz": "Dördüncü kanalda şu an ne var?", "arac": [], "yasak": ["kanal_kaydet"]},
+    {"id": "kanal-listesi", "tur": "normal", "soz": "Kanal listesini göster", "arac": ["kanal_listesi"], "arguman": {"islem": "goster"}},
+    {"id": "liste-kapat", "tur": "sinir", "soz": "Listeyi kapat", "arac": ["kanal_listesi"], "arguman": {"islem": "gizle"}, "yasak": ["tv_kapat"]},
+    {"id": "tv-kapat", "tur": "sinir", "soz": "Televizyonu kapat", "arac": ["tv_kapat", "YOK"], "arguman": {"onayli": "false"}},
+    {"id": "sayfa-kapat", "tur": "karsi", "soz": "Bu sayfayı kapat", "arac": [], "yasak": ["tv_kapat"]},
+    {"id": "ses-kis", "tur": "normal", "soz": "Sesi biraz kıs", "arac": ["ses"], "arguman": {"islem": "azalt"}},
+    {"id": "youtube", "tur": "normal", "soz": "YouTube'u aç", "arac": ["uygulama_ac"], "arguman": {"ad": "youtube"}},
+    {"id": "web-ara", "tur": "normal", "soz": "Tarayıcıda Kemal Sunal ara", "arac": ["web_ara", "akilli_ara"], "arguman": {}},
+    {"id": "ikinci-sonuc", "tur": "normal", "soz": "Google'daki ikinci sonucu aç", "arac": ["arama_sonucu"], "arguman": {"islem": "ac", "sira": "2"}, "yasak": ["tikla"]},
+    {"id": "kaydir", "tur": "normal", "soz": "Sayfayı aşağı kaydır", "arac": ["kaydir"], "arguman": {"yon": "asagi"}},
+    {"id": "hatirla", "tur": "normal", "soz": "Bunu hatırla: maçları TRT Spor'dan izlerim", "arac": ["hatirla"], "arguman": {"bilgi": "trt spor"}},
+    {"id": "hatirla-kendiligi", "tur": "karsi", "soz": "Bugün çok yorgunum", "arac": [], "yasak": ["hatirla"]},
+    {"id": "hatirladiklarim", "tur": "normal", "soz": "Hakkımda neler hatırlıyorsun?", "arac": ["hatirladiklarim"]},
+    {"id": "unut", "tur": "normal", "soz": "Maç bilgisini unut", "arac": ["unut"], "arguman": {"aranan": "maç|mac"}},
+    {"id": "doviz", "tur": "normal", "soz": "Dolar kaç lira?", "arac": ["doviz_kuru"], "arguman": {"birim": "usd|dolar"}},
+    {"id": "hava", "tur": "normal", "soz": "Yarın İstanbul'da hava nasıl olacak?", "arac": ["hava_durumu"], "arguman": {"sehir": "istanbul"}},
+    {"id": "uyku", "tur": "normal", "soz": "Yarım saat sonra televizyonu kapat", "arac": ["uyku_zamanlayicisi"], "arguman": {"islem": "kur", "dakika": "30"}, "yasak": ["tv_kapat"]},
+    {"id": "sohbet", "tur": "karsi", "soz": "Merhaba Jülide, nasılsın?", "arac": [], "yasak": []}
+  ]
+}

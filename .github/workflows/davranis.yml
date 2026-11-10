@@ -1,0 +1,42 @@
+name: Davranış testi (Gemini)
+
+# Jülide'nin gerçek sistem talimatı ve araç tanımlarıyla örnek cümlelerin doğru araca gidip gitmediğini ölçer.
+# Kota harcadığı için YALNIZ elle çalışır. Gerekli secret: GEMINI_TEST_ANAHTARI (Gemini API anahtarı).
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Gemini metin modeli"
+        required: false
+        default: "gemini-2.5-flash"
+
+jobs:
+  davranis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Davranış testini çalıştır
+        env:
+          GEMINI_TEST_ANAHTARI: ${{ secrets.GEMINI_TEST_ANAHTARI }}
+          GEMINI_TEST_MODELI: ${{ inputs.model }}
+        run: |
+          if [ -z "$GEMINI_TEST_ANAHTARI" ]; then
+            echo "::error::GEMINI_TEST_ANAHTARI secret'ı yok. Repo → Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:testDebugUnitTest --tests "com.siam.tvasistan.DavranisTesti" -i 2>&1 | grep -E "GEÇTİ|KALDI|FAILED|BUILD" || true
+          test -f app/build/reports/davranis-testi.md && grep -q "✅\|❌" app/build/reports/davranis-testi.md
+          ! grep -q "❌" app/build/reports/davranis-testi.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: davranis-raporu
+          path: app/build/reports/davranis-testi.md
+          if-no-files-found: ignore
