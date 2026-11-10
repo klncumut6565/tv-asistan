@@ -111,7 +111,12 @@ class GeminiLive(private val d: Dinleyici) {
     /** Oturum devam tutamacı: bağlantı yenilenince sohbet bağlamı kaybolmaz. */
     @Volatile var tutamac: String? = null
 
-    suspend fun baglan(anahtar: String, y: Uzak.Yapilandirma, talimat: String, araclar: JSONArray) {
+    /** Son bağlantı, telefondan seçilen ses/duygu ayarı reddedildiği için varsayılan (Kore, duygu kapalı) ile mi kuruldu. */
+    @Volatile var varsayilanSesleBaglandi = false
+        private set
+
+    suspend fun baglan(anahtar: String, y: Uzak.Yapilandirma, talimat: String, araclar: JSONArray, guvenliDeneme: Boolean = false) {
+        if (!guvenliDeneme) varsayilanSesleBaglandi = false
         if (anahtar.isBlank()) throw IOException("Gemini API anahtarı girilmemiş — Jülide uygulamasını açıp anahtarı kaydedin.")
         sesAdi = Uzak.sesDogrula(y.ses)
         duyguUyumu = y.duyguUyumu
@@ -160,6 +165,14 @@ class GeminiLive(private val d: Dinleyici) {
         }
         if (kotasiDolan.size >= sira.size) {
             throw KaliciHata("Gemini kotası tüm modellerde doldu (${kotasiDolan.size} model denendi). Kota genelde gece yarısı (Pasifik saati, TR 10:00) sıfırlanır.")
+        }
+        Log.w(ETIKET, "Gemini Live bağlanamadı (ses=$sesAdi, duygu=$duyguUyumu). Tüm denemeler: " + hatalar.joinToString(" | "))
+        // Telefondan seçilen ses ya da duygu uyumu bir modelde reddedilebilir: bir kez güvenli varsayılanla dene
+        if (!guvenliDeneme && (sesAdi != "Kore" || duyguUyumu)) {
+            Log.w(ETIKET, "Seçilen ses/duygu ayarıyla bağlanılamadı; Kore + duygu kapalı ile yeniden deneniyor")
+            baglan(anahtar, y.copy(ses = "Kore", duyguUyumu = false), talimat, araclar, guvenliDeneme = true)
+            varsayilanSesleBaglandi = true
+            return
         }
         throw IOException("Gemini Live bağlanamadı. " + hatalar.lastOrNull().orEmpty())
     }
