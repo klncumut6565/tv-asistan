@@ -102,9 +102,10 @@ class TelefonKoprusu(
         olayGonder("nabiz", JSONObject().put("t", System.currentTimeMillis() / 1000).put("ekran", ekranAcik()).put("surum", BuildConfig.VERSION_NAME))
     }
 
-    fun halGonder(oturumAcik: Boolean, konusuyor: Boolean) {
+    fun halGonder(oturumAcik: Boolean, konusuyor: Boolean, ses: String? = null, duygu: Boolean? = null) {
         val yuk = JSONObject().put("type", "broadcast").put("event", "hal")
-            .put("payload", JSONObject().put("oturum", oturumAcik).put("konusuyor", konusuyor).put("ekran", ekranAcik()))
+            .put("payload", JSONObject().put("oturum", oturumAcik).put("konusuyor", konusuyor).put("ekran", ekranAcik())
+                .apply { ses?.let { put("ses", it) }; duygu?.let { put("duygu", it) } })
         gonder(JSONObject().put("topic", konu).put("event", "broadcast").put("payload", yuk))
     }
 

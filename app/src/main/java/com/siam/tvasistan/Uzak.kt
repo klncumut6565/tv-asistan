@@ -59,11 +59,21 @@ object Uzak {
     )
 
     /** Ses adını doğrular (büyük/küçük harf duyarsız); geçersizse Kore. */
+    /**
+     * Telefon sayfasından yapılan ses seçimi uzaktan ayardan ÖNCELİKLİDİR (yalnız beyaz listedeki kadın sesleri).
+     * duyguTercihi: -1 = uzaktan ayar, 0 = kapalı, 1 = açık. Testlerde de kullanılır.
+     */
+    fun tercihUygula(y: Yapilandirma, sesTercihi: String, duyguTercihi: Int): Yapilandirma {
+        val ses = sesTercihi.takeIf { t -> SESLER.any { it.equals(t.trim(), true) } }?.let { sesDogrula(it) } ?: y.ses
+        val duygu = when (duyguTercihi) { 0 -> false; 1 -> true; else -> y.duyguUyumu }
+        return y.copy(ses = ses, duyguUyumu = duygu)
+    }
+
     fun sesDogrula(ad: String?): String = SESLER.firstOrNull { it.equals(ad?.trim(), ignoreCase = true) } ?: "Kore"
     private val KELIME_DESENI = Regex("^[\\p{L} ]{3,20}$")
     private val ABONELIK_DESENI = Regex("^[\\p{L}0-9 .+'-]{2,30}$")
 
-    private val VARSAYILAN = Yapilandirma(
+    internal val VARSAYILAN = Yapilandirma(
         modeller = listOf(
             Model("models/gemini-3.1-flash-live-preview", "Gemini 3.1 Flash Live", false),
             Model("models/gemini-3.8-live", "Gemini 3.8 Live", true),
@@ -98,7 +108,8 @@ object Uzak {
         } catch (e: Exception) {
             Log.w("TvAsistan", "Uzak ayar alınamadı: ${e.message}")
         }
-        return a.uzakAyar?.let { cozumle(it) } ?: VARSAYILAN
+        val y = a.uzakAyar?.let { cozumle(it) } ?: VARSAYILAN
+        return tercihUygula(y, a.sesTercihi, a.duyguTercihi)
     }
 
     private fun cozumle(metin: String): Yapilandirma? = try {

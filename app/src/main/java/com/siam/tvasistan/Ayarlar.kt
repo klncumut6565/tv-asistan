@@ -106,6 +106,16 @@ class Ayarlar(ctx: Context) {
         get() = p.getBoolean("kalabalik_modu", false)
         set(v) = p.edit().putBoolean("kalabalik_modu", v).apply()
 
+    /** Telefon sayfasından seçilen Jülide sesi (boş = uzaktan ayardaki ses). Uzak ayardan ÖNCELİKLİDİR. */
+    var sesTercihi: String
+        get() = p.getString("ses_tercihi", "") ?: ""
+        set(v) = p.edit().putString("ses_tercihi", v).apply()
+
+    /** Duygu uyumu tercihi: -1 = uzaktan ayar, 0 = kapalı, 1 = açık. */
+    var duyguTercihi: Int
+        get() = p.getInt("duygu_tercihi", -1)
+        set(v) = p.edit().putInt("duygu_tercihi", v).apply()
+
     var uyandirmaAktif: Boolean
         get() = p.getBoolean("uyandirma_aktif", false)
         set(v) = p.edit().putBoolean("uyandirma_aktif", v).apply()
