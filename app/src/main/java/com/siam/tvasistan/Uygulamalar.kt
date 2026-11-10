@@ -3,6 +3,7 @@ package com.siam.tvasistan
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import java.text.Normalizer
 import java.util.Locale
@@ -64,15 +65,61 @@ object Uygulamalar {
     /** Yeni uygulama kurulunca/kaldırılınca listeyi hemen tazelemek için. */
     fun onbellegiTemizle() {
         onbellekZamani = 0L
+        tarayiciZamani = 0L
     }
 
-    /** "https" bağlantılarını açabilen uygulamalar (tarayıcılar). */
-    fun tarayicilar(ctx: Context): List<Uyg> {
+    /** Paket adında geçerse tarayıcı sayılır (web adresi filtresi bildirmeyen TV tarayıcıları için). */
+    private val TARAYICI_PAKET_IZLERI = listOf(
+        "browser", "yandex", "chrome", "firefox", "opera", "vewd", "puffin", "tvbro", "tvweb", "vivaldi",
+        "sbrowser", "duckduckgo", "brave", "kiwi", "mozilla",
+    )
+
+    /** Uygulama ADI tarayıcıya benziyor mu ("Tarayıcı", "Yandex Browser", "Internet"). Testlerde de kullanılır. */
+    fun tarayiciAdiMi(ad: String, paket: String): Boolean {
+        val a = normal(ad)
+        val p = paket.lowercase(TR)
+        if ("youtube" in p || "youtube" in a) return false
+        return a == "tarayici" || a.startsWith("tarayici ") || a.endsWith(" tarayici") || a.contains("tarayicisi") ||
+            a.contains("browser") || a == "internet" || a.startsWith("internet ") && !a.contains("hiz") ||
+            TARAYICI_PAKET_IZLERI.any { it in p }
+    }
+
+    @Volatile private var tarayiciOnbellek: List<Uyg> = emptyList()
+    @Volatile private var tarayiciZamani = 0L
+
+    /** Web adresi açabilen paketler. MATCH_ALL: Android 6+ web sorgularını varsayılan tarayıcıya göre FİLTRELEMESİN. */
+    fun webAcabilenler(ctx: Context): Set<String> {
         val pm = ctx.packageManager
-        val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
-        return pm.queryIntentActivities(i, 0)
-            .map { Uyg(it.loadLabel(pm).toString(), it.activityInfo.packageName) }
-            .distinctBy { it.paket }
+        val l = linkedSetOf<String>()
+        for (sema in listOf("https", "http")) for (kategori in listOf(true, false)) {
+            val i = Intent(Intent.ACTION_VIEW, Uri.parse("$sema://www.google.com"))
+            if (kategori) i.addCategory(Intent.CATEGORY_BROWSABLE)
+            try { pm.queryIntentActivities(i, PackageManager.MATCH_ALL).forEach { l += it.activityInfo.packageName } } catch (_: Exception) {}
+        }
+        return l
+    }
+
+    /**
+     * Tarayıcılar: web adresi açabilenler + adı/paketi tarayıcı olan uygulamalar
+     * (ör. Vestel "Tarayıcı" uygulaması web adresi filtresi bildirmese de listeye girer). 30 sn önbellekli.
+     */
+    @Synchronized
+    fun tarayicilar(ctx: Context): List<Uyg> {
+        val simdi = android.os.SystemClock.elapsedRealtime()
+        if (tarayiciOnbellek.isNotEmpty() && simdi - tarayiciZamani < 30_000) return tarayiciOnbellek
+        val pm = ctx.packageManager
+        val sonuc = LinkedHashMap<String, Uyg>()
+        val kurulu = tumu(ctx).associateBy { it.paket }
+        for (p in webAcabilenler(ctx)) {
+            if (p == ctx.packageName || "youtube" in p.lowercase(TR)) continue
+            val ad = kurulu[p]?.ad ?: try { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() } catch (_: Exception) { p }
+            sonuc[p] = Uyg(ad, p)
+        }
+        for (u in kurulu.values) if (u.paket !in sonuc && tarayiciAdiMi(u.ad, u.paket)) sonuc[u.paket] = u
+        tarayiciOnbellek = sonuc.values.toList()
+        tarayiciZamani = simdi
+        android.util.Log.i("TvAsistan", "Tarayıcılar: " + tarayiciOnbellek.joinToString { "${it.ad} (${it.paket})" })
+        return tarayiciOnbellek
     }
 
     /**
@@ -80,14 +127,22 @@ object Uygulamalar {
      * (Android'in varsayılan tarayıcısı pasif yapılmış olsa bile ona gidilmez).
      * Öncelik: tercih edilen paket (aktifse) → adı "Tarayıcı/Browser/Internet" olan → ilk aktif tarayıcı.
      */
-    fun aktifTarayici(ctx: Context, tercih: String? = null): String? {
+    fun aktifTarayici(ctx: Context, tercih: String? = null): String? = aktifTarayicilar(ctx, tercih).firstOrNull()
+
+    /** Aktif tarayıcılar, denenme sırasıyla: tercih → "Tarayıcı" → adı tarayıcıya benzeyen → diğerleri. */
+    fun aktifTarayicilar(ctx: Context, tercih: String? = null): List<String> {
         val aktifler = liste(ctx).map { it.paket }.toSet()
         val l = tarayicilar(ctx).filter { it.paket in aktifler && it.paket != ctx.packageName }
-        if (l.isEmpty()) return null
-        tercih?.let { t -> l.firstOrNull { it.paket == t }?.let { return it.paket } }
-        return (l.firstOrNull { normal(it.ad).let { a -> a == "tarayici" || a.startsWith("tarayici") } }
-            ?: l.firstOrNull { normal(it.ad).let { a -> "tarayici" in a || "browser" in a || "internet" in a } }
-            ?: l.first()).paket
+        val sira = l.sortedBy { u ->
+            val a = normal(u.ad)
+            when {
+                u.paket == tercih -> 0
+                a == "tarayici" || a.startsWith("tarayici") -> 1
+                "tarayici" in a || "browser" in a || "internet" in a -> 2
+                else -> 3
+            }
+        }
+        return sira.map { it.paket }
     }
 
     /** Paket Jülide ayarlarında pasif mi. */

@@ -883,9 +883,63 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     }
 
     private fun tarayiciPaketleri(): Set<String> = try {
-        s.packageManager.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")), 0)
-            .map { it.activityInfo.packageName }.toSet()
+        Uygulamalar.tarayicilar(s).map { it.paket }.toSet()
     } catch (_: Exception) { emptySet() }
+
+    /**
+     * Tarayıcıda adres açar. Sırayla: (1) web adresi isteği, (2) web araması isteği, (3) uygulamayı açıp
+     * ADRES ÇUBUĞUNA yazma — dışarıdan adres kabul etmeyen TV tarayıcıları (ör. Vestel "Tarayıcı") için.
+     * Başarılı yolun adını, olmazsa null döner.
+     */
+    private fun tarayicidaAc(paket: String, adres: Uri, aramaMetni: String? = null): String? {
+        val pm = s.packageManager
+        for (kategori in listOf(true, false)) {
+            val i = Intent(Intent.ACTION_VIEW, adres).setPackage(paket)
+            if (kategori) i.addCategory(Intent.CATEGORY_BROWSABLE)
+            if (i.resolveActivity(pm) != null && baslat(i)) return "adres"
+        }
+        if (aramaMetni != null) {
+            val i = Intent(Intent.ACTION_WEB_SEARCH).setPackage(paket).putExtra(SearchManager.QUERY, aramaMetni)
+            if (i.resolveActivity(pm) != null && baslat(i)) return "web_arama"
+        }
+        val acilis = pm.getLeanbackLaunchIntentForPackage(paket) ?: pm.getLaunchIntentForPackage(paket) ?: return null
+        if (!baslat(acilis)) return null
+        var bekle = 0
+        while (s.aktifPaket != paket && bekle < 25) { SystemClock.sleep(200); bekle++ }
+        SystemClock.sleep(1200) // sayfa/arayüz yüklensin
+        return if (adresCubugunaYaz(adres.toString())) "adres_cubugu" else null
+    }
+
+    private val ADRES_CUBUGU = Regex("(url|adres|address|omnibox|location|search|arama|ara|sorgu|google)", RegexOption.IGNORE_CASE)
+
+    /** Açık tarayıcının adres çubuğunu bulur, adresi yazar ve Enter'a basar. */
+    private fun adresCubugunaYaz(adres: String): Boolean {
+        var alan = yaziAlani()
+        if (alan == null) {
+            // Adres çubuğu çoğu TV tarayıcısında önce tıklanınca düzenlenebilir olur
+            val aday = ogeler().firstOrNull { o ->
+                val id = o.dugum.viewIdResourceName.orEmpty()
+                (o.dugum.isClickable || o.dugum.isFocusable) && (ADRES_CUBUGU.containsMatchIn(id) || ADRES_CUBUGU.containsMatchIn(o.metin))
+            }?.dugum
+            aday?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            SystemClock.sleep(600)
+            alan = yaziAlani()
+        }
+        if (alan == null) {
+            Log.w("TvAsistan", "Tarayıcıda adres çubuğu bulunamadı")
+            return false
+        }
+        alan.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        val b = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, adres) }
+        if (!alan.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) return false
+        SystemClock.sleep(200)
+        val girildi = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            alan.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+        if (!girildi) try { adb.tuslar(listOf(KeyEvent.KEYCODE_ENTER)) } catch (e: Exception) { Log.w("TvAsistan", "Enter gönderilemedi: ${e.message}") }
+        return true
+    }
+
+    private fun tarayiciAdi(paket: String) = Uygulamalar.tarayicilar(s).firstOrNull { it.paket == paket }?.ad ?: paket
 
     private enum class Baglam { YOUTUBE, SPOTIFY, ABONELIK, TARAYICI, DIGER }
 
@@ -1030,8 +1084,19 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         val onceImza = ekranImzasi()
         val oncePaket = s.aktifPaket
         val adres = Uri.parse("https://www.google.com/search?q=${enc(q)}")
-        val paket = Uygulamalar.aktifTarayici(s, tarayici) ?: return hata(TARAYICI_YOK)
-        if (!baslat(Intent(Intent.ACTION_VIEW, adres).setPackage(paket))) return hata(TARAYICI_YOK)
+        val adaylar = Uygulamalar.aktifTarayicilar(s, tarayici)
+        if (adaylar.isEmpty()) return hata(TARAYICI_YOK)
+        val denenen = mutableListOf<String>()
+        var paket: String? = null
+        var yol: String? = null
+        for (p in adaylar.take(3)) {
+            yol = tarayicidaAc(p, adres, q)
+            if (yol != null) { paket = p; break }
+            denenen += tarayiciAdi(p)
+            Log.w("TvAsistan", "Web araması ${tarayiciAdi(p)} ($p) ile yapılamadı; sıradaki tarayıcı denenecek")
+        }
+        if (paket == null) return hata("Arama yapılamadı: ${denenen.joinToString(", ")} dışarıdan adres kabul etmedi ve adres çubuğu bulunamadı. Kullanıcıya Jülide ayarlarından başka bir tarayıcıyı aktif yapmasını öner.$ACILMADI")
+        Log.i("TvAsistan", "Web araması: ${tarayiciAdi(paket)} ($paket), yol=$yol" + if (denenen.isNotEmpty()) " (önce denenen: ${denenen.joinToString()})" else "")
         varsayilanTarayiciyiAyarla()
         google.secimiSifirla()
         val d = dogrula(onceImza, oncePaket, "Tarayıcıda '$q' araması")
@@ -1076,7 +1141,9 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         val onceImza = ekranImzasi()
         val oncePaket = s.aktifPaket
         val paket = Uygulamalar.aktifTarayici(s, s.aktifPaket) ?: return hata(TARAYICI_YOK)
-        if (!baslat(Intent(Intent.ACTION_VIEW, Uri.parse(adres)).setPackage(paket))) return hata(TARAYICI_YOK)
+        val yol = tarayicidaAc(paket, Uri.parse(adres))
+            ?: return hata("${tarayiciAdi(paket)} açıldı ama adres girilemedi (adres çubuğu bulunamadı).$ACILMADI")
+        Log.i("TvAsistan", "Adres açma: ${tarayiciAdi(paket)} ($paket), yol=$yol")
         return dogrula(onceImza, oncePaket, "$adres adresini açma")
     }
 
