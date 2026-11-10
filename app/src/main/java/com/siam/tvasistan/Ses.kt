@@ -311,6 +311,27 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     @Volatile private var acik = true
     /** Yazılan sesin tahmini bitiş anı (elapsedRealtime ms). */
     @Volatile private var bitis = 0L
+    /**
+     * KOPMA ALGILAYICI (yalnız log; çalmayı DEĞİŞTİRMEZ). Bir cevabın ORTASINDA duyulabilir bir kesinti olunca
+     * "KOPMA" ile başlayan tek bir log satırı yazar: türü, süresi, saati. Kullanıcının saat tutmasına gerek kalmaz.
+     *  - boşluk: Gemini'den sonraki ses parçası, öncekinin bitişinden >250 ms sonra geldi (ağ/model gecikmesi)
+     *  - hoparlör boşaldı: ses çalınması gerekirken AudioTrack tamponu boşaldı (underrun)
+     *  - erken duraklatma: çalar, tamponda çalınmamış ses varken duraklatıldı
+     *  - kesme: cevap sürerken ses bilerek kesildi (neden: tuş, kullanıcı konuştu, yeniden bağlanma…)
+     */
+    /** Çalar bir cevabın sesini çalıyor (ilk parçadan duraklatmaya kadar). */
+    @Volatile private var turIcinde = false
+    /** Model cevabı bitirdi: sıradaki parça YENİ cevabın başıdır, öncesindeki sessizlik kopma değildir. */
+    @Volatile private var yeniCevap = true
+    @Volatile private var sonUnderrun = 0
+
+    private fun kopma(tur: String, ayrinti: String) {
+        Log.w("TvAsistanSes", "KOPMA $tur: $ayrinti")
+    }
+
+    /** Model cevabını bitirdi: sonraki parça yeni bir cevaptır, aradaki sessizlik kopma sayılmaz. */
+    fun turSonu() { yeniCevap = true }
+
     /** Çalara yazılan toplam ses karesi (tanı için; çalma kafasıyla karşılaştırılır). */
     @Volatile private var yazilanKare = 0L
 
@@ -360,8 +381,10 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
                     val bekleyen = try { yazilanKare - track.playbackHeadPosition.toLong() } catch (_: Exception) { 0L }
                     synchronized(olcKilit) { olcBostaDuraklatma++; if (bekleyen > 2400) olcErkenDuraklatma++ }
                     if (bekleyen > 2400) Log.w("TvAsistanSes", "pause: tamponda ~${bekleyen / 24} ms çalınmamış ses vardı")
+                    if (bekleyen > 2400 && turIcinde) kopma("erken duraklatma", "tamponda ~${bekleyen / 24} ms çalınmamış ses varken çalar durdu (tahmini)")
                     try { track.pause() } catch (_: Exception) {}
                     oynuyor = false
+                    turIcinde = false
                 }
                 continue
             }
@@ -373,6 +396,16 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
             synchronized(olcKilit) { if (kb > olcKuyrukMaks) olcKuyrukMaks = kb }
             val simdi = SystemClock.elapsedRealtime()
             val sureMs = p.size / 48L // 24000 örnek/sn × 2 bayt = 48 bayt/ms
+            // Cevap ortasında önceki parça bitmişken yeni parça geç geldiyse duyulur bir boşluk oluştu
+            if (turIcinde && !yeniCevap && bitis > 0 && simdi - bitis > 250 && simdi - bitis < 8000) {
+                kopma("boşluk", "${simdi - bitis} ms sessizlik (Gemini'den ses geç geldi, kuyruk boştu)")
+            }
+            // Ses çalınıyor olmalıyken hoparlör tamponu boşaldıysa (underrun) duyulur bir takılma olur
+            val ur = try { track.underrunCount } catch (_: Exception) { sonUnderrun }
+            if (ur > sonUnderrun && turIcinde && bitis > simdi + 40) kopma("hoparlör boşaldı", "${ur - sonUnderrun} kez (ses tamponu yetişemedi)")
+            sonUnderrun = ur
+            turIcinde = true
+            yeniCevap = false
             bitis = maxOf(bitis, simdi) + sureMs
             // Küreyi konuşmayla senkron tutmak için parçayı ~40 ms'lik dilimlerle yaz ve seviyeyi bildir.
             var o = 0
@@ -429,7 +462,10 @@ class Oynatici(private val seviye: ((Float) -> Unit)? = null) {
     fun caliyor(ekMs: Long): Boolean = kuyruk.isNotEmpty() || SystemClock.elapsedRealtime() < bitis + ekMs
 
     /** Kesinti: kuyruktaki ve tampondaki sesi anında at. */
-    fun temizle() {
+    fun temizle(neden: String = "belirtilmedi") {
+        if (turIcinde && caliyor(0)) kopma("kesme", "cevap sürerken ses kesildi: $neden")
+        turIcinde = false
+        yeniCevap = true
         kuyruk.clear()
         synchronized(olcKilit) { olcKesinti++ }
         try {

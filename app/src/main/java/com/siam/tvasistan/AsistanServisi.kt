@@ -398,7 +398,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             Durum.DINLIYOR -> {
                 // Kalabalık modunda telefondaki her konuşma pencere açmaz: önce "Jülide" ya da tuş gerekir
                 if (!DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) return
-                oynatici?.let { if (it.caliyor()) it.temizle() }
+                oynatici?.let { if (it.caliyor()) it.temizle("telefonda yeni konuşma başladı") }
                 konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
                 if (medyaAktif) konusOdagiAl()
                 medyaSessizUyarisi = false
@@ -469,7 +469,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             Durum.DINLIYOR -> {
                 // Oturum açıkken kısa basış: Jülide'yi sustur ve dinlemeye geç (video açıkken
                 // mikrofonu 12 sn açar). Kapatmak için "sohbeti kapat" de ya da tuşa uzun bas.
-                oynatici?.let { if (it.caliyor()) it.temizle() }
+                oynatici?.let { if (it.caliyor()) it.temizle("kumanda tuşuna basıldı") }
                 konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
                 // Video/müzik açıksa konuşurken TV sesini sustur: odak alınca uygulamalar duraklar
                 // (ya da sesini kısar), pencere bitince odak bırakılır ve kaldığı yerden devam eder.
@@ -556,7 +556,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                         // Telefondan konuşuluyorsa Jülide'nin sözünü kes (bkz. telefonKonusmasiBasladi);
                         // TV/kumanda mikrofonunda yarı çift yönlü kural aynen geçerli.
                         if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700 &&
-                            DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) oy.temizle()
+                            DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) oy.temizle("telefon mikrofonunda konuşma")
                         else { tKapali++; return@Mikrofon }
                     }
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
@@ -772,7 +772,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         val tutamac = eski?.tutamac
         live = null
         eski?.kapat()
-        oynatici?.temizle()
+        oynatici?.temizle("Gemini bağlantısı yeniden kuruluyor")
         panel.durum("Yeniden bağlanıyor…")
         kapsam.launch {
             try {
@@ -936,7 +936,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     override fun kesildi() {
-        oynatici?.temizle()
+        oynatici?.temizle("Gemini cevabı kesti (sesi kullanıcı konuşması sandı)")
     }
 
     /** Aynı aracın aynı argümanla tur içinde döngüye girmesini engeller. */
@@ -991,6 +991,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     override fun turBitti() {
+        oynatici?.turSonu()
         ana.post {
             yeniTur = true
             aracKorumasi.sifirla()
