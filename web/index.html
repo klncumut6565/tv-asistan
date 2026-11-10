@@ -449,6 +449,13 @@
     }
   }
 
+  // "Durdur" düğmesi: telefon mikrofonunu kapatır VE TV'deki sohbeti (küreyi) de kapatır.
+  // Sayfa arka plana geçince çağrılan durdur() ise yalnız mikrofonu kapatır; TV'deki sohbet kumandayla sürebilir.
+  function durdurVeKapat() {
+    if (oturumAcik !== false) tvyeGonder("kapat");
+    durdur();
+  }
+
   function durdur() {
     calisiyor = false; konusuyor = false; gonderilecek = []; oncesi.length = 0;
     try { kanal && bagli && kanal.send({ type: "broadcast", event: "hoscakal", payload: {} }); } catch (_) {}
@@ -505,7 +512,7 @@
   });
 
   baslatBtn.addEventListener("click", () => {
-    if (!calisiyor) { try { uyanikVideo.muted = true; uyanikVideo.play().catch(() => {}); } catch (_) {} } calisiyor ? (durdur(), durum("Durduruldu")) : baslat(); });
+    if (!calisiyor) { try { uyanikVideo.muted = true; uyanikVideo.play().catch(() => {}); } catch (_) {} } calisiyor ? (durdurVeKapat(), durum("Durduruldu")) : baslat(); });
   duraklatBtn.addEventListener("click", () => {
     duraklatildi = !duraklatildi;
     duraklatBtn.textContent = duraklatildi ? "Devam et" : "Duraklat";
