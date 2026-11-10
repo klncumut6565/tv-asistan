@@ -86,6 +86,14 @@ class Ayarlar(ctx: Context) {
         } catch (_: Exception) { emptyMap() }
         set(v) = p.edit().putString("kutu_kanal_haritasi", org.json.JSONObject(v).toString()).apply()
 
+    /** TV+ kutusu kısayolları: ad → tuş dizisi metni ("sol*5, yukari*3, sag, tamam"). */
+    var kutuKisayollari: Map<String, String>
+        get() = try {
+            val j = org.json.JSONObject(p.getString("kutu_kisayollari", "{}") ?: "{}")
+            j.keys().asSequence().associateWith { j.getString(it) }
+        } catch (_: Exception) { emptyMap() }
+        set(v) = p.edit().putString("kutu_kisayollari", org.json.JSONObject(v).toString()).apply()
+
     var kanalHaritasi: Map<String, String>
         get() = try {
             val j = org.json.JSONObject(p.getString("kanal_haritasi", "{}") ?: "{}")

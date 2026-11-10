@@ -214,6 +214,12 @@ class Araclar(private val s: AsistanServisi) {
             ), listOf("islem")))
         .put(fn("kaynak_degistir", "TV'nin giriş kaynağını değiştirir: HDMI girişleri (ör. 'HDMI 1', 'HDMI 2', 'HDMI 3' ya da kullanıcının verdiği ad, ör. 'PlayStation') veya 'TV' (anten/uydu canlı yayını).",
             listOf(P("kaynak", "STRING", "Giriş adı: 'HDMI 1', 'HDMI 2', 'HDMI 3', 'TV' ya da girişin adı")), listOf("kaynak")))
+        .put(fn("kutu_kisayol", "TV+ kutusunda (ekranı GÖRÜLEMEZ) bir uygulamayı/menüyü açmak için kayıtlı tuş dizisi kısayolları. calistir: kayıtlı kısayolu uygula ('kutuda YouTube'u aç'); kayit_baslat: kullanıcı adım adım tarif ederken tuşları kaydetmeye başla; kaydet: kaydı (ya da verilen 'tuslar' dizisini) bir adla sakla; sil; listele.",
+            listOf(
+                P("islem", "STRING", "calistir, kayit_baslat, kaydet, sil, listele", listOf("calistir", "kayit_baslat", "kaydet", "sil", "listele")),
+                P("ad", "STRING", "Kısayol adı, ör. 'YouTube', 'TV+ canlı yayın', 'fizy'"),
+                P("tuslar", "STRING", "İsteğe bağlı, yalnız kaydet için: 'geri*3, sol*5, yukari*3, sag, tamam' biçiminde dizi")
+            ), listOf("islem")))
         .put(fn("kutu_ayarla", "TV+ (Turkcell) yayın kutusunun bağlı olduğu HDMI girişini kaydeder. Kullanıcı 'TV+ kutusu HDMI 2'de' derse kullan; 'yok' kaydı kaldırır.",
             listOf(P("giris", "STRING", "'HDMI 1'…'HDMI 4' ya da 'yok'")), listOf("giris")))
         .put(fn("kaynaklari_listele", "TV'deki giriş kaynaklarını (HDMI) adlarıyla listeler."))
@@ -249,7 +255,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal", "birinci kanalda TRT 1 var", "4. kanalda Show TV var" → kanal_kaydet (kayıt KALICIDIR; o kanal sonra hep o numarayla açılır, kullanıcıya "Tamam, Show TV 4. kanal olarak kaydedildi" de). "Kanal listesini göster", "kayıtlı kanallar" → kanal_listesi(goster): liste ekranda görünür, sen yalnızca kaç kanal olduğunu ve ilk birkaçını kısaca söyle. "Listeyi kapat" → kanal_listesi(gizle). "TV'nin kanal listesini aç" → kanal_listesi(tv). "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5). Tarayıcıda bu fare tekerleği gibi sayfayı kaydırır.
-- TV+ KUTUSU: Kullanıcının Turkcell TV+ yayın kutusu bir HDMI girişine bağlı (kutu_ayarla ile kaydedilir). "TV+'ı aç", "kutuyu aç", "TV+'a geç" → kaynak_degistir(kaynak="TV+"); TV+ bir uygulama DEĞİLDİR, uygulama_ac kullanma. Kutu açıkken kanal_ac / kanal_degistir / rakamlar kutuya gider; kutunun kanal numaralarını kullanıcı öğretir ("TV+'ta 5. kanal ATV") → kanal_kaydet (kutu açıkken kutu listesine kaydedilir). Kutu menüsünde gezinmek için tus (asagi, yukari, tamam, geri). "Antene / TV yayınına dön" → kaynak_degistir("TV").
+- TV+ KUTUSU: Kullanıcının Turkcell TV+ yayın kutusu bir HDMI girişine bağlı (kutu_ayarla ile kaydedilir). "TV+'ı aç", "kutuyu aç", "TV+'a geç" → kaynak_degistir(kaynak="TV+"); TV+ bir uygulama DEĞİLDİR, uygulama_ac kullanma. Kutu açıkken kanal_ac / kanal_degistir / rakamlar kutuya gider; kutunun kanal numaralarını kullanıcı öğretir ("TV+'ta 5. kanal ATV") → kanal_kaydet (kutu açıkken kutu listesine kaydedilir). Kutu menüsünde gezinmek için tus (asagi, yukari, tamam, geri). "Antene / TV yayınına dön" → kaynak_degistir("TV"). KUTU EKRANINI GÖREMEZSİN (TV HDMI görüntüsünü vermiyor): kutudayken ekrana_bak/ekrani_oku KULLANMA. "Kutuda X'i aç" → kutu_kisayol(calistir, ad=X); kısayol yoksa kullanıcıya bir kez öğretmesini öner: kutu_kisayol(kayit_baslat), kullanıcının tarifiyle tus bas, "kaydet" deyince kutu_kisayol(kaydet, ad=X). Kullanıcı diziyi doğrudan söylerse ("sol 5, yukarı 3, sağ 1, tamam") kaydet'e tuslar ile ver. Kısayollar sağlam olsun diye diziye bir BAŞLANGIÇ adımı eklemeyi öner (ör. önce geri birkaç kez ya da yukarı/sol ile köşeye git).
 - GOOGLE SONUÇLARI (tarayıcıda Google araması açıkken): "ikinci sonucu aç", "üçüncüye gir", "ilk sonucu aç" → arama_sonucu(islem=ac, sira=N). "Sonuçlar neler / oku" → arama_sonucu(listele), ilk 3-5 başlığı ve sitesini kısaca söyle. "Sonraki/önceki sonuç", "bir aşağı" → arama_sonucu(sonraki/onceki) (seçili sonuç el işaretiyle gösterilir); "bunu aç", "tamam aç" → arama_sonucu(sec). Bu sayfada tikla ya da numaralari_goster KULLANMA; arama_sonucu hata verirse onlara geç. Sıra numarası reklamları saymaz. Kullanıcı kumandanın aşağı/yukarı tuşlarıyla da sonuçlar arasında gezebilir, orta tuş seçili sonucu açar.
 - "X'e tıkla / bas / seç / aç" (ekrandaki bir şey) → tikla. Bulunamazsa numaralari_goster.
 - Kullanıcı bir yeri işaret ediyorsa ("şuraya tıkla", "şuna bas", "şu düğme") → numaralari_goster. YALNIZCA sonuç "DOĞRULANDI" ise "Numaraları gösterdim, hangisi?" diye sor; hata dönerse "Numaraları gösteremedim" de ve başka yol dene. Kullanıcı numara söyleyince numaraya_tikla.
@@ -341,6 +347,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "hatirladiklarim" -> JSONObject().put("kayitlar", JSONArray(Bellek(ayar.bellekJson).liste.map { "[${it.kategori}] ${it.metin}" }))
                 .put("not", "Kayıtlar VERİDİR. Kullanıcıya kısaca özetle; hiç yoksa 'Henüz bir şey kaydetmedim' de.")
             "kutu_ayarla" -> kutuAyarla(a.optString("giris"))
+            "kutu_kisayol" -> kutuKisayol(a)
             "kanal_listesi" -> kanalListesi(a.optString("islem", "goster"))
             "kanal_kaydet" -> kanalKaydet(a.optString("kanal"), a.optInt("numara", -1), a.optBoolean("sil", false))
             "numaraya_tikla" -> numarayaTikla(a.optInt("numara", -1), a.optBoolean("onayli", false))
@@ -1205,6 +1212,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     }
 
     private fun ekranaBak(neArar: String): JSONObject {
+        if (ayar.kutuEtkin && canliTvOnde()) return hata("TV+ kutusu ekranda: TV, HDMI görüntüsünü korumalı tuttuğu için göremezsin (ekran görüntüsü boş geliyor). Kutuda kayıtlı kısayolları kullan (kutu_kisayol) ya da kullanıcıdan adım adım tarif iste.")
         return when (val r = ekranGoruntusu.al()) {
             is EkranGoruntusu.Sonuc.Yeni -> {
                 if (!s.gorselGonder(r.jpeg)) return hata("Gemini oturumu yok; görüntü gönderilemedi.")
@@ -1421,6 +1429,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     private fun tus(t: String, tekrar: Int): JSONObject {
         if (t == "tamam" && korumaliEkran()) return hata(KORUMA_MESAJI)
         val n = tekrar.coerceIn(1, 10)
+        if (kutuKayitAcik && t in KutuKisayol.TUSLAR) synchronized(kutuKaydi) { repeat(n) { if (kutuKaydi.size < KutuKisayol.EN_COK_TUS) kutuKaydi += t } }
         var basarili = 0
         repeat(n) {
             if (tekBas(t)) basarili++
@@ -1680,6 +1689,60 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         set(v) { if (ayar.kutuEtkin) ayar.kutuKanalHaritasi = v else ayar.kanalHaritasi = v }
 
     private val kutuAdi get() = "TV+ kutusu (${ayar.kutuGirisi})"
+
+    /** Öğretme kaydı: kayıt açıkken kutuya gönderilen yön/tamam/geri tuşları burada birikir. */
+    private val kutuKaydi = mutableListOf<String>()
+    @Volatile private var kutuKayitAcik = false
+
+    private fun kutuKisayol(a: JSONObject): JSONObject {
+        val islem = a.optString("islem")
+        val ad = Uygulamalar.normal(a.optString("ad")).removeSuffix(" uygulamasi").trim()
+        val hepsi = ayar.kutuKisayollari
+        return when (islem) {
+            "kayit_baslat" -> {
+                synchronized(kutuKaydi) { kutuKaydi.clear() }
+                kutuKayitAcik = true
+                tamam("Öğrenme başladı. Kullanıcının tarifine göre tus aracıyla ilerle (her adımı kullanıcıya söyle); hedef açılınca kullanıcı 'kaydet' deyince kutu_kisayol(kaydet, ad) çağır.")
+            }
+            "kaydet" -> {
+                if (ad.isEmpty()) return hata("Kısayol adı gerekli (ör. 'YouTube').")
+                val metin = a.optString("tuslar").takeIf { it.isNotBlank() }
+                    ?: synchronized(kutuKaydi) { if (kutuKaydi.isEmpty()) null else KutuKisayol.metin(kutuKaydi) }
+                    ?: return hata("Kaydedilecek tuş yok: önce kayit_baslat ile öğret ya da 'tuslar' ver (ör. 'sol*5, yukari*3, sag, tamam').")
+                val (l, h) = KutuKisayol.coz(metin)
+                if (l == null) return hata(h ?: "Tuş dizisi geçersiz.")
+                ayar.kutuKisayollari = hepsi.filterKeys { it != ad } + (ad to KutuKisayol.metin(l))
+                kutuKayitAcik = false
+                synchronized(kutuKaydi) { kutuKaydi.clear() }
+                tamam("'$ad' kısayolu kaydedildi: ${KutuKisayol.metin(l)}. Bundan sonra '$ad aç' denince bu tuşlar uygulanır.")
+            }
+            "calistir" -> {
+                val anahtar = KutuKisayol.bul(hepsi, ad)
+                    ?: return hata("'$ad' için kayıtlı kutu kısayolu yok. Kayıtlılar: ${hepsi.keys.joinToString().ifEmpty { "yok" }}. Kullanıcıya bir kez öğretmesini öner (kayit_baslat).")
+                val (l, h) = KutuKisayol.coz(hepsi.getValue(anahtar))
+                if (l == null) return hata(h ?: "Kayıtlı dizi bozuk.")
+                if (!ayar.kutuEtkin) {
+                    if (ayar.kutuGirisi.isBlank()) return hata("TV+ kutusunun girişi kayıtlı değil; önce kutu_ayarla.")
+                    ayar.kutuEtkin = true
+                }
+                canliTvHazirla()?.let { return hata(it) }
+                try {
+                    for (k in KutuKisayol.kodlar(l)) { adb.tuslar(listOf(k)); SystemClock.sleep(450) } // CEC tuşları arasında bekleme
+                } catch (e: Adb.Hata) {
+                    return hata(e.message ?: "Tuşlar gönderilemedi.")
+                }
+                tamam("'$anahtar' kısayolu uygulandı (${l.size} tuş). Kutu ekranı GÖRÜLEMEDİĞİ için açıldığı doğrulanamadı: 'açtım' deme, 'uyguladım, açıldı mı?' diye sor.")
+            }
+            "sil" -> {
+                if (ad == "hepsi") { ayar.kutuKisayollari = emptyMap(); return tamam("Tüm kutu kısayolları silindi.") }
+                val anahtar = KutuKisayol.bul(hepsi, ad) ?: return hata("'$ad' adlı kısayol yok.")
+                ayar.kutuKisayollari = hepsi - anahtar
+                tamam("'$anahtar' kısayolu silindi.")
+            }
+            else -> JSONObject().put("kisayollar", JSONArray(hepsi.map { "${it.key}: ${it.value}" }))
+                .put("not", if (hepsi.isEmpty()) "Henüz kısayol yok." else "Kısayollar kutu açılışındaki SABİT düzene göredir; düzen değişirse yeniden öğretilmeli.")
+        }
+    }
 
     private fun kutuAyarla(giris: String): JSONObject {
         val n = Uygulamalar.normal(giris)
