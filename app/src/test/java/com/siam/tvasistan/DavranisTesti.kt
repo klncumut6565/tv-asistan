@@ -28,8 +28,11 @@ class DavranisTesti {
 
     private fun normal(s: String) = Uygulamalar.normal(s)
 
+    /** Günlük kota bitti: kalan vakalara hiç istek gönderilmez (beklemek işe yaramaz). */
+    private class GunlukKotaDoldu(m: String) : Exception(m)
+
     private fun istek(anahtar: String, model: String, govde: JSONObject): JSONObject {
-        repeat(3) { deneme ->
+        repeat(2) { deneme ->
             val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent").openConnection() as HttpURLConnection
             c.requestMethod = "POST"
             c.doOutput = true
@@ -40,7 +43,15 @@ class DavranisTesti {
             c.outputStream.use { it.write(govde.toString().toByteArray()) }
             val kod = c.responseCode
             val metin = (if (kod in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText().orEmpty()
-            if (kod == 429 || kod >= 500) { Thread.sleep(20_000L * (deneme + 1)); return@repeat }
+            if (kod == 429 && Regex("PerDay|per day|daily", RegexOption.IGNORE_CASE).containsMatchIn(metin)) {
+                throw GunlukKotaDoldu("Gemini günlük kotası doldu")
+            }
+            if (kod == 429 || kod >= 500) {
+                // Dakikalık sınır: Gemini'nin önerdiği kadar (en çok 15 sn) bekle, bir kez daha dene
+                val oneri = Regex("\"retryDelay\"\\s*:\\s*\"(\\d+)").find(metin)?.groupValues?.get(1)?.toLongOrNull() ?: 10
+                if (deneme == 0) { Thread.sleep(minOf(oneri, 15) * 1000); return@repeat }
+                error("Gemini HTTP $kod (dakikalık sınır ya da sunucu hatası)")
+            }
             if (kod !in 200..299) error("Gemini HTTP $kod: ${metin.take(300)}")
             return JSONObject(metin)
         }
@@ -63,6 +74,7 @@ class DavranisTesti {
         val secili = System.getenv("GEMINI_TEST_VAKALAR").orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         val sonuclar = mutableListOf<Sonuc>()
+        var kotaBitti = false
         for (i in 0 until set.length()) {
             val v = set.getJSONObject(i)
             val id = v.getString("id"); val soz = v.getString("soz"); val tur = v.optString("tur", "normal")
@@ -76,7 +88,12 @@ class DavranisTesti {
                 .put("tools", JSONArray().put(JSONObject().put("functionDeclarations", araclar)))
                 .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", soz)))))
                 .put("generationConfig", JSONObject().put("temperature", 0))
+            if (kotaBitti) {
+                println("ÇALIŞMADI $id: günlük kota dolduğu için gönderilmedi")
+                sonuclar += Sonuc(id, tur, soz, false, kabul.joinToString("/"), "—", "günlük kota doldu (gönderilmedi)", calisti = false); continue
+            }
             val cevap = try { istek(anahtar, model, govde) } catch (e: Exception) {
+                if (e is GunlukKotaDoldu) kotaBitti = true
                 val m = e.message.orEmpty().take(160)
                 println("ÇALIŞMADI $id: '$soz' → $m")
                 sonuclar += Sonuc(id, tur, soz, false, kabul.joinToString("/"), "—", m, calisti = false); continue
