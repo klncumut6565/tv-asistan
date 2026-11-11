@@ -398,7 +398,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             Durum.DINLIYOR -> {
                 // Kalabalık modunda telefondaki her konuşma pencere açmaz: önce "Jülide" ya da tuş gerekir
                 if (!DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) return
-                oynatici?.let { if (it.caliyor()) it.temizle("telefonda yeni konuşma başladı") }
+                // Jülide konuşurken telefonun duyduğu ses büyük olasılıkla TV'nin kendi sesi (yankı): sözünü KESME.
+                // Söz kesmek için "Jülide" denir (uyandırma dinleyicisi) ya da kumanda tuşuna basılır.
+                if (oynatici?.caliyor() == true) return
                 konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 12_000
                 if (medyaAktif) konusOdagiAl()
                 medyaSessizUyarisi = false
@@ -553,11 +555,12 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     // hoparlör tamponu bitene kadar (+1,5 sn) TV mikrofonu kapalı. Normal modda davranış AYNI.
                     if (sakaModu && !oy.caliyor() && oy.caliyor(1500)) { tKapali++; return@Mikrofon }
                     if (oy.caliyor()) {
-                        // Telefondan konuşuluyorsa Jülide'nin sözünü kes (bkz. telefonKonusmasiBasladi);
-                        // TV/kumanda mikrofonunda yarı çift yönlü kural aynen geçerli.
-                        if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700 &&
-                            DinlemeKapisi.telefonPencereAcsin(kalabalik, SystemClock.elapsedRealtime(), konusmaPenceresiBitis)) oy.temizle("telefon mikrofonunda konuşma")
-                        else { tKapali++; return@Mikrofon }
+                        // Jülide konuşurken telefon mikrofonu TV hoparlöründen gelen sesi (Jülide'nin kendi sesi,
+                        // TV+ yayını) duyar. Sesin yüksekliğiyle söz kesmek bu yankıda Jülide'yi sürekli susturuyordu
+                        // (logda saatte ~70 "KOPMA kesme: telefon mikrofonunda konuşma"). Artık telefon sesi yalnız
+                        // "Jülide" kelimesi için dinlenir; söz kesme "Jülide" deyince ya da kumanda tuşuyla olur.
+                        if (SystemClock.elapsedRealtime() - sonTelefonSesi < 700) uyandirma?.besle(pcm)
+                        tKapali++; return@Mikrofon
                     }
                     // Video/müzik çalarken TV sesi mikrofona girer: yalnız tetik tuşuyla açılan pencerede dinle.
                     val simdi = SystemClock.elapsedRealtime()
@@ -598,7 +601,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 }
                 mikrofon = m
                 // Uzak ayar izin verse bile kullanıcı ayar ekranından açmadıkça uyandırma kelimesi çalışmaz.
-                if (y.uyandirma && surekliSohbet && (ayarlar.uyandirmaAktif || kalabalik)) {
+                // Telefon mikrofonu bağlıyken de açılır (model inmişse): Jülide konuşurken söz kesmek için "Jülide" denir
+                if (y.uyandirma && surekliSohbet && (ayarlar.uyandirmaAktif || kalabalik ||
+                        (telefon != null && Uyandirma.modelHazirMi(this@AsistanServisi)))) {
                     uyandirma = Uyandirma(this@AsistanServisi, y.uyandirmaKelimeleri) { ana.post { uyandirmaDuyuldu() } }
                         .also { it.baslat() }
                 }
@@ -706,6 +711,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     /** Yerel dinleyici "Jülide"yi duydu: TV'yi kıs/duraklat, dinlemeye geç, son saniyeleri ilet. */
     private fun uyandirmaDuyuldu() {
         if (durum != Durum.DINLIYOR || bekleyenKapat) return
+        // Jülide konuşurken "Jülide" dendi: kullanıcı söz kesmek istiyor
+        oynatici?.let { if (it.caliyor()) it.temizle("kullanıcı 'Jülide' dedi") }
         konusmaPenceresiBitis = SystemClock.elapsedRealtime() + 10_000
         if (medyaAktif) konusOdagiAl()
         medyaSessizUyarisi = false
