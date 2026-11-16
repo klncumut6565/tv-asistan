@@ -1,0 +1,4 @@
+# Vendor kütüphane kopyaları grafiğe girmesin
+*.min.js
+web/supabase.js
+webos/lib/supabase.js
