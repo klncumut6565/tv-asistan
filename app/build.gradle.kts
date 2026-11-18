@@ -78,6 +78,9 @@ dependencies {
     // "Jülide" uyandırma kelimesi: internetsiz konuşma tanıma (Apache 2.0)
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.alphacephei:vosk-android:0.3.47@aar")
+    // Yerel yazı tanıma (OCR): resim olarak çizilen ekranlarda (Prime, TOD) yazı + konum, internetsiz.
+    // Model APK içinde (Play Hizmetleri indirmesi gerekmez). Latin alfabesi: Türkçe dahil.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // Birim testleri (JVM): Android'in org.json'u testlerde boş taslaktır, gerçeği eklenir
     testImplementation("junit:junit:4.13.2")

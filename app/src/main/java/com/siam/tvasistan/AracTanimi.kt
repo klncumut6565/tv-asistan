@@ -93,7 +93,7 @@ object AracTanimi {
             listOf(P("url", "STRING", "Tam adres, ör. https://www.siam.com.tr")), listOf("url")))
         .put(fn("ekrana_bak", "Ekranın KÜÇÜK bir görüntüsünü sana gönderir; sen ekranı GÖRÜRSÜN. Yalnızca ekrani_oku boş/yetersiz döndüğünde kullan (Prime Video, TOD, Netflix gibi ekranı resim olarak çizen uygulamalar). Kota harcar: gereksiz yere ve arka arkaya çağırma; yön tuşlarıyla birkaç adım ilerledikten sonra tekrar bak.",
             listOf(P("ne_ariyorum", "STRING", "Ekranda ne aradığın, ör. 'Yüzüklerin Efendisi kapağı', 'Oynat düğmesi'"))))
-        .put(fn("ekrani_oku", "Şu an ekranda görünen yazıları/düğmeleri ve açık uygulamayı döndürür. Bir şeye tıklamadan önce kullan."))
+        .put(fn("ekrani_oku", "Şu an ekranda görünen yazıları/düğmeleri ve açık uygulamayı döndürür. Bir şeye tıklamadan önce kullan. Ekranı resim olarak çizen uygulamalarda (Prime Video, TOD) yazıları TV'de yerel yazı tanımayla, konumlarıyla okur (kota harcamaz); [odakta] = seçili öğe."))
         .put(fn("tikla", "Ekranda yazısı verilen öğeye tıklar (ör. 'Ara', 'Oynat', bir film adı).",
             listOf(
                 P("metin", "STRING", "Öğenin ekrandaki yazısı"),
@@ -104,7 +104,7 @@ object AracTanimi {
                 P("metin", "STRING", "Yazılacak metin"),
                 P("gonder", "BOOLEAN", "true ise yazdıktan sonra ara/onayla (Enter)")
             ), listOf("metin")))
-        .put(fn("tus", "Kumanda tuşu gibi davranır.",
+        .put(fn("tus", "Kumanda tuşu gibi davranır. Ekranı resim olarak çizen uygulamalarda yön tuşundan sonra ODAK bilgisini (seçili öğenin yeri ve üzerindeki yazı) ya da 'görünür değişiklik olmadı' bilgisini döndürür.",
             listOf(
                 P("tus", "STRING", "Basılacak tuş", listOf("yukari", "asagi", "sol", "sag", "tamam", "geri", "ana_ekran", "son_uygulamalar")),
                 P("tekrar", "INTEGER", "Kaç kez basılacağı (varsayılan 1, en çok 10)")

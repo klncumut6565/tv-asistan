@@ -32,9 +32,24 @@ class EkranGoruntusu(private val s: AccessibilityService) {
     @Volatile private var sonParmakIzi = 0L
     @Volatile private var sonZaman = 0L
 
-    fun al(hedefGenislik: Int = 768, kalite: Int = 50): Sonuc {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return Sonuc.Hata("Bu Android sürümü ekran görüntüsünü desteklemiyor.")
-        // Android en çok saniyede bir görüntüye izin verir
+    /**
+     * Yerel işlem (yazı tanıma, odak bulma) için ekran görüntüsü: en çok [enCokGenislik] px. Gemini'ye GİTMEZ.
+     * Çağıran recycle() etmelidir. Alınamazsa null.
+     */
+    fun bitmap(enCokGenislik: Int = 1920): Bitmap? {
+        val (tam, _) = yakala()
+        tam ?: return null
+        if (tam.width <= enCokGenislik) return tam
+        val oran = enCokGenislik.toFloat() / tam.width
+        val k = Bitmap.createScaledBitmap(tam, enCokGenislik, (tam.height * oran).toInt(), true)
+        tam.recycle()
+        return k
+    }
+
+    /** Ham görüntü (tam çözünürlük) ya da hata mesajı. Android en çok saniyede bir görüntüye izin verir. */
+    @Synchronized
+    private fun yakala(): Pair<Bitmap?, String?> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null to "Bu Android sürümü ekran görüntüsünü desteklemiyor."
         val bekle = 1100 - (SystemClock.elapsedRealtime() - sonZaman)
         if (bekle > 0) SystemClock.sleep(bekle)
         sonZaman = SystemClock.elapsedRealtime()
@@ -62,8 +77,13 @@ class EkranGoruntusu(private val s: AccessibilityService) {
                 bitti.countDown()
             }
         })
-        if (!bitti.await(4, TimeUnit.SECONDS)) return Sonuc.Hata("Ekran görüntüsü zaman aşımı.")
-        val tam = bmp ?: return Sonuc.Hata(hata ?: "Ekran görüntüsü boş.")
+        if (!bitti.await(4, TimeUnit.SECONDS)) return null to "Ekran görüntüsü zaman aşımı."
+        return bmp to (if (bmp == null) (hata ?: "Ekran görüntüsü boş.") else null)
+    }
+
+    fun al(hedefGenislik: Int = 768, kalite: Int = 50): Sonuc {
+        val (ham, hataMesaji) = yakala()
+        val tam = ham ?: return Sonuc.Hata(hataMesaji ?: "Ekran görüntüsü boş.")
 
         val oran = hedefGenislik.toFloat() / tam.width
         val kucuk = if (oran < 1f) Bitmap.createScaledBitmap(tam, hedefGenislik, (tam.height * oran).toInt(), true) else tam
@@ -80,6 +100,27 @@ class EkranGoruntusu(private val s: AccessibilityService) {
         kucuk.recycle()
         Log.i("TvAsistan", "Ekran görüntüsü: ${g}x$y, ${cikis.size() / 1024} KB")
         return Sonuc.Yeni(cikis.toByteArray(), g, y)
+    }
+
+    companion object {
+        /** Odak bulucu için küçük parlaklık ızgarası (0..255), satır satır. */
+        fun parlaklikIzgarasi(b: Bitmap, g: Int, y: Int): IntArray {
+            val k = Bitmap.createScaledBitmap(b, g, y, true)
+            val p = IntArray(g * y)
+            k.getPixels(p, 0, g, 0, 0, g, y)
+            if (k !== b) k.recycle()
+            return IntArray(g * y) { i -> val c = p[i]; (Color.red(c) * 3 + Color.green(c) * 6 + Color.blue(c)) / 10 }
+        }
+
+        /** Simsiyah (korumalı video / ekran kapalı) mı? */
+        fun siyahMi(b: Bitmap): Boolean {
+            var parlak = 0
+            for (yy in 0 until 18) for (xx in 0 until 32) {
+                val p = b.getPixel(xx * (b.width - 1) / 31, yy * (b.height - 1) / 17)
+                if ((Color.red(p) * 3 + Color.green(p) * 6 + Color.blue(p)) / 10 > 24) parlak++
+            }
+            return parlak < 6
+        }
     }
 
     /** 32×18 örnek noktadan kaba parmak izi (küçük değişimler önemsenmez) + simsiyah kontrolü. */

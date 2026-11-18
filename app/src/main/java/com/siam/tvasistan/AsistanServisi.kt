@@ -68,10 +68,39 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     /** Basit komutlar (kanal, ses, HDMI, medya) için LLM'siz hızlı yol. */
     private val hizli by lazy {
         HizliYol(
-            calistir = { ad, args -> araclar.calistir(ad, args) },
+            calistir = { ad, args -> araclar.calistir(ad, args).also { aracKaydet(ad, it) } },
             bildir = { m -> ana.post { panel.durum(m) } },
         )
     }
+
+    // ---- SÖZ DENETÇİSİ: Jülide yapmadığı işi "yaptım" demesin (bkz. SozDenetcisi)
+    private val turAraclari = java.util.Collections.synchronizedList(mutableListOf<SozDenetcisi.AracKaydi>())
+    private val calisanArac = java.util.concurrent.atomic.AtomicInteger(0)
+    @Volatile private var aracSayaci = 0
+    private var denetimSayaci = -1
+    private var turDuzeltildi = false
+    private val sozDenetimi = Runnable { sozuDenetle() }
+
+    private fun aracKaydet(ad: String, sonuc: JSONObject) {
+        turAraclari += SozDenetcisi.AracKaydi(ad, !sonuc.has("hata"), sonuc.optString("hata").takeIf { it.isNotEmpty() })
+    }
+
+    /** Tur bitti: söylenenle yapılanı karşılaştır; tutmazsa modele düzeltme gönder (turda en çok bir kez). */
+    private fun sozuDenetle() {
+        if (durum != Durum.DINLIYOR || bekleyenKapat || sakaModu || turDuzeltildi) return
+        if (calisanArac.get() > 0 || aracSayaci != denetimSayaci) return // araç sürüyor/yeni araç geldi: sonraki tur sonunda bakılır
+        val metin = asistanMetin.toString()
+        val araclarListesi = synchronized(turAraclari) { turAraclari.toList() }
+        val ihlal = SozDenetcisi.degerlendir(metin, araclarListesi) ?: return
+        val l = live ?: return
+        turDuzeltildi = true
+        Log.w(ETIKET, "TANI söz denetimi: iddia='${ihlal.iddia}' neden='${ihlal.neden}' araçlar=${araclarListesi.map { "${it.ad}:${if (it.basarili) "ok" else "hata"}" }}")
+        telefon?.durumGonder("Denetim: \"${ihlal.iddia}\" doğrulanmadı — Jülide düzeltiyor")
+        l.metinGonder(SozDenetcisi.duzeltmeMesaji(ihlal))
+    }
+
+    /** Ekranda GERÇEKTEN önde olan pencerenin paketi (olay önbelleği değil, canlı sorgu). Bilinmiyorsa null. */
+    fun canliPaket(): String? = try { rootInActiveWindow?.packageName?.toString() } catch (_: Exception) { null }
 
     /** Araçlar için: ekran görüntüsünü canlı Gemini oturumuna gönderir. */
     fun gorselGonder(jpeg: ByteArray): Boolean {
@@ -1007,6 +1036,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
             // hemen ikinci komutu verebilsin (TV sesi varken konuşma eşiği yükseltilir).
             konusmaPenceresiBitis = maxOf(konusmaPenceresiBitis, SystemClock.elapsedRealtime() + 8000)
             if (durum == Durum.DINLIYOR && !bekleyenKapat) panel.durum("Jülide dinliyor…")
+            // Söz denetimi: döküm geç gelebilir, araç sonucu sonrası devam konuşması olabilir → 1,5 sn sonra bak
+            denetimSayaci = aracSayaci
+            ana.removeCallbacks(sozDenetimi)
+            ana.postDelayed(sozDenetimi, 1500)
             val cevap = asistanMetin.toString().trim()
             if (cevap.isNotEmpty()) telefon?.durumGonder("Jülide: $cevap")
         }
@@ -1020,6 +1053,9 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 asistanMetin.clear()
                 yeniTur = false
                 hizli.yeniTur()
+                ana.removeCallbacks(sozDenetimi)
+                turAraclari.clear()
+                turDuzeltildi = false
             }
             kullaniciMetin.append(t)
             if (durum == Durum.DINLIYOR && !bekleyenKapat && !sakaModu) hizli.metin(kullaniciMetin.toString())
@@ -1040,6 +1076,18 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     override fun aracCagrisi(ad: String, args: JSONObject): JSONObject {
+        aracSayaci++
+        calisanArac.incrementAndGet()
+        try {
+            val sonuc = aracCagrisiIc(ad, args)
+            aracKaydet(ad, sonuc)
+            return sonuc
+        } finally {
+            calisanArac.decrementAndGet()
+        }
+    }
+
+    private fun aracCagrisiIc(ad: String, args: JSONObject): JSONObject {
         Log.i(ETIKET, "TANI olay: araç $ad")
         sonEtkinlik = SystemClock.elapsedRealtime()
         aracKorumasi.denetle(ad, args)?.let {
