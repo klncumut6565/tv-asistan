@@ -92,17 +92,52 @@
   .komut-satir button { width: auto; padding: 12px 16px; font-size: 16px; }
   #komutYanit { margin-top: 10px; }
   #komutYanit:empty::before { content: "Örn: YouTube'da Tarkan aç · TRT 1'i aç · sesi kıs · bugün hangi maçlar var"; color: var(--soluk); }
-  /* Kumanda (yön tuşları) */
-  .kumanda { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(3, 64px); gap: 10px; justify-content: center; margin: 6px 0 12px; }
-  .kumanda button { width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 24px; background: #22314a; color: var(--yazi); border: 1px solid var(--cizgi); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
-  .kumanda button:active { background: var(--mor-koyu); }
-  .kumanda .ok { background: var(--mor); color: #160a33; font-size: 18px; font-weight: 700; }
-  .kumanda-alt { display: flex; gap: 8px; }
-  .kumanda-alt button { padding: 12px; font-size: 15px; }
-  .ses-kanal { margin-bottom: 8px; }
-  .ses-kanal .dikey { flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
-  .ses-kanal .dikey button { font-weight: 650; touch-action: manipulation; }
-  .ses-kanal .etiket { text-align: center; font-size: 13px; color: var(--soluk); padding: 9px 0; }
+  /* Kumanda (yön tuşları) — tasarım: solda ses, ortada halkalı yön tuşları, sağda kanal, altta Geri/Ana ekran/Menü */
+  .kumanda-kart { position: relative; padding: 18px 16px 22px; border-radius: 24px; border: 1px solid rgba(96,128,255,.45);
+    background: radial-gradient(120% 80% at 50% 45%, #141c3a 0%, #0b1024 70%);
+    box-shadow: 0 0 0 1px rgba(167,123,255,.12) inset, 0 0 28px rgba(76,110,255,.25); }
+  .kumanda-bas { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .kumanda-bas h2 { margin: 0; font-size: 20px; font-weight: 650; display: flex; align-items: center; gap: 10px; }
+  .tv-hap { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(96,128,255,.45); background: rgba(20,28,60,.7); color: var(--yazi); white-space: nowrap; }
+  .tv-hap .isik { width: 10px; height: 10px; }
+  .kumanda-orta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .kumanda-orta button, .kumanda-alt3 button { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  .hap { flex: 0 0 auto; width: clamp(58px, 17vw, 74px); height: clamp(170px, 46vw, 200px); display: flex; flex-direction: column;
+    border-radius: 999px; overflow: hidden; border: 1.5px solid rgba(80,140,255,.75);
+    background: linear-gradient(180deg, #1b2b63 0%, #121c45 100%); box-shadow: 0 0 18px rgba(60,120,255,.35), inset 0 1px 0 rgba(255,255,255,.08); }
+  .hap button { flex: 1; width: 100%; padding: 0; border-radius: 0; background: transparent; color: #fff; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; font-size: 15px; font-weight: 600; }
+  .hap button + button { border-top: 1px solid rgba(120,150,255,.35); }
+  .hap button:active { background: rgba(109,63,224,.45); }
+  .hap svg { width: 30px; height: 30px; fill: #fff; }
+  .hap .kucuk svg { width: 24px; height: 24px; }
+  .hap b { font-size: 19px; font-weight: 700; letter-spacing: 1px; }
+  .yon-halka { flex: 0 0 auto; position: relative; width: clamp(170px, 48vw, 200px); aspect-ratio: 1; border-radius: 50%; padding: 7px;
+    background: conic-gradient(from 200deg, #3b82f6, #6d5cff, #b05cff, #3b82f6 60%, #2563eb, #3b82f6);
+    box-shadow: 0 0 24px rgba(80,120,255,.55), 0 0 40px rgba(167,92,255,.25); }
+  .yon-ic { position: relative; width: 100%; height: 100%; border-radius: 50%; background: #0b1024; padding: 5px; }
+  .yon-izgara { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; transform: rotate(45deg); }
+  .yon-izgara button { width: 100%; height: 100%; padding: 0; background: linear-gradient(135deg, #24335f, #1a254a); color: #fff;
+    border-radius: 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+  .yon-izgara button:active { background: rgba(109,63,224,.6); }
+  .yon-izgara button svg { width: 26px; height: 26px; fill: #fff; transform: rotate(-45deg); }
+  .yon-izgara .y { border-top-left-radius: 100%; }   /* üst */
+  .yon-izgara .sg { border-top-right-radius: 100%; } /* sağ */
+  .yon-izgara .sl { border-bottom-left-radius: 100%; } /* sol */
+  .yon-izgara .a { border-bottom-right-radius: 100%; } /* alt */
+  .yon-izgara .y svg { transform: rotate(-45deg) translateY(10%); }
+  .yon-ok { position: absolute; left: 50%; top: 50%; width: 40%; aspect-ratio: 1; transform: translate(-50%, -50%); padding: 0;
+    border-radius: 50%; border: 5px solid #0b1024; color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .5px;
+    background: radial-gradient(circle at 35% 30%, #b18cff 0%, #7a3cff 45%, #3b2bdc 100%); box-shadow: 0 0 18px rgba(140,90,255,.65); }
+  .yon-ok:active { filter: brightness(1.25); }
+  .kumanda-alt3 { display: flex; justify-content: space-around; margin-top: 26px; }
+  .kumanda-alt3 .yuvar { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 15px; color: var(--yazi); }
+  .kumanda-alt3 button { width: clamp(58px, 17vw, 72px); height: clamp(58px, 17vw, 72px); padding: 0; border-radius: 50%; color: #fff;
+    background: radial-gradient(circle at 40% 35%, #26357a 0%, #172158 70%); border: 1px solid rgba(90,120,255,.55);
+    box-shadow: 0 0 14px rgba(60,100,255,.35), inset 0 1px 0 rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; }
+  .kumanda-alt3 button:active { background: rgba(109,63,224,.6); }
+  .kumanda-alt3 svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
@@ -134,28 +169,36 @@
     <div id="komutYanit" class="cevap"></div>
   </section>
 
-  <section class="kart">
-    <label>🎮 Kumanda</label>
-    <div class="kumanda">
-      <span></span><button data-tus="yukari" aria-label="Yukarı">▲</button><span></span>
-      <button data-tus="sol" aria-label="Sol">◀</button><button data-tus="tamam" class="ok" aria-label="Tamam">OK</button><button data-tus="sag" aria-label="Sağ">▶</button>
-      <span></span><button data-tus="asagi" aria-label="Aşağı">▼</button><span></span>
+  <section class="kumanda-kart" aria-label="Kumanda">
+    <div class="kumanda-bas">
+      <h2>🎮 Kumanda</h2>
+      <span class="tv-hap"><span id="kumandaIsik" class="isik"></span><span id="kumandaDurum">TV durumu…</span></span>
     </div>
-    <div class="kumanda-alt ses-kanal">
-      <div class="dikey">
-        <button data-tus="ses_artir" class="ikincil" aria-label="Sesi artır">🔊 Ses +</button>
-        <button data-tus="sessiz" class="ikincil" aria-label="Sessiz">🔇</button>
-        <button data-tus="ses_azalt" class="ikincil" aria-label="Sesi azalt">🔉 Ses −</button>
+    <div class="kumanda-orta">
+      <div class="hap">
+        <button data-tus="ses_artir" aria-label="Sesi artır"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Ses +</button>
+        <button data-tus="ses_azalt" class="kucuk" aria-label="Sesi azalt"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Ses −</button>
       </div>
-      <div class="dikey">
-        <button data-tus="kanal_yukari" class="ikincil" aria-label="Sonraki kanal">P +</button>
-        <span class="etiket">Kanal</span>
-        <button data-tus="kanal_asagi" class="ikincil" aria-label="Önceki kanal">P −</button>
+      <div class="yon-halka">
+        <div class="yon-ic">
+          <div class="yon-izgara">
+            <button data-tus="yukari" class="y" aria-label="Yukarı"><svg viewBox="0 0 24 24"><path d="M12 5l8 12H4z"/></svg></button>
+            <button data-tus="sag" class="sg" aria-label="Sağ"><svg viewBox="0 0 24 24" style="transform:rotate(45deg)"><path d="M12 5l8 12H4z"/></svg></button>
+            <button data-tus="sol" class="sl" aria-label="Sol"><svg viewBox="0 0 24 24" style="transform:rotate(-135deg)"><path d="M12 5l8 12H4z"/></svg></button>
+            <button data-tus="asagi" class="a" aria-label="Aşağı"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M12 5l8 12H4z"/></svg></button>
+          </div>
+          <button data-tus="tamam" class="yon-ok" aria-label="Tamam">OK</button>
+        </div>
+      </div>
+      <div class="hap">
+        <button data-tus="kanal_yukari" aria-label="Sonraki kanal"><svg viewBox="0 0 24 24" style="width:22px;height:22px"><path d="M12 5l8 12H4z"/></svg><b>P +</b></button>
+        <button data-tus="kanal_asagi" aria-label="Önceki kanal"><svg viewBox="0 0 24 24" style="width:22px;height:22px;transform:rotate(180deg)"><path d="M12 5l8 12H4z"/></svg><b>P −</b></button>
       </div>
     </div>
-    <div class="kumanda-alt">
-      <button data-tus="geri" class="ikincil">↩ Geri</button>
-      <button data-tus="ana_ekran" class="ikincil">⌂ Ana ekran</button>
+    <div class="kumanda-alt3">
+      <div class="yuvar"><button data-tus="geri" aria-label="Geri"><svg viewBox="0 0 24 24"><path d="M9 7L5 11l4 4"/><path d="M5 11h9a5 5 0 0 1 0 10H8"/></svg></button>Geri</div>
+      <div class="yuvar"><button data-tus="ana_ekran" aria-label="Ana ekran"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" fill="#fff"/></svg></button>Ana ekran</div>
+      <div class="yuvar"><button data-tus="menu" aria-label="Menü"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>Menü</div>
     </div>
   </section>
 
@@ -577,12 +620,14 @@
   const isik = $("isik"), isikMetin = $("isikMetin");
   let izleIstemci = null, izleKanal = null, izleKod = "", sonGorulme = 0, sonOturum = null, yoklama = null, ekran = true;
   function isikYaz() {
-    if (!izleKod) { isik.className = "isik"; isikMetin.textContent = "TV kodu girilmedi"; return; }
+    if (!izleKod) { isik.className = "isik"; isikMetin.textContent = "TV kodu girilmedi"; const kd = $("kumandaDurum"); if (kd) kd.textContent = "TV kodu yok"; return; }
     const ulasiliyor = Date.now() - sonGorulme < 45000;
     const acik = ulasiliyor && ekran !== false;
     isik.className = "isik " + (acik ? "acik" : "kapali");
     isikMetin.textContent = acik ? ("TV açık · Jülide " + (sonOturum ? "sohbette" : "hazır"))
       : ulasiliyor ? "TV kapalı (bekleme modunda)" : "TV kapalı ya da çevrimdışı";
+    const ki = $("kumandaIsik"), kd = $("kumandaDurum");
+    if (ki && kd) { ki.className = "isik " + (acik ? "acik" : "kapali"); kd.textContent = acik ? "TV Bağlı" : ulasiliyor ? "TV Beklemede" : "TV Bağlı Değil"; }
   }
   const sesSec = $("sesSec"), duyguEl = $("duygu"), sesDurum = $("sesDurum");
   let sesGonderiliyor = null;
@@ -622,7 +667,7 @@
   let komutBekle = null;
   function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
   // Yazılı komut ve kumanda TV'de en az bu sürümü ister; eski sürüm bu mesajları sessizce yok sayar
-  const EN_AZ_SURUM = 147; // yazılı komut 145, tuş onayı 146, ses/kanal tuşları 147
+  const EN_AZ_SURUM = 148; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148
   function tvEski() { const n = parseInt(String(tvSurum || "").split(".").pop(), 10); return n > 0 && n < EN_AZ_SURUM; }
   function eskiMesaji() { return "TV'deki Jülide eski sürüm (" + tvSurum + "). Bu özellik için en az 0.1." + EN_AZ_SURUM + " gerekli: Ayarlar → TV'yi güncelle, sonra TV'de 'Yükle'ye basın."; }
   function yanitYok() {
@@ -636,7 +681,7 @@
     p = p || {};
     komutYanit.textContent = p.ok ? "✓ " + (TUS_ADI[p.t] || p.t) : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.";
   }
-  const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran", ses_artir: "Ses +", ses_azalt: "Ses −", sessiz: "Sessiz", kanal_yukari: "P +", kanal_asagi: "P −" };
+  const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran", ses_artir: "Ses +", ses_azalt: "Ses −", sessiz: "Sessiz", kanal_yukari: "P +", kanal_asagi: "P −", menu: "Menü" };
   function komutYanitGeldi(p) {
     p = p || {};
     if (!p.m) return;

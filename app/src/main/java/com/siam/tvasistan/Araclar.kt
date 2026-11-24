@@ -1399,6 +1399,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         "sessiz" -> !ses("sessiz", null).has("hata")
         "kanal_yukari" -> !kanalDegistir("sonraki", 1).has("hata")
         "kanal_asagi" -> !kanalDegistir("onceki", 1).has("hata")
+        "menu" -> try { adb.tuslar(listOf(82)); true } catch (e: Exception) { Log.w("TvAsistan", "Menü tuşu: ${e.message}"); false } // KEYCODE_MENU
         else -> t in setOf("yukari", "asagi", "sol", "sag", "tamam", "geri", "ana_ekran") && tekBas(t)
     }
 
