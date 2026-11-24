@@ -605,6 +605,22 @@
   const komutMetin = $("komutMetin"), komutGonder = $("komutGonder"), komutYanit = $("komutYanit");
   let komutBekle = null;
   function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
+  // Yazılı komut ve kumanda TV'de en az bu sürümü ister; eski sürüm bu mesajları sessizce yok sayar
+  const EN_AZ_SURUM = 145;
+  function tvEski() { const n = parseInt(String(tvSurum || "").split(".").pop(), 10); return n > 0 && n < EN_AZ_SURUM; }
+  function eskiMesaji() { return "TV'deki Jülide eski sürüm (" + tvSurum + "). Bu özellik için en az 0.1." + EN_AZ_SURUM + " gerekli: Ayarlar → TV'yi güncelle, sonra TV'de 'Yükle'ye basın."; }
+  function yanitYok() {
+    if (tvEski()) return eskiMesaji();
+    if (Date.now() - sonGorulme > 45000) return "TV'ye ulaşılamıyor: TV açık mı, üstteki ışık yeşil mi?";
+    return "TV yanıt vermedi. TV'deki Jülide sürümü: " + (tvSurum || "bilinmiyor") + " (en az 0.1." + EN_AZ_SURUM + " olmalı).";
+  }
+  let tusBekle = null;
+  function tusOnayGeldi(p) {
+    clearTimeout(tusBekle); tusBekle = null;
+    p = p || {};
+    komutYanit.textContent = p.ok ? "✓ " + (TUS_ADI[p.t] || p.t) : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.";
+  }
+  const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran" };
   function komutYanitGeldi(p) {
     p = p || {};
     if (!p.m) return;
@@ -624,7 +640,7 @@
     clearTimeout(komutBekle);
     komutBekle = setTimeout(() => {
       komutGonder.disabled = false;
-      komutYanit.textContent = "TV yanıt vermedi: TV açık mı (ışık yeşil mi)? TV'deki Jülide güncel olmalı.";
+      komutYanit.textContent = yanitYok();
     }, 15000);
   }
   komutGonder.addEventListener("click", komutuGonder);
@@ -632,6 +648,8 @@
   document.querySelectorAll("[data-tus]").forEach((b) => b.addEventListener("click", () => {
     if (!izleKanal) { kanalYok(komutYanit); return; }
     try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus } }); } catch (_) {}
+    clearTimeout(tusBekle);
+    tusBekle = setTimeout(() => { tusBekle = null; komutYanit.textContent = yanitYok(); }, 4000);
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}
   }));
   function gorundu(p) {
@@ -662,6 +680,7 @@
     });
     izleKanal.on("broadcast", { event: "guncelleme_durum" }, ({ payload }) => guncellemeDurumu(payload));
     izleKanal.on("broadcast", { event: "komut_yanit" }, ({ payload }) => komutYanitGeldi(payload));
+    izleKanal.on("broadcast", { event: "tus_onay" }, ({ payload }) => tusOnayGeldi(payload));
     izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
     clearInterval(yoklama);
     yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);

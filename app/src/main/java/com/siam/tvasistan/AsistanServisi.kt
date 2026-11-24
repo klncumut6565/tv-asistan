@@ -368,7 +368,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 "tus" -> yuk.optString("t").let { t ->
                     tusIsci.execute {
                         val ok = try { araclar.kumandaTusu(t) } catch (e: Exception) { Log.w(ETIKET, "Telefon tuşu ($t): ${e.message}"); false }
-                        if (!ok) telefon?.olayGonder("komut_yanit", org.json.JSONObject().put("m", "'$t' tuşu uygulanamadı.").put("bitti", true))
+                        telefon?.olayGonder("tus_onay", org.json.JSONObject().put("t", t).put("ok", ok))
                     }
                 }
             }
