@@ -86,6 +86,19 @@
   .isik { width: 12px; height: 12px; border-radius: 50%; background: #6b7280; flex: none; }
   .isik.acik { background: #22c55e; box-shadow: 0 0 8px 2px rgba(34, 197, 94, .7); }
   .isik.kapali { background: #ef4444; box-shadow: 0 0 8px 2px rgba(239, 68, 68, .6); }
+  /* Yazılı komut */
+  .komut-satir { display: flex; gap: 8px; }
+  .komut-satir input#komutMetin { flex: 1; min-width: 0; font-size: 16px; letter-spacing: 0; text-transform: none; text-align: left; padding: 12px; }
+  .komut-satir button { width: auto; padding: 12px 16px; font-size: 16px; }
+  #komutYanit { margin-top: 10px; }
+  #komutYanit:empty::before { content: "Örn: YouTube'da Tarkan aç · TRT 1'i aç · sesi kıs · bugün hangi maçlar var"; color: var(--soluk); }
+  /* Kumanda (yön tuşları) */
+  .kumanda { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(3, 64px); gap: 10px; justify-content: center; margin: 6px 0 12px; }
+  .kumanda button { width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 24px; background: #22314a; color: var(--yazi); border: 1px solid var(--cizgi); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .kumanda button:active { background: var(--mor-koyu); }
+  .kumanda .ok { background: var(--mor); color: #160a33; font-size: 18px; font-weight: 700; }
+  .kumanda-alt { display: flex; gap: 8px; }
+  .kumanda-alt button { padding: 12px; font-size: 15px; }
 </style>
 </head>
 <body>
@@ -106,6 +119,28 @@
   <section class="kart">
     <label>Jülide</label>
     <div id="cevap" class="cevap"></div>
+  </section>
+
+  <section class="kart">
+    <label for="komutMetin">⌨️ Yazılı komut (sesli asistanı açmadan çalışır)</label>
+    <div class="komut-satir">
+      <input id="komutMetin" type="text" enterkeyhint="send" autocomplete="off" maxlength="500" placeholder="Komutu yazın…">
+      <button id="komutGonder">Gönder</button>
+    </div>
+    <div id="komutYanit" class="cevap"></div>
+  </section>
+
+  <section class="kart">
+    <label>🎮 Kumanda</label>
+    <div class="kumanda">
+      <span></span><button data-tus="yukari" aria-label="Yukarı">▲</button><span></span>
+      <button data-tus="sol" aria-label="Sol">◀</button><button data-tus="tamam" class="ok" aria-label="Tamam">OK</button><button data-tus="sag" aria-label="Sağ">▶</button>
+      <span></span><button data-tus="asagi" aria-label="Aşağı">▼</button><span></span>
+    </div>
+    <div class="kumanda-alt">
+      <button data-tus="geri" class="ikincil">↩ Geri</button>
+      <button data-tus="ana_ekran" class="ikincil">⌂ Ana ekran</button>
+    </div>
   </section>
 
   <details id="ayar" class="ayar">
@@ -566,6 +601,39 @@
     guncelDurum.textContent = (p.tamam ? "✓ " : "") + (p.m || "");
     if (p.m && !/denetleniyor/i.test(p.m)) { clearTimeout(guncelBekle); guncelleBtn.disabled = false; }
   }
+  // ---- YAZILI KOMUT ve KUMANDA (sesli oturumdan bağımsız; izleme kanalıyla TV'ye gider)
+  const komutMetin = $("komutMetin"), komutGonder = $("komutGonder"), komutYanit = $("komutYanit");
+  let komutBekle = null;
+  function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
+  function komutYanitGeldi(p) {
+    p = p || {};
+    if (!p.m) return;
+    komutYanit.textContent = p.m;
+    clearTimeout(komutBekle);
+    if (p.bitti) komutGonder.disabled = false;
+    else komutBekle = setTimeout(() => { komutGonder.disabled = false; }, 90000);
+  }
+  function komutuGonder() {
+    const m = (komutMetin.value || "").trim();
+    if (!m) return;
+    if (!izleKanal) { kanalYok(komutYanit); return; }
+    komutGonder.disabled = true;
+    komutYanit.textContent = "TV'ye gönderiliyor…";
+    try { izleKanal.send({ type: "broadcast", event: "komut", payload: { m } }); } catch (_) {}
+    komutMetin.value = "";
+    clearTimeout(komutBekle);
+    komutBekle = setTimeout(() => {
+      komutGonder.disabled = false;
+      komutYanit.textContent = "TV yanıt vermedi: TV açık mı (ışık yeşil mi)? TV'deki Jülide güncel olmalı.";
+    }, 15000);
+  }
+  komutGonder.addEventListener("click", komutuGonder);
+  komutMetin.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); komutuGonder(); } });
+  document.querySelectorAll("[data-tus]").forEach((b) => b.addEventListener("click", () => {
+    if (!izleKanal) { kanalYok(komutYanit); return; }
+    try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus } }); } catch (_) {}
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}
+  }));
   function gorundu(p) {
     if (p && p.ses && !sesGonderiliyor) {
       if ([...sesSec.options].some((o) => o.value === p.ses)) sesSec.value = p.ses;
@@ -593,6 +661,7 @@
       $("sesKaydet").disabled = false;
     });
     izleKanal.on("broadcast", { event: "guncelleme_durum" }, ({ payload }) => guncellemeDurumu(payload));
+    izleKanal.on("broadcast", { event: "komut_yanit" }, ({ payload }) => komutYanitGeldi(payload));
     izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
     clearInterval(yoklama);
     yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);

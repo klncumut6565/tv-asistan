@@ -1392,6 +1392,10 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
     }
 
+    /** Telefon sayfasındaki yön tuşları: kullanıcının KENDİ kumanda basışı (ekran izleme yok, hızlı). */
+    fun kumandaTusu(t: String): Boolean =
+        t in setOf("yukari", "asagi", "sol", "sag", "tamam", "geri", "ana_ekran") && tekBas(t)
+
     private fun tekBas(t: String): Boolean {
         // Önce GERÇEK kumanda tuşu (ADB input keyevent): tarayıcıların kendi imleci/odağı bunu dinler.
         val kod = when (t) {

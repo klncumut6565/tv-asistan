@@ -257,6 +257,32 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
         return aktifPaket == ana
     }
 
+    // ---- YAZILI KOMUT ve TELEFON KUMANDASI (ses hattından bağımsız)
+    private val tusIsci = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "telefon-tus").apply { isDaemon = true } }
+    private val komutIsci = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "yazili-komut").apply { isDaemon = true } }
+    private val metinKomut by lazy {
+        MetinKomut(anahtar = { ayarlar.geminiAnahtari }, talimat = { araclar.sistemTalimati() },
+            calistir = { ad, a -> araclar.calistir(ad, a) })
+    }
+
+    /** Telefondan yazılan komutu sesli oturum açmadan yürütür; ara durumları ve sonucu telefona yazar. */
+    private fun telefondanKomut(metin: String) {
+        val m = metin.trim().take(500)
+        if (m.isEmpty()) return
+        fun yanit(y: String, bitti: Boolean) {
+            telefon?.olayGonder("komut_yanit", org.json.JSONObject().put("m", y).put("bitti", bitti))
+        }
+        yanit("Komut alındı, çalışıyor…", false)
+        komutIsci.execute {
+            Log.i(ETIKET, "Yazılı komut: $m")
+            val s = try { metinKomut.yurut(m) { ara -> yanit(ara, false) } }
+                    catch (e: Exception) { MetinKomut.Sonuc("Hata: ${e.message}", emptyList()) }
+            // "Açtım" yalnız gerçekten açıldıysa: söz denetçisi tutarsızlık bulursa uyarı ekle
+            val ihlal = try { SozDenetcisi.degerlendir(s.mesaj, s.araclar) } catch (_: Exception) { null }
+            yanit(if (ihlal == null) s.mesaj else "${s.mesaj}\n⚠ Doğrulanmadı: ${ihlal.neden}", true)
+        }
+    }
+
     /** Sesli komut ("kendini güncelle") veya otomatik döngü tarafından çağrılır. */
     fun guncellemeyiKur(s: Guncelleme.Surum) {
         bekleyenSurum = null
@@ -336,6 +362,15 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 "ses_ayari" -> ana.post { sesAyariGeldi(yuk) }
                 // Telefon sayfasındaki "TV'yi güncelle" düğmesi
                 "guncelle" -> ana.post { telefondanGuncelle() }
+                // Telefon sayfasındaki yazılı komut kutusu (sesli oturum açmadan)
+                "komut" -> telefondanKomut(yuk.optString("m"))
+                // Telefon sayfasındaki yön tuşları ve Tamam
+                "tus" -> yuk.optString("t").let { t ->
+                    tusIsci.execute {
+                        val ok = try { araclar.kumandaTusu(t) } catch (e: Exception) { Log.w(ETIKET, "Telefon tuşu ($t): ${e.message}"); false }
+                        if (!ok) telefon?.olayGonder("komut_yanit", org.json.JSONObject().put("m", "'$t' tuşu uygulanamadı.").put("bitti", true))
+                    }
+                }
             }
         }, ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
     }
