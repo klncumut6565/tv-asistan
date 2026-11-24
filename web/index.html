@@ -99,6 +99,10 @@
   .kumanda .ok { background: var(--mor); color: #160a33; font-size: 18px; font-weight: 700; }
   .kumanda-alt { display: flex; gap: 8px; }
   .kumanda-alt button { padding: 12px; font-size: 15px; }
+  .ses-kanal { margin-bottom: 8px; }
+  .ses-kanal .dikey { flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+  .ses-kanal .dikey button { font-weight: 650; touch-action: manipulation; }
+  .ses-kanal .etiket { text-align: center; font-size: 13px; color: var(--soluk); padding: 9px 0; }
 </style>
 </head>
 <body>
@@ -136,6 +140,18 @@
       <span></span><button data-tus="yukari" aria-label="Yukarı">▲</button><span></span>
       <button data-tus="sol" aria-label="Sol">◀</button><button data-tus="tamam" class="ok" aria-label="Tamam">OK</button><button data-tus="sag" aria-label="Sağ">▶</button>
       <span></span><button data-tus="asagi" aria-label="Aşağı">▼</button><span></span>
+    </div>
+    <div class="kumanda-alt ses-kanal">
+      <div class="dikey">
+        <button data-tus="ses_artir" class="ikincil" aria-label="Sesi artır">🔊 Ses +</button>
+        <button data-tus="sessiz" class="ikincil" aria-label="Sessiz">🔇</button>
+        <button data-tus="ses_azalt" class="ikincil" aria-label="Sesi azalt">🔉 Ses −</button>
+      </div>
+      <div class="dikey">
+        <button data-tus="kanal_yukari" class="ikincil" aria-label="Sonraki kanal">P +</button>
+        <span class="etiket">Kanal</span>
+        <button data-tus="kanal_asagi" class="ikincil" aria-label="Önceki kanal">P −</button>
+      </div>
     </div>
     <div class="kumanda-alt">
       <button data-tus="geri" class="ikincil">↩ Geri</button>
@@ -606,7 +622,7 @@
   let komutBekle = null;
   function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
   // Yazılı komut ve kumanda TV'de en az bu sürümü ister; eski sürüm bu mesajları sessizce yok sayar
-  const EN_AZ_SURUM = 145;
+  const EN_AZ_SURUM = 147; // yazılı komut 145, tuş onayı 146, ses/kanal tuşları 147
   function tvEski() { const n = parseInt(String(tvSurum || "").split(".").pop(), 10); return n > 0 && n < EN_AZ_SURUM; }
   function eskiMesaji() { return "TV'deki Jülide eski sürüm (" + tvSurum + "). Bu özellik için en az 0.1." + EN_AZ_SURUM + " gerekli: Ayarlar → TV'yi güncelle, sonra TV'de 'Yükle'ye basın."; }
   function yanitYok() {
@@ -620,7 +636,7 @@
     p = p || {};
     komutYanit.textContent = p.ok ? "✓ " + (TUS_ADI[p.t] || p.t) : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.";
   }
-  const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran" };
+  const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran", ses_artir: "Ses +", ses_azalt: "Ses −", sessiz: "Sessiz", kanal_yukari: "P +", kanal_asagi: "P −" };
   function komutYanitGeldi(p) {
     p = p || {};
     if (!p.m) return;
