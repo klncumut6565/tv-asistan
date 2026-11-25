@@ -91,6 +91,8 @@ object AracTanimi {
             listOf(P("sorgu", "STRING", "Aranacak metin")), listOf("sorgu")))
         .put(fn("url_ac", "Bir web adresini tarayıcıda açar.",
             listOf(P("url", "STRING", "Tam adres, ör. https://www.siam.com.tr")), listOf("url")))
+        .put(fn("ekranda_gorev", "EKRANA BAKARAK GÖREVİ KENDİ YAPAR: TV ekranının görüntüsünü yapay zekayla inceler, odaktaki öğeyi ve hedefi bulur, hangi yön tuşuna kaç kez basılacağını ya da sayfada nereye tıklanacağını belirleyip uygular, ekranı yeniden görüp hedefe varana kadar devam eder (en çok 12 adım). Uygun uygulama/sayfa AÇIKKEN kullan: ör. tarayıcıda arama sonuçları açıkken hedef='Susuz Yaz filmini aç ve oynat', YouTube/Prime/TOD'da hedef='Yüzüklerin Efendisi'ni bul ve oynat', menüde hedef='Ayarlar'a gir'. Satın alma/kiralama/ödeme/kaldırma onaylarına basmaz. Sonuç 'basarili' değilse açtım deme.",
+            listOf(P("hedef", "STRING", "Ekranda ulaşılacak sonuç, açık ve tek cümle (ör. 'Susuz Yaz filmini açıp oynat')")), listOf("hedef")))
         .put(fn("ekrana_bak", "Ekranın KÜÇÜK bir görüntüsünü sana gönderir; sen ekranı GÖRÜRSÜN. Yalnızca ekrani_oku boş/yetersiz döndüğünde kullan (Prime Video, TOD, Netflix gibi ekranı resim olarak çizen uygulamalar). Kota harcar: gereksiz yere ve arka arkaya çağırma; yön tuşlarıyla birkaç adım ilerledikten sonra tekrar bak.",
             listOf(P("ne_ariyorum", "STRING", "Ekranda ne aradığın, ör. 'Yüzüklerin Efendisi kapağı', 'Oynat düğmesi'"))))
         .put(fn("ekrani_oku", "Şu an ekranda görünen yazıları/düğmeleri ve açık uygulamayı döndürür. Bir şeye tıklamadan önce kullan. Ekranı resim olarak çizen uygulamalarda (Prime Video, TOD) yazıları TV'de yerel yazı tanımayla, konumlarıyla okur (kota harcamaz); [odakta] = seçili öğe."))

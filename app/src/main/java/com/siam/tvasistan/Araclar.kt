@@ -98,6 +98,7 @@ Görevin kullanıcının sesli komutlarını araçlarla TV'de gerçekten uygulam
 - FİLM/DİZİ: Kullanıcının abonelikleri YALNIZCA şunlar: ${abonelikler.joinToString(", ")}. Ana ekrandayken / bağlam yokken akilli_ara soru_sor döndürür → kullanıcıya platformu sor (YouTube, tarayıcı, abonelikler; içeriğe en uygun 2-3 tanesi). Sonra ekrani_oku ile sonuçlara bak, doğru başlığa tikla, sonra "Oynat"/"İzle"/"Play" öğesine tikla. İlk platformda yoksa sıradakini dene; hiçbirinde yoksa kısaca söyle. Abonelik dışı platformları (Netflix, Disney+ vb.) önerme ve onlarda arama.
 - "YouTube'da X'i aç / oynat / çal / izle", "X şarkısını aç" (YouTube açıkken ya da YouTube denildiğinde) → youtube_oynat: videoyu DOĞRUDAN başlatır, sonuç sayfasına tıklamaya gerek yok. "İkincisini / başka birini aç" → aynı sorgu ile sira=2, 3... Yalnızca "YouTube'da ara, sonuçları göster" denirse youtube_ara. "Tarayıcıdan X" → akilli_ara(platform=tarayıcı). Belirli site adresi → url_ac.
 - Arama sonuçları geldikten sonra: ekrani_oku ile bak, doğru sonuca tikla, gerekiyorsa Oynat/İzle'ye tikla.
+- EKRANA BAKARAK GÖREV: Kullanıcı ekrandaki bir şeyi açmanı/seçmeni isterse ("tarayıcıdan Susuz Yaz filmini aç", "şu filmi oynat", "ayarlara gir") ve hedef birkaç adım gerektiriyorsa → önce uygun uygulamayı/sayfayı aç (ör. tarayıcıda ara), sonra ekranda_gorev(hedef="... aç ve oynat"): ekrana kendisi bakar, hangi yön tuşuna basılacağını ya da nereye tıklanacağını bulur, OK'ye basar ve sonucu ekranda doğrular. Sonuç başarısızsa açtım DEME.
 - Ekranda gezinme → ekrani_oku, tikla, tus, kaydir. Prime Video, TOD gibi ekranı resim olarak çizen uygulamalarda ekrani_oku yazıları TV'de YEREL YAZI TANIMA ile okur (kaynak=yerel_yazi_tanima, konum yüzdeleriyle; [odakta] = seçili öğe) ve bu ekranlarda yön tuşu (tus) basınca sonuçta ODAK bilgisi (seçili öğenin yeri ve üzerindeki yazı) gelir: önce bunları kullan, kota harcamaz. "GÖRÜNÜR DEĞİŞİKLİK OLMADI" dönerse aynı tuşa üst üste basma. Bunlar yetmezse (afiş, simge, yazısız öğe): ekrani_oku yazıları OKUYAMAZSA (Prime Video, TOD, Netflix gibi uygulamalar ekranı resim olarak çizer) → ekrana_bak: ekranı görürsün; hedefi ve odaktaki öğeyi bul, tus ile odağı taşı, tamam'a bas. ekrana_bak kota harcar: her tuştan sonra değil, birkaç adımda bir bak. Tıklamadan önce emin değilsen mutlaka ekrani_oku çağır; ekranda olmayan bir şeyi uydurma.
 - TV KANALLARI (canlı yayın): "ATV'yi aç", "Show TV'ye geç", "TRT 1'i aç", "7. kanalı aç" → kanal_ac. kanal_ac bir kanalın numarasını bilmediğini söylerse kullanıcıya "ATV kaçıncı kanalda?" diye sor; numarayı söyleyince kanal_kaydet ile kaydet ve kanal_ac ile aç. "ATV 4. kanalda", "TRT 1 birinci kanal", "birinci kanalda TRT 1 var", "4. kanalda Show TV var" → kanal_kaydet (kayıt KALICIDIR; o kanal sonra hep o numarayla açılır, kullanıcıya "Tamam, Show TV 4. kanal olarak kaydedildi" de). "Kanal listesini göster", "kayıtlı kanallar" → kanal_listesi(goster): liste ekranda görünür, sen yalnızca kaç kanal olduğunu ve ilk birkaçını kısaca söyle. "Listeyi kapat" → kanal_listesi(gizle). "TV'nin kanal listesini aç" → kanal_listesi(tv). "Sonraki/önceki kanal", "kanal yukarı/aşağı", "iki kanal ileri" → kanal_degistir. Kanal adlarını uygulama_ac ile KARIŞTIRMA (TOD bir uygulamadır, ATV/Show TV/Kanal D/Star/FOX/NOW/TV8/TRT kanaldır).
 - "Aşağı/yukarı/sağa/sola kaydır", "sayfayı aşağı indir" → kaydir (yon; "biraz" = 1, "biraz daha" = 2, "çok/en aşağı" = 5). Tarayıcıda bu fare tekerleği gibi sayfayı kaydırır.
@@ -180,6 +181,7 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             "web_ara" -> webAra(a.optString("sorgu"))
             "url_ac" -> urlAc(a.optString("url"))
             "ekrani_oku" -> ekraniOku()
+            "ekranda_gorev" -> ekrandaGorev(a.optString("hedef"))
             "ekrana_bak" -> ekranaBak(a.optString("ne_ariyorum"))
             "tikla" -> tikla(a.optString("metin"), a.optBoolean("onayli", false))
             "yaz" -> yaz(a.optString("metin"), a.optBoolean("gonder", false))
@@ -1074,6 +1076,59 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
             adim++
         }
         return null
+    }
+
+    // ---- GÖRSEL GEZİNME: ekran görüntüsü → yapay zeka → tuş/tıklama → tekrar bak (Gemini Live'dan bağımsız)
+    private val gorselGezgin by lazy {
+        GorselGezgin(
+            anahtar = { ayar.geminiAnahtari },
+            yakala = { ekranGoruntusu.bitmap(4000) },
+            uygula = { e -> gezginEylemi(e) },
+            bildir = { m -> Log.i("TvAsistan", "Görsel gezinme: $m") },
+        )
+    }
+
+    private fun ekrandaGorev(hedef: String): JSONObject {
+        val h = hedef.trim().take(200)
+        if (h.isEmpty()) return hata("Hedef verilmedi.")
+        if (ayar.kutuEtkin && canliTvOnde()) return hata("TV+ kutusu ekranda: kutu görüntüsü korumalı, göremem. kutu_kisayol kullan.")
+        val r = gorselGezgin.yurut(h)
+        val ozet = r.adimlar.takeLast(6).joinToString(" ; ")
+        return if (r.basarili) tamam("Hedef gerçekleşti (ekranda doğrulandı): ${r.mesaj}. Adımlar: $ozet")
+        else hata("Hedef TAMAMLANAMADI: ${r.mesaj}. Yapılan adımlar: ${ozet.ifBlank { "yok" }}. Kullanıcıya açtım DEME; durumu söyle.")
+    }
+
+    /** GorselGezgin'in seçtiği tek eylem: hata metni ya da null. */
+    private fun gezginEylemi(e: GorselGezgin.Eylem): String? = when (e) {
+        is GorselGezgin.Eylem.Tus -> {
+            if (e.tus == "tamam" && korumaliEkran()) KORUMA_MESAJI
+            else {
+                var hataMetni: String? = null
+                for (i in 0 until e.tekrar) {
+                    if (!tekBas(e.tus)) { hataMetni = "'${e.tus}' tuşu basılamadı"; break }
+                    if (i < e.tekrar - 1) android.os.SystemClock.sleep(220)
+                }
+                hataMetni
+            }
+        }
+        is GorselGezgin.Eylem.Tikla -> {
+            if (korumaliEkran()) KORUMA_MESAJI
+            else try { adb.dokun(e.x, e.y); null } catch (ex: Exception) {
+                if (dokun(e.x.toFloat(), e.y.toFloat())) null else "Tıklanamadı (ADB: ${ex.message})"
+            }
+        }
+        is GorselGezgin.Eylem.Yaz -> {
+            val r = yaz(e.metin, e.gonder)
+            if (!r.has("hata")) null
+            else try { adb.metinYaz(e.metin); if (e.gonder) adb.tuslar(listOf(66)); null } catch (ex: Exception) { r.optString("hata") }
+        }
+        is GorselGezgin.Eylem.Kaydir -> try {
+            val dm = s.resources.displayMetrics
+            val x = dm.widthPixels / 2
+            val (y1, y2) = if (e.yon == "asagi") dm.heightPixels * 7 / 10 to dm.heightPixels * 3 / 10 else dm.heightPixels * 3 / 10 to dm.heightPixels * 7 / 10
+            adb.kaydir(x, y1, x, y2); null
+        } catch (ex: Exception) { if (tekBas(if (e.yon == "asagi") "asagi" else "yukari")) null else "Kaydırılamadı: ${ex.message}" }
+        GorselGezgin.Eylem.Bekle -> null
     }
 
     private fun ekranaBak(neArar: String): JSONObject {
