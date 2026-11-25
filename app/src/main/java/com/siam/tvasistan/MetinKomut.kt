@@ -21,7 +21,17 @@ class MetinKomut(
     private val talimat: () -> String,
     private val calistir: (String, JSONObject) -> JSONObject,
 ) {
-    class Sonuc(val mesaj: String, val araclar: List<SozDenetcisi.AracKaydi>)
+    /**
+     * basari: true = son eylem aracı başarıyla çalıştı, false = başarısız ya da komut işlenemedi,
+     * null = yalnız bilgi/cevap (eylem aracı çalışmadı).
+     */
+    class Sonuc(val mesaj: String, val araclar: List<SozDenetcisi.AracKaydi>, private val hata: Boolean = false) {
+        val basari: Boolean? get() {
+            if (hata) return false
+            val eylemler = araclar.filter { it.ad !in SozDenetcisi.OKUMA_ARACLARI }
+            return if (eylemler.isEmpty()) null else eylemler.last().basarili
+        }
+    }
 
     companion object {
         private const val ETIKET = "TvAsistan"
@@ -64,7 +74,7 @@ class MetinKomut(
         }
         // 2) Metin Gemini + araçlar
         val k = anahtar().trim()
-        if (k.isEmpty()) return Sonuc("Gemini anahtarı TV'de kayıtlı değil.", kayitlar)
+        if (k.isEmpty()) return Sonuc("Gemini anahtarı TV'de kayıtlı değil.", kayitlar, hata = true)
         val simdi = System.currentTimeMillis()
         val sira = MODELLER.sortedBy { (kotaDolu[it] ?: 0) > simdi }
         var sonHata = ""
@@ -83,13 +93,13 @@ class MetinKomut(
                 sonHata = e.message.orEmpty()
             } catch (e: Exception) {
                 // Araç çalıştıktan sonra model değiştirmek işi ikinci kez yaptırabilir: dur
-                if (kayitlar.isNotEmpty()) return Sonuc("Komut kısmen işlendi; Gemini cevabı alınamadı (${e.message}).", kayitlar)
+                if (kayitlar.isNotEmpty()) return Sonuc("Komut kısmen işlendi; Gemini cevabı alınamadı (${e.message}).", kayitlar, hata = true)
                 sonHata = e.message.orEmpty()
                 Log.w(ETIKET, "Yazılı komut: $model hata: $sonHata")
             }
         }
         return Sonuc(if (sonHata == "kota doldu") "Gemini kotası tüm metin modellerinde doldu; sonra tekrar deneyin."
-            else "Gemini'ye ulaşılamadı: ${sonHata.take(140)}", kayitlar)
+            else "Gemini'ye ulaşılamadı: ${sonHata.take(140)}", kayitlar, hata = true)
     }
 
     private fun modelleYurut(model: String, k: String, metin: String, kayitlar: MutableList<SozDenetcisi.AracKaydi>, ara: (String) -> Unit): String {

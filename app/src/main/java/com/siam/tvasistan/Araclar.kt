@@ -2245,6 +2245,14 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
                 val yuzde = (seviye ?: return hata("Seviye verilmedi.")).coerceIn(0, 100)
                 am.setStreamVolume(akis, am.getStreamMaxVolume(akis) * yuzde / 100, bayrak)
             }
+            "seviye" -> { // TV'nin kendi ses kademesi (yazılı/sesli "sesi 17 yap"); okunarak doğrulanır
+                val max = am.getStreamMaxVolume(akis).coerceAtLeast(1)
+                val hedef = (seviye ?: return hata("Seviye verilmedi.")).coerceIn(0, max)
+                am.setStreamVolume(akis, hedef, bayrak)
+                val simdi = am.getStreamVolume(akis)
+                return if (simdi == hedef) tamam("Ses seviyesi $simdi yapıldı${if (max != 100) " (en çok $max)" else ""}.")
+                else hata("Ses $hedef yapılamadı; şu an $simdi (TV sesi başka cihazdan yönetiliyor olabilir).")
+            }
             else -> return hata("Bilinmeyen ses işlemi: $islem")
         }
         val max = am.getStreamMaxVolume(akis).coerceAtLeast(1)

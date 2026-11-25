@@ -269,17 +269,20 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     private fun telefondanKomut(metin: String) {
         val m = metin.trim().take(500)
         if (m.isEmpty()) return
-        fun yanit(y: String, bitti: Boolean) {
-            telefon?.olayGonder("komut_yanit", org.json.JSONObject().put("m", y).put("bitti", bitti))
+        // ok: true = yapıldı, false = yapılamadı, yok = bilgi/ara durum (telefon sayfası rozet gösterir)
+        fun yanit(y: String, bitti: Boolean, ok: Boolean? = null) {
+            telefon?.olayGonder("komut_yanit", org.json.JSONObject().put("m", y).put("bitti", bitti).apply { ok?.let { put("ok", it) } })
         }
         yanit("Komut alındı, çalışıyor…", false)
         komutIsci.execute {
             Log.i(ETIKET, "Yazılı komut: $m")
             val s = try { metinKomut.yurut(m) { ara -> yanit(ara, false) } }
-                    catch (e: Exception) { MetinKomut.Sonuc("Hata: ${e.message}", emptyList()) }
-            // "Açtım" yalnız gerçekten açıldıysa: söz denetçisi tutarsızlık bulursa uyarı ekle
+                    catch (e: Exception) { MetinKomut.Sonuc("Hata: ${e.message}", emptyList(), hata = true) }
+            // "Açtım" yalnız gerçekten açıldıysa: söz denetçisi tutarsızlık bulursa uyarı ekle ve başarı sayma
             val ihlal = try { SozDenetcisi.degerlendir(s.mesaj, s.araclar) } catch (_: Exception) { null }
-            yanit(if (ihlal == null) s.mesaj else "${s.mesaj}\n⚠ Doğrulanmadı: ${ihlal.neden}", true)
+            Log.i(ETIKET, "Yazılı komut sonucu: basari=${s.basari} ihlal=${ihlal != null} araclar=${s.araclar.map { it.ad + ":" + it.basarili }}")
+            if (ihlal == null) yanit(s.mesaj, true, s.basari)
+            else yanit("${s.mesaj}\n⚠ Doğrulanmadı: ${ihlal.neden}", true, false)
         }
     }
 

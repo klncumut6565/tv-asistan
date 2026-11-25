@@ -59,6 +59,8 @@ object HizliKomut {
     private val SES_ARTIR = Regex("^ses(i)?( (biraz|bir tik|az|biraz daha))? (artir|yukselt|yukari al|yukari)$")
     private val SES_AZALT = Regex("^ses(i)?( (biraz|bir tik|az|biraz daha))? (azalt|kis|dusur|alcalt|asagi al|asagi)$")
     private val SESSIZ = Regex("^(sessize al|sesi kapat|sesi kes)$")
+    /** "ses seviyesini 17 yap", "sesi 13'e getir", "ses 20 olsun": TV'nin kendi ses kademesi (yüzde değil). */
+    private val SES_SEVIYE = Regex("^ses(i|in)?( seviye(si|sini)?)? (\\d{1,3})( (e|a|ye|ya|e kadar|a kadar))? (yap|ayarla|olsun|getir|al|cek|ver)$")
 
     private const val MEDYA_NESNE = "((videoyu|filmi|diziyi|sarkiyi|muzigi|yayini) )?"
     private val DURAKLAT = Regex("^$MEDYA_NESNE(duraklat|durdur)$")
@@ -109,6 +111,9 @@ object HizliKomut {
         if (SONRAKI_KANAL.matches(n)) return Komut("kanal_degistir", JSONObject().put("yon", "sonraki").put("adet", 1))
         if (ONCEKI_KANAL.matches(n)) return Komut("kanal_degistir", JSONObject().put("yon", "onceki").put("adet", 1))
         if (SESSIZ.matches(n)) return Komut("ses", JSONObject().put("islem", "sessiz"))
+        SES_SEVIYE.find(n)?.let { m ->
+            return Komut("ses", JSONObject().put("islem", "seviye").put("seviye", m.groupValues[4].toInt().coerceIn(0, 100)))
+        }
         if (SES_ARTIR.matches(n)) return Komut("ses", JSONObject().put("islem", "artir").put("seviye", 2))
         if (SES_AZALT.matches(n)) return Komut("ses", JSONObject().put("islem", "azalt").put("seviye", 2))
         if (DURAKLAT.matches(n)) return Komut("medya", JSONObject().put("islem", "duraklat"))

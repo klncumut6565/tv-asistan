@@ -90,7 +90,13 @@
   .komut-satir { display: flex; gap: 8px; }
   .komut-satir input#komutMetin { flex: 1; min-width: 0; font-size: 16px; letter-spacing: 0; text-transform: none; text-align: left; padding: 12px; }
   .komut-satir button { width: auto; padding: 12px 16px; font-size: 16px; }
-  #komutYanit { margin-top: 10px; }
+  #komutYanit { margin-top: 10px; white-space: pre-line; }
+  .rozet { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .4px; padding: 3px 9px; border-radius: 999px; margin-bottom: 6px; }
+  .rozet.yapildi { background: rgba(34,197,94,.18); color: #4ade80; border: 1px solid rgba(74,222,128,.5); }
+  .rozet.yapilamadi { background: rgba(239,68,68,.16); color: #f87171; border: 1px solid rgba(248,113,113,.5); }
+  .rozet.bilgi { background: rgba(96,128,255,.16); color: #93a5ff; border: 1px solid rgba(147,165,255,.45); }
+  .rozet.bekliyor { background: rgba(250,204,21,.14); color: #facc15; border: 1px solid rgba(250,204,21,.45); }
+  #komutSurum { margin: 6px 0 0; font-size: 12px; }
   #komutYanit:empty::before { content: "Örn: YouTube'da Tarkan aç · TRT 1'i aç · sesi kıs · bugün hangi maçlar var"; color: var(--soluk); }
   /* Kumanda (yön tuşları) — tasarım: solda ses, ortada halkalı yön tuşları, sağda kanal, altta Geri/Ana ekran/Menü */
   .kumanda-kart { position: relative; padding: 18px 16px 22px; border-radius: 24px; border: 1px solid rgba(96,128,255,.45);
@@ -167,6 +173,7 @@
       <button id="komutGonder">Gönder</button>
     </div>
     <div id="komutYanit" class="cevap"></div>
+    <p class="ipucu" id="komutSurum"></p>
   </section>
 
   <section class="kumanda-kart" aria-label="Kumanda">
@@ -637,6 +644,8 @@
   function surumYaz() {
     const eski = tvSurum && sonSurum && (parseInt(sonSurum.split(".").pop(), 10) > parseInt(tvSurum.split(".").pop(), 10));
     surumBilgi.textContent = "TV: " + (tvSurum || "?") + " · Son: " + (sonSurum || "?") + (eski ? " ⚠" : (tvSurum && sonSurum ? " ✓" : ""));
+    const ks = $("komutSurum");
+    if (ks) ks.textContent = tvSurum ? ("TV'deki Jülide: " + tvSurum + (typeof tvEski === "function" && tvEski() ? " — eski, Ayarlar → TV'yi güncelle" : "")) : "";
   }
   function sonSurumuAl() {
     fetch("https://api.github.com/repos/klncumut6565/tv-asistan/releases/latest", { cache: "no-cache" })
@@ -679,13 +688,20 @@
   function tusOnayGeldi(p) {
     clearTimeout(tusBekle); tusBekle = null;
     p = p || {};
-    komutYanit.textContent = p.ok ? "✓ " + (TUS_ADI[p.t] || p.t) : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.";
+    komutDurum(p.ok ? "yapildi" : "yapilamadi", p.ok ? (TUS_ADI[p.t] || p.t) + " tuşu basıldı." : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.");
   }
   const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran", ses_artir: "Ses +", ses_azalt: "Ses −", sessiz: "Sessiz", kanal_yukari: "P +", kanal_asagi: "P −", menu: "Menü" };
+  /** Komut kartına durum rozeti + mesaj yazar. tur: yapildi | yapilamadi | bilgi | bekliyor */
+  function komutDurum(tur, metin) {
+    const ad = { yapildi: "✓ YAPILDI", yapilamadi: "✗ YAPILAMADI", bilgi: "ℹ CEVAP", bekliyor: "⏳ ÇALIŞIYOR" }[tur] || "";
+    komutYanit.textContent = "";
+    if (ad) { const r = document.createElement("span"); r.className = "rozet " + tur; r.textContent = ad; komutYanit.appendChild(r); komutYanit.appendChild(document.createElement("br")); }
+    komutYanit.appendChild(document.createTextNode(String(metin || "").replace(/^✓\s*/, "")));
+  }
   function komutYanitGeldi(p) {
     p = p || {};
     if (!p.m) return;
-    komutYanit.textContent = p.m;
+    komutDurum(!p.bitti ? "bekliyor" : p.ok === true ? "yapildi" : p.ok === false ? "yapilamadi" : "bilgi", p.m);
     clearTimeout(komutBekle);
     if (p.bitti) komutGonder.disabled = false;
     else komutBekle = setTimeout(() => { komutGonder.disabled = false; }, 90000);
@@ -695,14 +711,17 @@
     if (!m) return;
     if (!izleKanal) { kanalYok(komutYanit); return; }
     komutGonder.disabled = true;
-    komutYanit.textContent = "TV'ye gönderiliyor…";
+    komutDurum("bekliyor", "TV'ye gönderiliyor…");
+    // Sonucu beklemeden bilinen engeli hemen söyle (yine de gönderilir)
+    if (tvEski()) komutDurum("yapilamadi", eskiMesaji());
+    else if (sonGorulme && Date.now() - sonGorulme > 45000) komutDurum("yapilamadi", "TV'ye ulaşılamıyor: TV açık mı, üstteki ışık yeşil mi? (yine de gönderildi)");
     try { izleKanal.send({ type: "broadcast", event: "komut", payload: { m } }); } catch (_) {}
     komutMetin.value = "";
     clearTimeout(komutBekle);
     komutBekle = setTimeout(() => {
       komutGonder.disabled = false;
-      komutYanit.textContent = yanitYok();
-    }, 15000);
+      komutDurum("yapilamadi", yanitYok());
+    }, 10000);
   }
   komutGonder.addEventListener("click", komutuGonder);
   komutMetin.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); komutuGonder(); } });
@@ -710,7 +729,7 @@
     if (!izleKanal) { kanalYok(komutYanit); return; }
     try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus } }); } catch (_) {}
     clearTimeout(tusBekle);
-    tusBekle = setTimeout(() => { tusBekle = null; komutYanit.textContent = yanitYok(); }, 4000);
+    tusBekle = setTimeout(() => { tusBekle = null; komutDurum("yapilamadi", yanitYok()); }, 4000);
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}
   }));
   function gorundu(p) {

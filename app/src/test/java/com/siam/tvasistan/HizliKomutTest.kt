@@ -35,6 +35,15 @@ class HizliKomutTest {
         assertEquals("kanal_degistir adet=1,yon=onceki", k("kanalı aşağı"))
     }
 
+    @Test fun sesSeviyesi() {
+        assertEquals("ses islem=seviye,seviye=17", k("ses seviyesini 17 yap"))
+        assertEquals("ses islem=seviye,seviye=13", k("sesi 13 yap"))
+        assertEquals("ses islem=seviye,seviye=13", k("Sesi 13'e getir"))
+        assertEquals("ses islem=seviye,seviye=20", k("ses 20 olsun"))
+        assertEquals("ses islem=seviye,seviye=5", k("ses seviyesi 5 yap"))
+        assertNull(k("ses 17 dakika sonra kapansın"))
+    }
+
     @Test fun sesVeMedya() {
         assertEquals("ses islem=azalt,seviye=2", k("Sesi kıs"))
         assertEquals("ses islem=artir,seviye=2", k("sesi biraz artır"))

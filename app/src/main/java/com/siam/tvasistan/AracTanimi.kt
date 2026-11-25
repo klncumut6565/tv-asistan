@@ -150,8 +150,8 @@ object AracTanimi {
             ), listOf("numara")))
         .put(fn("ses", "TV ses seviyesini değiştirir.",
             listOf(
-                P("islem", "STRING", "Yapılacak işlem", listOf("artir", "azalt", "sessiz", "sesi_ac", "ayarla")),
-                P("seviye", "INTEGER", "'ayarla' için 0-100 arası yüzde; artir/azalt için adım sayısı")
+                P("islem", "STRING", "Yapılacak işlem. Kullanıcı 'sesi 17 yap' gibi bir SAYI söylerse 'seviye' kullan (TV'nin gösterdiği kademe); 'yüzde 30' derse 'ayarla'.", listOf("artir", "azalt", "sessiz", "sesi_ac", "ayarla", "seviye")),
+                P("seviye", "INTEGER", "'seviye' için TV ses kademesi; 'ayarla' için 0-100 arası yüzde; artir/azalt için adım sayısı")
             ), listOf("islem")))
         .put(fn("medya", "Oynatılan videoyu/müziği kontrol eder.",
             listOf(P("islem", "STRING", "Medya komutu", listOf("oynat", "duraklat", "oynat_duraklat", "durdur", "ileri_sar", "geri_sar", "sonraki", "onceki"))),
