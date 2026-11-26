@@ -1367,6 +1367,40 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         return null
     }
 
+    /**
+     * Telefon sayfasındaki klavye: {m, gonder, canli}. Metin TV'deki yazı alanına TÜMÜYLE yerleştirilir
+     * (Türkçe harfler korunur; silme de telefondaki metinle eşitlenerek olur). Yazı alanı görünmeyen
+     * uygulamalarda yalnız canlı OLMAYAN gönderimde ADB "input text" yedeği kullanılır (Türkçe harfler sadeleşir).
+     */
+    fun telefonKlavye(j: JSONObject): JSONObject {
+        if (korumaliEkran()) return hata(KORUMA_MESAJI)
+        val metin = j.optString("m").take(200)
+        val gonder = j.optBoolean("gonder")
+        yaziAlani()?.let { alan ->
+            alan.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            val b = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, metin) }
+            if (alan.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) {
+                alan.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
+                    putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, metin.length)
+                    putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, metin.length)
+                })
+                if (gonder) {
+                    val ok = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                        alan.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+                    if (!ok) try { adb.tuslar(listOf(66)) } catch (_: Exception) {}
+                }
+                return tamam(if (gonder) "Yazıldı ve arandı." else "TV'ye yazıldı.").put("yol", "alan")
+            }
+        }
+        if (j.optBoolean("canli")) return hata("TV'de yazı alanı bulunamadı: önce kumandayla arama kutusunu seçin ya da 'Ara' düğmesine basın.").put("yol", "yok")
+        if (metin.isBlank()) return hata("Yazılacak metin yok.")
+        return try {
+            adb.metinYaz(metin)
+            if (gonder) adb.tuslar(listOf(66))
+            tamam("TV klavyesiyle yazıldı (Türkçe harfler sadeleştirildi: ç→c, ş→s…).").put("yol", "adb")
+        } catch (e: Exception) { hata("Yazılamadı: ${e.message}") }
+    }
+
     private fun yaz(metin: String, gonder: Boolean): JSONObject {
         if (korumaliEkran()) return hata(KORUMA_MESAJI)
         val alan = yaziAlani() ?: return hata("Ekranda yazı alanı yok. Önce arama kutusuna tıkla.")

@@ -72,6 +72,15 @@
   .fare-hiz { display: flex; align-items: center; gap: 10px; margin: 10px 2px 0; font-size: 13px; color: var(--soluk); }
   .fare-hiz input { flex: 1; accent-color: #7a3cff; padding: 0; }
   .fare-hiz span { width: 38px; text-align: right; color: var(--yazi); }
+  .tv-klavye { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(96,128,255,.25); }
+  .tv-klavye label { display: block; font-size: 14px; color: var(--yazi); margin-bottom: 8px; font-weight: 600; }
+  .klavye-satir { display: flex; gap: 6px; }
+  .klavye-satir input { flex: 1; min-width: 0; font-size: 17px; letter-spacing: 0; text-transform: none; text-align: left; padding: 12px;
+    border-radius: 14px; background: #0f1736; border: 1px solid rgba(80,140,255,.55); color: var(--yazi); }
+  .klavye-satir button { width: auto; padding: 12px 14px; font-size: 15px; border-radius: 14px; touch-action: manipulation; }
+  .klavye-satir .klavye-sil { background: #1b2b63; color: #fff; border: 1px solid rgba(80,140,255,.45); padding: 12px; }
+  .klavye-durum { margin: 8px 2px 0; font-size: 12.5px; color: var(--soluk); min-height: 1.2em; }
+  .klavye-durum.ok { color: #4ade80; } .klavye-durum.hata { color: #f87171; }
   .gizli { display: none !important; }
   #karanlik { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; align-items: flex-end;
     justify-content: center; padding-bottom: 40px; color: #333; font-size: 14px; }
@@ -241,6 +250,15 @@
       <div class="yuvar"><button data-tus="geri" aria-label="Geri"><svg viewBox="0 0 24 24"><path d="M9 7L5 11l4 4"/><path d="M5 11h9a5 5 0 0 1 0 10H8"/></svg></button>Geri</div>
       <div class="yuvar"><button data-tus="ana_ekran" aria-label="Ana ekran"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" fill="#fff"/></svg></button>Ana ekran</div>
       <div class="yuvar"><button data-tus="menu" aria-label="Menü"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>Menü</div>
+    </div>
+    <div class="tv-klavye">
+      <label for="klavyeMetin">⌨️ TV'ye yaz</label>
+      <div class="klavye-satir">
+        <input id="klavyeMetin" type="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="200" placeholder="Arama kutusuna yazılacak metin…">
+        <button id="klavyeSil" class="klavye-sil" aria-label="Temizle">✕</button>
+        <button id="klavyeAra">Ara ⏎</button>
+      </div>
+      <p id="klavyeDurum" class="klavye-durum">Önce TV'de arama kutusunu seçin; yazdıkça TV'ye düşer.</p>
     </div>
   </section>
 
@@ -711,7 +729,7 @@
   let komutBekle = null;
   function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
   // Yazılı komut ve kumanda TV'de en az bu sürümü ister; eski sürüm bu mesajları sessizce yok sayar
-  const EN_AZ_SURUM = 151; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148, fare 151
+  const EN_AZ_SURUM = 153; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148, fare 151, klavye 153
   function tvEski() { const n = parseInt(String(tvSurum || "").split(".").pop(), 10); return n > 0 && n < EN_AZ_SURUM; }
   function eskiMesaji() { return "TV'deki Jülide eski sürüm (" + tvSurum + "). Bu özellik için en az 0.1." + EN_AZ_SURUM + " gerekli: Ayarlar → TV'yi güncelle, sonra TV'de 'Yükle'ye basın."; }
   function yanitYok() {
@@ -833,6 +851,32 @@
     fareGonder(t === "tik" ? { tik: 1 } : t === "cift" ? { tik: 2 } : { kay: t === "kay-yukari" ? 0.25 : -0.25 });
   }));
 
+  // ---- TELEFON KLAVYESİ → TV arama kutusu (yazdıkça canlı; Ara = gönder)
+  const klavyeMetin = $("klavyeMetin"), klavyeAra = $("klavyeAra"), klavyeSil = $("klavyeSil"), klavyeDurum = $("klavyeDurum");
+  let klavyeZaman = null, klavyeBekle = null;
+  function klavyeDurumYaz(m, tur) { klavyeDurum.textContent = m; klavyeDurum.className = "klavye-durum" + (tur ? " " + tur : ""); }
+  function klavyeGonder(gonder, canli) {
+    if (!izleKanal) { klavyeDurumYaz("Önce Ayarlar'dan TV kodunu girin.", "hata"); return; }
+    clearTimeout(klavyeZaman); klavyeZaman = null;
+    try { izleKanal.send({ type: "broadcast", event: "klavye", payload: { m: klavyeMetin.value, gonder, canli } }); } catch (_) {}
+    if (gonder) klavyeDurumYaz("Aranıyor…");
+    clearTimeout(klavyeBekle);
+    klavyeBekle = setTimeout(() => klavyeDurumYaz(yanitYok(), "hata"), 6000);
+  }
+  function klavyeOnay(p) {
+    p = p || {};
+    clearTimeout(klavyeBekle);
+    if (p.hata) klavyeDurumYaz(p.hata, "hata");
+    else klavyeDurumYaz("✓ " + (p.sonuc || "TV'ye yazıldı."), "ok");
+  }
+  klavyeMetin.addEventListener("input", () => {
+    clearTimeout(klavyeZaman);
+    klavyeZaman = setTimeout(() => klavyeGonder(false, true), 350);
+  });
+  klavyeMetin.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); klavyeGonder(true, false); } });
+  klavyeAra.addEventListener("click", () => klavyeGonder(true, false));
+  klavyeSil.addEventListener("click", () => { klavyeMetin.value = ""; klavyeGonder(false, true); klavyeMetin.focus(); });
+
   document.querySelectorAll("[data-tus]").forEach((b) => b.addEventListener("click", () => {
     if (!izleKanal) { kanalYok(komutYanit); return; }
     try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus } }); } catch (_) {}
@@ -869,6 +913,7 @@
     izleKanal.on("broadcast", { event: "guncelleme_durum" }, ({ payload }) => guncellemeDurumu(payload));
     izleKanal.on("broadcast", { event: "komut_yanit" }, ({ payload }) => komutYanitGeldi(payload));
     izleKanal.on("broadcast", { event: "tus_onay" }, ({ payload }) => tusOnayGeldi(payload));
+    izleKanal.on("broadcast", { event: "klavye_onay" }, ({ payload }) => klavyeOnay(payload));
     izleKanal.subscribe((st) => { if (st === "SUBSCRIBED") yokla(); });
     clearInterval(yoklama);
     yoklama = setInterval(() => { if (!document.hidden) yokla(); isikYaz(); }, 20000);

@@ -258,6 +258,7 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
     }
 
     // ---- YAZILI KOMUT ve TELEFON KUMANDASI (ses hattından bağımsız)
+    @Volatile private var bekleyenKlavye: org.json.JSONObject? = null
     private val tusIsci = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "telefon-tus").apply { isDaemon = true } }
     private val komutIsci = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "yazili-komut").apply { isDaemon = true } }
     private val metinKomut by lazy {
@@ -372,6 +373,16 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                     tusIsci.execute {
                         val ok = try { araclar.kumandaTusu(t) } catch (e: Exception) { Log.w(ETIKET, "Telefon tuşu ($t): ${e.message}"); false }
                         telefon?.olayGonder("tus_onay", org.json.JSONObject().put("t", t).put("ok", ok))
+                    }
+                }
+                // Telefon sayfasındaki klavye: yalnız EN SON metin işlenir (hızlı yazımda kuyruk birikmez)
+                "klavye" -> {
+                    bekleyenKlavye = yuk
+                    tusIsci.execute {
+                        val y = bekleyenKlavye ?: return@execute
+                        bekleyenKlavye = null
+                        val r = try { araclar.telefonKlavye(y) } catch (e: Exception) { org.json.JSONObject().put("hata", e.message ?: "hata") }
+                        telefon?.olayGonder("klavye_onay", r.put("canli", y.optBoolean("canli")).put("gonder", y.optBoolean("gonder")))
                     }
                 }
                 // Telefon sayfasındaki dokunmatik fare alanı: hareket anında (iş parçacığı beklemeden), tık/kaydırma sırayla
