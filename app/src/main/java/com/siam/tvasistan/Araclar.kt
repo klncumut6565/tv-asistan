@@ -591,6 +591,40 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
         }
     }
 
+    /**
+     * Telefon sayfasındaki dokunmatik fare alanı (kullanıcının KENDİ hareketi, kumanda gibi):
+     *  {dx, dy}: alan genişliğine göre normalleştirilmiş kayma → imleç taşınır (hızlı harekette ivmeli)
+     *  {tik: 1|2}: imlecin altına gerçek dokunma (2 = çift tık)
+     *  {kay: dy}: iki parmakla sayfa kaydırma (imlecin bulunduğu yerde)
+     *  {gizle: true}: imleci kaldır
+     */
+    fun telefonFare(j: JSONObject) {
+        if (j.optBoolean("gizle")) { imlec.gizle(); return }
+        val dm = s.resources.displayMetrics
+        val gen = dm.widthPixels.toFloat(); val yuk = dm.heightPixels.toFloat()
+        if (!imlec.acik) imlec.goster(Imlec.Mod.FARE)
+        when {
+            j.has("tik") -> {
+                imlec.basildiGoster()
+                hareket(imlec.x, imlec.y, j.optInt("tik", 1) >= 2)
+            }
+            j.has("kay") -> {
+                val d = (j.optDouble("kay", 0.0).toFloat() * yuk * 1.6f).coerceIn(-yuk * 0.8f, yuk * 0.8f)
+                if (kotlin.math.abs(d) < 8f) return
+                val x = imlec.x.toInt().coerceIn(1, gen.toInt() - 1)
+                val y1 = (yuk / 2f - d / 2f).toInt(); val y2 = (yuk / 2f + d / 2f).toInt()
+                try { adb.kaydir(x, y1.coerceIn(1, yuk.toInt() - 1), x, y2.coerceIn(1, yuk.toInt() - 1), 220) }
+                catch (e: Exception) { tekBas(if (d < 0) "asagi" else "yukari") }
+            }
+            else -> {
+                val dx = j.optDouble("dx", 0.0).toFloat(); val dy = j.optDouble("dy", 0.0).toFloat()
+                val hiz = kotlin.math.sqrt(dx * dx + dy * dy)
+                val ivme = 1.4f + (hiz * 6f).coerceAtMost(1.6f) // yavaş: hassas, hızlı: ekranı çabuk geçer
+                imlec.gitPx(imlec.x + dx * gen * ivme, imlec.y + dy * gen * ivme)
+            }
+        }
+    }
+
     private fun imlecKonumu(): String {
         val dm = s.resources.displayMetrics
         return "yatay %${(imlec.x * 100 / dm.widthPixels).toInt()}, dikey %${(imlec.y * 100 / dm.heightPixels).toInt()}"

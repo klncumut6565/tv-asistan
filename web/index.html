@@ -137,6 +137,21 @@
     border-radius: 50%; border: 5px solid #0b1024; color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .5px;
     background: radial-gradient(circle at 35% 30%, #b18cff 0%, #7a3cff 45%, #3b2bdc 100%); box-shadow: 0 0 18px rgba(140,90,255,.65); }
   .yon-ok:active { filter: brightness(1.25); }
+  /* Fare modu: kumanda alanı dokunmatik yüzey olur */
+  .mod-sec { display: flex; gap: 6px; margin: -6px 0 14px; padding: 4px; border-radius: 999px; background: rgba(20,28,60,.7); border: 1px solid rgba(96,128,255,.35); }
+  .mod-sec button { flex: 1; padding: 8px 6px; border-radius: 999px; font-size: 14px; font-weight: 650; background: transparent; color: var(--soluk); border: 0; }
+  .mod-sec button.secili { background: linear-gradient(135deg, #3b5bff, #7a3cff); color: #fff; box-shadow: 0 0 12px rgba(110,90,255,.5); }
+  .dokunmatik { position: relative; height: clamp(190px, 52vw, 230px); border-radius: 20px; touch-action: none; -webkit-user-select: none; user-select: none;
+    background: radial-gradient(120% 120% at 50% 40%, #1a2552 0%, #10173a 70%); border: 1.5px solid rgba(80,140,255,.65);
+    box-shadow: 0 0 18px rgba(60,120,255,.3), inset 0 0 30px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .dokunmatik .ipucu-ic { color: rgba(200,210,255,.55); font-size: 13px; line-height: 1.6; text-align: center; pointer-events: none; padding: 0 14px; }
+  .dokunmatik .iz { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(140,110,255,.55), rgba(140,110,255,0) 70%); opacity: 0; transition: opacity .2s; }
+  .dokunmatik.basili .iz { opacity: 1; }
+  .fare-tuslar { display: flex; gap: 8px; margin-top: 10px; }
+  .fare-tuslar button { flex: 1; padding: 11px 6px; font-size: 14px; border-radius: 14px; background: #1b2b63; color: #fff; border: 1px solid rgba(80,140,255,.55); touch-action: manipulation; }
+  .fare-tuslar button:active { background: rgba(109,63,224,.6); }
+  .gizli { display: none !important; }
   .kumanda-alt3 { display: flex; justify-content: space-around; margin-top: 26px; }
   .kumanda-alt3 .yuvar { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 15px; color: var(--yazi); }
   .kumanda-alt3 button { width: clamp(58px, 17vw, 72px); height: clamp(58px, 17vw, 72px); padding: 0; border-radius: 50%; color: #fff;
@@ -181,7 +196,23 @@
       <h2>🎮 Kumanda</h2>
       <span class="tv-hap"><span id="kumandaIsik" class="isik"></span><span id="kumandaDurum">TV durumu…</span></span>
     </div>
-    <div class="kumanda-orta">
+    <div class="mod-sec" role="tablist">
+      <button id="modKumanda" class="secili" role="tab">🎮 Kumanda</button>
+      <button id="modFare" role="tab">🖱 Fare</button>
+    </div>
+    <div id="farePanel" class="gizli">
+      <div id="dokunmatik" class="dokunmatik" aria-label="Fare alanı">
+        <div class="iz" id="fareIz"></div>
+        <div class="ipucu-ic">Parmağınızı kaydırın: imleç hareket eder<br>Dokunun: tıkla · Çift dokunun: çift tık<br>İki parmakla kaydırın: sayfa kayar</div>
+      </div>
+      <div class="fare-tuslar">
+        <button data-fare="tik">👆 Tıkla</button>
+        <button data-fare="cift">Çift tık</button>
+        <button data-fare="kay-yukari">▲ Kaydır</button>
+        <button data-fare="kay-asagi">▼ Kaydır</button>
+      </div>
+    </div>
+    <div class="kumanda-orta" id="kumandaOrta">
       <div class="hap">
         <button data-tus="ses_artir" aria-label="Sesi artır"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Ses +</button>
         <button data-tus="ses_azalt" class="kucuk" aria-label="Sesi azalt"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Ses −</button>
@@ -676,7 +707,7 @@
   let komutBekle = null;
   function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
   // Yazılı komut ve kumanda TV'de en az bu sürümü ister; eski sürüm bu mesajları sessizce yok sayar
-  const EN_AZ_SURUM = 148; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148
+  const EN_AZ_SURUM = 151; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148, fare 151
   function tvEski() { const n = parseInt(String(tvSurum || "").split(".").pop(), 10); return n > 0 && n < EN_AZ_SURUM; }
   function eskiMesaji() { return "TV'deki Jülide eski sürüm (" + tvSurum + "). Bu özellik için en az 0.1." + EN_AZ_SURUM + " gerekli: Ayarlar → TV'yi güncelle, sonra TV'de 'Yükle'ye basın."; }
   function yanitYok() {
@@ -725,6 +756,73 @@
   }
   komutGonder.addEventListener("click", komutuGonder);
   komutMetin.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); komutuGonder(); } });
+  // ---- FARE MODU: dokunmatik alan → TV'deki imleç (göreli hareket; Supabase hız sınırı için ~12 mesaj/sn)
+  const modKumanda = $("modKumanda"), modFare = $("modFare"), farePanel = $("farePanel"), kumandaOrta = $("kumandaOrta");
+  const ped = $("dokunmatik"), fareIz = $("fareIz");
+  function fareGonder(payload) { if (izleKanal) try { izleKanal.send({ type: "broadcast", event: "fare", payload }); } catch (_) {} }
+  function modSec(fare) {
+    modFare.classList.toggle("secili", fare); modKumanda.classList.toggle("secili", !fare);
+    farePanel.classList.toggle("gizli", !fare); kumandaOrta.classList.toggle("gizli", fare);
+    if (!izleKanal && fare) kanalYok(komutYanit);
+    if (!fare) fareGonder({ gizle: true });
+    try { localStorage.setItem("julide_kumanda_modu", fare ? "fare" : "kumanda"); } catch (_) {}
+  }
+  modKumanda.addEventListener("click", () => modSec(false));
+  modFare.addEventListener("click", () => modSec(true));
+  try { if (localStorage.getItem("julide_kumanda_modu") === "fare") { modFare.classList.add("secili"); modKumanda.classList.remove("secili"); farePanel.classList.remove("gizli"); kumandaOrta.classList.add("gizli"); } } catch (_) {}
+
+  const parmaklar = new Map(); // pointerId → {x, y}
+  let birikX = 0, birikY = 0, birikKay = 0, sonGonderim = 0, gonderZaman = null;
+  let dokunBas = 0, dokunYol = 0, ikiParmak = false, sonTik = 0, tekTikZaman = null;
+  function birikmisiGonder() {
+    gonderZaman = null; sonGonderim = Date.now();
+    if (birikKay) { fareGonder({ kay: +birikKay.toFixed(4) }); birikKay = 0; }
+    if (birikX || birikY) { fareGonder({ dx: +birikX.toFixed(4), dy: +birikY.toFixed(4) }); birikX = 0; birikY = 0; }
+  }
+  function planla() {
+    if (gonderZaman) return;
+    gonderZaman = setTimeout(birikmisiGonder, Math.max(0, 80 - (Date.now() - sonGonderim)));
+  }
+  ped.addEventListener("pointerdown", (e) => {
+    ped.setPointerCapture && ped.setPointerCapture(e.pointerId);
+    parmaklar.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (parmaklar.size === 1) { dokunBas = Date.now(); dokunYol = 0; ikiParmak = false; }
+    if (parmaklar.size >= 2) ikiParmak = true;
+    const r = ped.getBoundingClientRect(); fareIz.style.left = (e.clientX - r.left) + "px"; fareIz.style.top = (e.clientY - r.top) + "px";
+    ped.classList.add("basili"); e.preventDefault();
+  });
+  ped.addEventListener("pointermove", (e) => {
+    const o = parmaklar.get(e.pointerId); if (!o) return;
+    const w = ped.clientWidth || 300;
+    const dx = e.clientX - o.x, dy = e.clientY - o.y;
+    o.x = e.clientX; o.y = e.clientY;
+    dokunYol += Math.abs(dx) + Math.abs(dy);
+    const r = ped.getBoundingClientRect(); fareIz.style.left = (e.clientX - r.left) + "px"; fareIz.style.top = (e.clientY - r.top) + "px";
+    if (ikiParmak) { birikKay += (dy / w) / parmaklar.size; }
+    else { birikX += dx / w; birikY += dy / w; }
+    planla(); e.preventDefault();
+  });
+  function birak(e) {
+    if (!parmaklar.has(e.pointerId)) return;
+    parmaklar.delete(e.pointerId);
+    if (parmaklar.size > 0) return;
+    ped.classList.remove("basili");
+    const kisa = Date.now() - dokunBas < 260 && dokunYol < 10 && !ikiParmak;
+    if (gonderZaman) { clearTimeout(gonderZaman); birikmisiGonder(); }
+    if (!kisa) return;
+    // Dokunma = tık; 300 ms içinde ikinci dokunma = çift tık
+    if (tekTikZaman && Date.now() - sonTik < 300) { clearTimeout(tekTikZaman); tekTikZaman = null; fareGonder({ tik: 2 }); }
+    else { sonTik = Date.now(); tekTikZaman = setTimeout(() => { tekTikZaman = null; fareGonder({ tik: 1 }); }, 300); }
+    if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {}
+  }
+  ped.addEventListener("pointerup", birak);
+  ped.addEventListener("pointercancel", birak);
+  document.querySelectorAll("[data-fare]").forEach((b) => b.addEventListener("click", () => {
+    if (!izleKanal) { kanalYok(komutYanit); return; }
+    const t = b.dataset.fare;
+    fareGonder(t === "tik" ? { tik: 1 } : t === "cift" ? { tik: 2 } : { kay: t === "kay-yukari" ? 0.25 : -0.25 });
+  }));
+
   document.querySelectorAll("[data-tus]").forEach((b) => b.addEventListener("click", () => {
     if (!izleKanal) { kanalYok(komutYanit); return; }
     try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus } }); } catch (_) {}

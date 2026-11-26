@@ -374,6 +374,10 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                         telefon?.olayGonder("tus_onay", org.json.JSONObject().put("t", t).put("ok", ok))
                     }
                 }
+                // Telefon sayfasındaki dokunmatik fare alanı: hareket anında (iş parçacığı beklemeden), tık/kaydırma sırayla
+                "fare" -> if (yuk.has("tik") || yuk.has("kay")) tusIsci.execute {
+                    try { araclar.telefonFare(yuk) } catch (e: Exception) { Log.w(ETIKET, "Telefon faresi: ${e.message}") }
+                } else try { araclar.telefonFare(yuk) } catch (e: Exception) { Log.w(ETIKET, "Telefon faresi: ${e.message}") }
             }
         }, ekranAcik = { getSystemService(android.os.PowerManager::class.java)?.isInteractive != false }).also { it.baslat() }
     }
