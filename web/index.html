@@ -69,6 +69,9 @@
   .cevap { font-size: 15px; color: var(--yazi); white-space: pre-wrap; min-height: 22px; }
   .cevap:empty::before { content: "Jülide'nin cevapları burada görünür."; color: var(--soluk); }
   .ipucu { font-size: 13px; color: var(--soluk); margin: 0; }
+  .fare-hiz { display: flex; align-items: center; gap: 10px; margin: 10px 2px 0; font-size: 13px; color: var(--soluk); }
+  .fare-hiz input { flex: 1; accent-color: #7a3cff; padding: 0; }
+  .fare-hiz span { width: 38px; text-align: right; color: var(--yazi); }
   .gizli { display: none !important; }
   #karanlik { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; align-items: flex-end;
     justify-content: center; padding-bottom: 40px; color: #333; font-size: 14px; }
@@ -205,6 +208,7 @@
         <div class="iz" id="fareIz"></div>
         <div class="ipucu-ic">Parmağınızı kaydırın: imleç hareket eder<br>Dokunun: tıkla · Çift dokunun: çift tık<br>İki parmakla kaydırın: sayfa kayar</div>
       </div>
+      <label class="fare-hiz">Hassasiyet <input id="fareHiz" type="range" min="15" max="100" step="5" value="45"><span id="fareHizDeger">45%</span></label>
       <div class="fare-tuslar">
         <button data-fare="tik">👆 Tıkla</button>
         <button data-fare="cift">Çift tık</button>
@@ -771,6 +775,12 @@
   modFare.addEventListener("click", () => modSec(true));
   try { if (localStorage.getItem("julide_kumanda_modu") === "fare") { modFare.classList.add("secili"); modKumanda.classList.remove("secili"); farePanel.classList.remove("gizli"); kumandaOrta.classList.add("gizli"); } } catch (_) {}
 
+  // Hassasiyet: hareket TV'ye gönderilmeden önce ölçeklenir (TV güncellemesi gerekmez). Varsayılan %45.
+  const fareHiz = $("fareHiz"), fareHizDeger = $("fareHizDeger");
+  let fareCarpan = 0.45;
+  try { const k = parseInt(localStorage.getItem("julide_fare_hiz"), 10); if (k >= 15 && k <= 100) fareHiz.value = k; } catch (_) {}
+  function hizYaz() { fareCarpan = fareHiz.value / 100; fareHizDeger.textContent = fareHiz.value + "%"; try { localStorage.setItem("julide_fare_hiz", fareHiz.value); } catch (_) {} }
+  fareHiz.addEventListener("input", hizYaz); hizYaz();
   const parmaklar = new Map(); // pointerId → {x, y}
   let birikX = 0, birikY = 0, birikKay = 0, sonGonderim = 0, gonderZaman = null;
   let dokunBas = 0, dokunYol = 0, ikiParmak = false, sonTik = 0, tekTikZaman = null;
@@ -799,7 +809,7 @@
     dokunYol += Math.abs(dx) + Math.abs(dy);
     const r = ped.getBoundingClientRect(); fareIz.style.left = (e.clientX - r.left) + "px"; fareIz.style.top = (e.clientY - r.top) + "px";
     if (ikiParmak) { birikKay += (dy / w) / parmaklar.size; }
-    else { birikX += dx / w; birikY += dy / w; }
+    else { birikX += (dx / w) * fareCarpan; birikY += (dy / w) * fareCarpan; }
     planla(); e.preventDefault();
   });
   function birak(e) {
