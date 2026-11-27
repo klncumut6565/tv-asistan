@@ -81,6 +81,9 @@
   .klavye-satir .klavye-sil { background: #1b2b63; color: #fff; border: 1px solid rgba(80,140,255,.45); padding: 12px; }
   .klavye-durum { margin: 8px 2px 0; font-size: 12.5px; color: var(--soluk); min-height: 1.2em; }
   .klavye-durum.ok { color: #4ade80; } .klavye-durum.hata { color: #f87171; }
+  .bag-mod { display: flex; align-items: center; gap: 10px; line-height: 1.35; margin: -4px 4px 14px; font-size: 13px; color: var(--yazi); }
+  .bag-mod input { width: 18px; height: 18px; accent-color: #7a3cff; margin: 0; flex: none; }
+  .bag-mod .soluk { color: var(--soluk); font-size: 12px; }
   .gizli { display: none !important; }
   #karanlik { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; align-items: flex-end;
     justify-content: center; padding-bottom: 40px; color: #333; font-size: 14px; }
@@ -212,6 +215,7 @@
       <button id="modKumanda" class="secili" role="tab">🎮 Kumanda</button>
       <button id="modFare" role="tab">🖱 Fare</button>
     </div>
+    <label class="bag-mod" id="bagModSatir"><input type="checkbox" id="bagMod" checked><span>🔗 Tarayıcıda yön tuşları bağlantıları seçsin<br><span class="soluk">Kapalıysa tarayıcının kendi imleci kullanılır</span></span></label>
     <div id="farePanel" class="gizli">
       <div id="dokunmatik" class="dokunmatik" aria-label="Fare alanı">
         <div class="iz" id="fareIz"></div>
@@ -729,7 +733,7 @@
   let komutBekle = null;
   function kanalYok(el) { el.textContent = "Önce Ayarlar'dan TV kodunu girin."; }
   // Yazılı komut ve kumanda TV'de en az bu sürümü ister; eski sürüm bu mesajları sessizce yok sayar
-  const EN_AZ_SURUM = 153; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148, fare 151, klavye 153
+  const EN_AZ_SURUM = 154; // yazılı komut 145, tuş onayı 146, ses/kanal 147, menü 148, fare 151, klavye 153, bağlantı modu 154
   function tvEski() { const n = parseInt(String(tvSurum || "").split(".").pop(), 10); return n > 0 && n < EN_AZ_SURUM; }
   function eskiMesaji() { return "TV'deki Jülide eski sürüm (" + tvSurum + "). Bu özellik için en az 0.1." + EN_AZ_SURUM + " gerekli: Ayarlar → TV'yi güncelle, sonra TV'de 'Yükle'ye basın."; }
   function yanitYok() {
@@ -737,11 +741,15 @@
     if (Date.now() - sonGorulme > 45000) return "TV'ye ulaşılamıyor: TV açık mı, üstteki ışık yeşil mi?";
     return "TV yanıt vermedi. TV'deki Jülide sürümü: " + (tvSurum || "bilinmiyor") + " (en az 0.1." + EN_AZ_SURUM + " olmalı).";
   }
+  const bagMod = $("bagMod");
+  try { if (localStorage.getItem("julide_bag_mod") === "0") bagMod.checked = false; } catch (_) {}
+  bagMod.addEventListener("change", () => { try { localStorage.setItem("julide_bag_mod", bagMod.checked ? "1" : "0"); } catch (_) {} });
+  function bagModAcik() { return !!bagMod.checked; }
   let tusBekle = null;
   function tusOnayGeldi(p) {
     clearTimeout(tusBekle); tusBekle = null;
     p = p || {};
-    komutDurum(p.ok ? "yapildi" : "yapilamadi", p.ok ? (TUS_ADI[p.t] || p.t) + " tuşu basıldı." : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.");
+    komutDurum(p.ok ? "yapildi" : "yapilamadi", p.m ? p.m : p.ok ? (TUS_ADI[p.t] || p.t) + " tuşu basıldı." : "'" + (TUS_ADI[p.t] || p.t) + "' tuşu TV'de uygulanamadı.");
   }
   const TUS_ADI = { yukari: "Yukarı", asagi: "Aşağı", sol: "Sol", sag: "Sağ", tamam: "OK", geri: "Geri", ana_ekran: "Ana ekran", ses_artir: "Ses +", ses_azalt: "Ses −", sessiz: "Sessiz", kanal_yukari: "P +", kanal_asagi: "P −", menu: "Menü" };
   /** Komut kartına durum rozeti + mesaj yazar. tur: yapildi | yapilamadi | bilgi | bekliyor */
@@ -879,7 +887,7 @@
 
   document.querySelectorAll("[data-tus]").forEach((b) => b.addEventListener("click", () => {
     if (!izleKanal) { kanalYok(komutYanit); return; }
-    try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus } }); } catch (_) {}
+    try { izleKanal.send({ type: "broadcast", event: "tus", payload: { t: b.dataset.tus, bag: bagModAcik() } }); } catch (_) {}
     clearTimeout(tusBekle);
     tusBekle = setTimeout(() => { tusBekle = null; komutDurum("yapilamadi", yanitYok()); }, 4000);
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}

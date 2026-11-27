@@ -1516,6 +1516,41 @@ HATIRLATMA: Her cevabın yalnızca Türkçe olacak.
     }
 
     /** Telefon sayfasındaki yön tuşları: kullanıcının KENDİ kumanda basışı (ekran izleme yok, hızlı). */
+    /** Son telefon tuşunun kullanıcıya gösterilecek açıklaması (ör. seçilen bağlantı); yoksa null. */
+    @Volatile var sonTusMesaji: String? = null
+
+    /** Tarayıcıda bağlantı modu: yön tuşları bağlantılar arasında gezinir (tarayıcının kendi imleci yerine). */
+    val baglantiSecici by lazy {
+        BaglantiSecici(s,
+            dokun = { x, y -> hareket(x, y, false) },
+            kaydir = { asagi ->
+                val dm = s.resources.displayMetrics
+                val x = dm.widthPixels / 2
+                val (y1, y2) = if (asagi) dm.heightPixels * 7 / 10 to dm.heightPixels * 3 / 10 else dm.heightPixels * 3 / 10 to dm.heightPixels * 7 / 10
+                try { adb.kaydir(x, y1, x, y2, 300) } catch (_: Exception) {}
+            })
+    }
+
+    private fun tarayiciOnde(): Boolean {
+        val p = s.aktifPaket ?: return false
+        return try { Uygulamalar.tarayicilar(s).any { it.paket == p } } catch (_: Exception) { false }
+    }
+
+    fun kumandaTusu(t: String, baglantiModu: Boolean): Boolean {
+        sonTusMesaji = null
+        if (baglantiModu && t in setOf("yukari", "asagi", "sol", "sag", "tamam") && tarayiciOnde()) {
+            if (t == "tamam") {
+                baglantiSecici.tamam()?.let { sonTusMesaji = "🔗 Açılıyor: ${it.ifBlank { "bağlantı" }}"; return true }
+            } else {
+                imlec.gizle()
+                val m = try { baglantiSecici.yon(t) } catch (e: Exception) { Log.w("TvAsistan", "Bağlantı modu: ${e.message}"); null }
+                if (m != null) { sonTusMesaji = "🔗 Seçili: ${m.ifBlank { "(yazısız bağlantı)" }}"; return true }
+                sonTusMesaji = "Bu sayfada bağlantılar okunamadı; tarayıcının kendi yön tuşu kullanıldı."
+            }
+        } else if (t == "geri" || t == "ana_ekran") baglantiSecici.temizle()
+        return kumandaTusu(t)
+    }
+
     fun kumandaTusu(t: String): Boolean = when (t) {
         "ses_artir" -> !ses("artir", 1).has("hata")
         "ses_azalt" -> !ses("azalt", 1).has("hata")

@@ -371,8 +371,8 @@ class AsistanServisi : AccessibilityService(), GeminiLive.Dinleyici {
                 // Telefon sayfasındaki yön tuşları ve Tamam
                 "tus" -> yuk.optString("t").let { t ->
                     tusIsci.execute {
-                        val ok = try { araclar.kumandaTusu(t) } catch (e: Exception) { Log.w(ETIKET, "Telefon tuşu ($t): ${e.message}"); false }
-                        telefon?.olayGonder("tus_onay", org.json.JSONObject().put("t", t).put("ok", ok))
+                        val ok = try { araclar.kumandaTusu(t, yuk.optBoolean("bag", true)) } catch (e: Exception) { Log.w(ETIKET, "Telefon tuşu ($t): ${e.message}"); false }
+                        telefon?.olayGonder("tus_onay", org.json.JSONObject().put("t", t).put("ok", ok).apply { araclar.sonTusMesaji?.let { put("m", it) } })
                     }
                 }
                 // Telefon sayfasındaki klavye: yalnız EN SON metin işlenir (hızlı yazımda kuyruk birikmez)
